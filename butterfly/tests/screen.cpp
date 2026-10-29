@@ -7,6 +7,7 @@
 //   ./screen <session|idle|still|gif> [fps] [every]   (every: print one frame in that many)
 #include "../display.cpp"
 #include "../tables_data.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>

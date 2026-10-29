@@ -8,6 +8,7 @@
 // as the OP-XY would: full sustain while the note is held, then a release of
 // about 0.6 s (a time constant of 0.2 s). Voices are taken round-robin.
 #include "../engine.cpp"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
