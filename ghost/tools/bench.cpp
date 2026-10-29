@@ -39,7 +39,7 @@ int main() {
     const double ref = reference();
     // The default (Seance), and the heaviest setting: the stereo bed mixed in,
     // split past 3/4 (the fundamental's notch), beat, trade and orbit moving.
-    const double settings[2][8] = {{0.6, 0.6, 0.6, 0.4, 0.2, 0.2, 0.4, 0}, {0.7, 0.5, 1, 0.5, 0.6, 0.9, 0.6, 0.5}};
+    const double settings[2][8] = {{0.6, 0.6, 0.6, 0.4, 0.2, 0.2, 0.4, 0.5}, {0.7, 0.5, 1, 0.5, 0.6, 0.9, 0.6, 0.5}};
     const char* const labels[2] = {"default", "heaviest"};
     for (int k = 0; k < 2; ++k) {
         static opxy::i32 out[128], parameters[8];

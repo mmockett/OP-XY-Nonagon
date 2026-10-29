@@ -214,8 +214,8 @@ int main() {
         const double b = rms(left);
         check(a > 0.01 && b > 0.01, "the bed plays, and without a sample breath does");
     }
-    {   // A loaded sample tells at the defaults (bed at 0): the held note's
-        // third-octave spectrum moves by 8 dB or more on average.
+    {   // A loaded sample tells at the defaults (bed at 50%): the held note's
+        // third-octave spectrum moves by 6 dB or more on average.
         std::vector<double> bands[2];
         for (u32 k = 0; k < 2; ++k) {
             play({{0, 4, 57}}, presets[0].values, 4.3, left, right, k == 1, 0.05, 0.2);
@@ -228,7 +228,7 @@ int main() {
         double moved = 0;
         for (size_t i = 0; i < bands[0].size(); ++i) moved += std::fabs(bands[1][i] - bands[0][i]) / bands[0].size();
         std::printf("a loaded sample at the defaults moves the spectrum %.1f dB a third-octave\n", moved);
-        check(moved > 8, "a loaded sample changes the default sound");
+        check(moved > 6, "a loaded sample changes the default sound");
     }
     {   // Without a sample, bed is Ghost's own whisper: noisier, and in gusts.
         double v[8] = {0.6, 0.6, 0.6, 0, 0, 0, 0.5, 0};

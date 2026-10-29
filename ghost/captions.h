@@ -67,7 +67,7 @@ inline void fill(const Input& input, bool has_sample, char (&values)[8][header_c
     const u32 cm = near_cm(level(input.slots[kNear]));
     if (cm >= 100) { decimal(values[kNear], (cm + 5) / 10, 1); append(values[kNear], "m"); }
     else { put(values[kNear], cm); append(values[kNear], "cm"); }
-    // bed: the sample's share (40% at least), or without one the whisper's.
+    // bed: the sample's share, or without one the whisper's.
     percent(values[kBed], bed_share(level(input.slots[kBed]), has_sample));
 }
 }

@@ -27,10 +27,11 @@ Ghost is an OP-XY sample engine with stereo output, id `ghost`. It needs the
 SDK's sample-overview change, which gives sample engines their own screen and
 is still in review as
 [etcetc000/open-xy pull request 182](https://github.com/etcetc000/open-xy/pull/182).
-It plays without a sample, on breath and hum alone. A loaded sample always
-sets the resonators ringing, at least 60% of what excites them, and bed takes
-it to all of it, so the ghost takes on the recording's grain, envelope and
-colour; without one, bed is a whisper of Ghost's own.
+It plays without a sample, on breath and hum alone. A loaded sample sets the
+resonators ringing in its share of what excites them, bed's value: none at
+0%, half at the 50% default, all of it at 100%, so the ghost takes on the
+recording's grain, envelope and colour; without one, bed is a whisper of
+Ghost's own.
 
 **Status: experimental.** Ghost passes the SDK's tests and runs on an
 OP-XY, and its CPU figures (below) are estimates, not
@@ -56,32 +57,36 @@ Press any encoder to switch pages. Shift + turn makes fine steps.
 | beat | 0 to 6 Hz, curved (0.9 Hz at 25, 2.2 Hz at 50) | 0.7 Hz | `0.7Hz` | The right ear sharp by this much: a binaural beat on the fundamental, and on each harmonic its multiple. |
 | orbit | front; spread to 100%; then a circle from every minute down to every 2 s (14 s at 50) | 80% spread | `front`, `80%`, `2.0s` | Its first quarter spreads the notes from the front round your head. The rest circles them, close by the right ear and far on the left. |
 | near | 3 m to 10 cm, exponential | 76 cm | `3.0m`, `76cm`, `9cm` | Distance: far is quieter and much darker (4 octaves darker at 3 m); near is brighter, louder, and much louder in the facing ear, as a whisper at the ear is. |
-| bed | 0 to 100%, equal power | 0% | the share: `60%` to `100%` with a sample, `0%` to `100%` without | The loaded sample against breath and hum: 60% of what excites the resonators at 0, all of it at 100, so a loaded sample always tells. The hum gives way faster (as its share squared) and the vowel's formants thin, so the recording, not the hum, sets the note ringing, in its own colour. A little whitening (half its samples, at random, at 0.4) adds the grain that rings every harmonic of the note. With no sample, Ghost's own whisper from 0: white breath in gusts, a syllable every 60 to 250 ms, and the note comes and goes with them. |
+| bed | 0 to 100%, equal power | 50% | the share: `50%` with a sample at the default, `25%` without | The loaded sample against breath and hum: none of what excites the resonators at 0, half at 50, all of it at 100. The hum gives way faster (as its share to the fourth: a quarter at an even share) and the vowel's formants thin, so the recording, not the hum, sets the note ringing, in its own colour. A little whitening (half its samples, at random, at 0.4) adds the grain that rings every harmonic of the note. With no sample, Ghost's own whisper, rising as bed squared (a quarter at the default, all of it at 100): white breath in gusts, a syllable every 60 to 250 ms, and the note comes and goes with them. |
 
 Each control measured on a held A3, the others at the defaults (Seance)
 (`tools/controls.cpp`):
 
 | Control | 0 | 25 | 50 | 75 | 100 |
 | --- | --- | --- | --- | --- | --- |
-| ring: harmonic to noise | 12 dB | 15 dB | 19 dB | 20 dB | 22 dB |
-| ring: rise to within 3 dB of its level | 0 s | 0 s | 0.10 s | 0.40 s | 0.75 s |
-| voice: spectral centroid | 1128 Hz | 405 Hz | 595 Hz | 626 Hz | 396 Hz |
-| voice: harmonic to noise | 14 dB | 21 dB | 20 dB | 21 dB | 24 dB |
-| split: each of the first 8 harmonics louder in its own ear, at least (trade still) | −2.8 dB | +2.8 dB | +7.9 dB | +15.4 dB | +28.5 dB |
-| split: the fundamental against the third harmonic, in the odd ear | −11 dB | −9 dB | −7 dB | −6 dB | −20 dB |
-| trade: a full swap and back (beat still) | still | 12.2 s | 5.1 s | 2.5 s | 1.5 s (set) |
-| beat: the right ear above the left | 0 Hz | 0.94 Hz | 2.26 Hz | 3.94 Hz | 5.99 Hz |
-| orbit: where a note begun 67° right starts, as the left ear's delay | 0 (front) | +14 samples | +14 | (circling) | (circling) |
+| ring: harmonic to noise | 6 dB | 8 dB | 12 dB | 13 dB | 16 dB |
+| ring: rise to within 3 dB of its level (bed's gusts still) | 0 s | 0.05 s | 0.10 s | 0.15 s | 0.65 s |
+| voice: spectral centroid | 1199 Hz | 590 Hz | 726 Hz | 1020 Hz | 1400 Hz |
+| voice: harmonic to noise | 14 dB | 14 dB | 11 dB | 14 dB | 15 dB |
+| split: each of the first 8 harmonics louder in its own ear, at least (trade still) | −2.5 dB | +3.3 dB | +5.6 dB | +16.0 dB | +27.2 dB |
+| split: the fundamental against the third harmonic, in the odd ear | −16 dB | −12 dB | −10 dB | −7 dB | −19 dB |
+| trade: a full swap and back (beat and bed's gusts still) | still | 12.2 s | 5.1 s | 2.5 s | 1.5 s (set) |
+| beat: the right ear above the left | 0 Hz | 0.96 Hz | 2.32 Hz | 3.98 Hz | 5.95 Hz |
+| orbit: where a note begun 67° right starts, as the left ear's delay | 0 (front) | +14 samples | +13 | (circling) | (circling) |
 | orbit: a circle (set) | none | none | 14 s | 4.3 s | 2.0 s |
-| orbit: how far the left ear's delay travels over 4 s | 0 | 1 sample | 25 samples | 30 | 30 |
-| near: level (a note at the right; split and trade still) | −31.3 dBFS | −26.5 | −24.7 | −24.1 | −22.9 |
-| near: right over left | +9.4 dB | +7.4 | +6.0 | +8.7 | +13.7 |
-| near: spectral centroid | 596 Hz | 695 Hz | 715 Hz | 720 Hz | 736 Hz |
-| bed, no sample: harmonic to noise | 21 dB | 14 dB | 12 dB | 12 dB | 12 dB |
-| bed, no sample: how far the level swells and sinks (25 ms, 10th to 90th percentile) | 4.2 dB | 4.6 dB | 5.7 dB | 7.8 dB | 8.7 dB |
-| bed, no sample: spectral centroid | 716 Hz | 858 Hz | 898 Hz | 965 Hz | 933 Hz |
-| bed, a recorded voice loaded (its share 60 to 100%): harmonic to noise | 8 dB | 5 dB | 9 dB | 9 dB | 2 dB |
-| bed, a recorded voice loaded: spectral centroid | 694 Hz | 774 Hz | 726 Hz | 714 Hz | 699 Hz |
+| orbit: how far the left ear's delay travels over 4 s | 0 | 2 samples | 25 samples | 29 | 30 |
+| near: level (a note at the right; split and trade still) | −32.2 dBFS | −26.4 | −24.1 | −23.8 | −22.3 |
+| near: right over left | +10.2 dB | +7.5 | +7.0 | +9.8 | +13.8 |
+| near: spectral centroid | 689 Hz | 853 Hz | 816 Hz | 826 Hz | 927 Hz |
+| bed, no sample (the whisper's share 0, 6, 25, 56, 100%): harmonic to noise | 21 dB | 17 dB | 13 dB | 12 dB | 12 dB |
+| bed, no sample: how far the level swells and sinks (25 ms, 10th to 90th percentile) | 4.2 dB | 3.9 dB | 4.7 dB | 7.0 dB | 8.7 dB |
+| bed, no sample: spectral centroid | 716 Hz | 753 Hz | 872 Hz | 964 Hz | 933 Hz |
+| bed, a recorded voice loaded (its share 0 to 100%): harmonic to noise | 21 dB | 14 dB | 10 dB | 6 dB | 9 dB |
+| bed, a recorded voice loaded: spectral centroid | 726 Hz | 677 Hz | 765 Hz | 767 Hz | 795 Hz |
+
+The other controls are measured at the defaults, bed's whisper at its
+quarter share included; ring's rise and trade's swaps with its gusts
+still, which would hide them.
 
 `tools/controls.cpp --fifths` measures each at 21 points and finds its
 flattest fifth of travel. Each control moves through at least one of its
@@ -95,46 +100,46 @@ envelope (`machine.json`) has a gentle attack and a long release, for pads.
 ## Presets
 
 "Chord" is the peak of an eight-note chord (C3 E3 G3 B3 D4 F#4 A4 C5) struck
-together, where 1.0 is full scale.
+together, where 1.0 is full scale, with no sample and with one.
 
 | Preset | Role | Sound | Chord |
 | --- | --- | --- | --- |
-| Seance | The init sound: a haunted pad | A sung "ah", 2 s ring, harmonics split 60% and trading every 7 s, a 0.7 Hz beat, the notes spread round you | 0.75 |
-| Whisper | Whispers at your ears | Breath alone, a short ring (a pitched whisper), each note in its own place, 12 cm away | 0.86 |
-| Choir | A choir from nowhere | A sung "oh", long ring, split 80%, the voices circling slowly, at a distance | 0.56 |
-| Revenant | A drone | "oo", 10 s ring, a 2.2 Hz beat breathing between the ears, held in front | 0.60 |
-| Wraith | A presence that circles | Breath turning to "oo", circling every 3.1 s and passing close | 0.83 |
-| Skull | The note that isn't there | "eh", the fundamental gone, the halves trading every 8.4 s: a melody heard only between the ears | 0.69 |
-| Glass | Ringing, bell-like | "ee", 8 s ring, a slight beat: a glass harmonica | 0.61 |
-| Haunting | A recording, as an apparition | The bed at full, rung at the note, split 70%, spread and drifting; with no sample, a whispering ghost | 0.61 |
+| Seance | The init sound: a haunted pad | A sung "ah", 2 s ring, harmonics split 60% and trading every 7 s, a 0.7 Hz beat, the notes spread round you; bed at half | 0.69 / 0.56 |
+| Whisper | Whispers at your ears | Breath alone, a short ring (a pitched whisper), each note in its own place, 12 cm away; bed at half | 0.87 / 0.81 |
+| Choir | A choir from nowhere | A sung "oh", long ring, split 80%, the voices circling slowly, at a distance; bed at half | 0.53 / 0.37 |
+| Revenant | A drone | "oo", 10 s ring, a 2.2 Hz beat breathing between the ears, held in front; bed at 40% | 0.59 / 0.66 |
+| Wraith | A presence that circles | Breath turning to "oo", circling every 3.1 s and passing close; bed at half | 0.72 / 0.72 |
+| Skull | The note that isn't there | "eh", the fundamental gone, the halves trading every 8.4 s: a melody heard only between the ears; bed at half | 0.74 / 0.69 |
+| Glass | Ringing, bell-like | "ee", 8 s ring, a slight beat: a glass harmonica; bed at 40%, to keep it clear | 0.64 / 0.67 |
+| Haunting | A recording, as an apparition | The bed at full, rung at the note, split 70%, spread and drifting; with no sample, a whispering ghost | 0.74 / 0.67 |
 
-Every preset, measured on a held A3 (`tools/measure.cpp`):
+Every preset with no sample, measured on a held A3 (`tools/measure.cpp`):
 
 | Preset | Level (dBFS RMS) | Crest | Harmonic to noise | Centroid | Mono fold-down | Its worst third-octave | Coherence between the ears, now |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Seance | −26.7 | 14.0 dB | 21 dB | 688 Hz | −3.2 dB | −3.5 dB | 0.07 |
-| Whisper | −25.4 | 15.4 dB | 8 dB | 1680 Hz | −3.0 dB | −5.0 dB | 0.66 |
-| Choir | −25.8 | 10.7 dB | 23 dB | 469 Hz | −2.9 dB | −4.2 dB | 0.40 |
-| Revenant | −24.3 | 7.2 dB | 26 dB | 258 Hz | −3.0 dB | −3.0 dB | 0.10 |
-| Wraith | −25.8 | 14.2 dB | 13 dB | 842 Hz | −2.4 dB | −3.9 dB | 0.29 |
-| Skull | −24.7 | 8.9 dB | 21 dB | 589 Hz | −2.0 dB | −3.0 dB | 0.22 |
-| Glass | −25.4 | 9.3 dB | 29 dB | 284 Hz | −2.8 dB | −3.6 dB | 0.74 |
-| Haunting | −27.0 | 13.3 dB | 11 dB | 689 Hz | −2.0 dB | −4.4 dB | 0.40 |
+| Seance | −26.7 | 16.3 dB | 14 dB | 827 Hz | −4.0 dB | −4.3 dB | 0.22 |
+| Whisper | −25.4 | 15.9 dB | 8 dB | 1903 Hz | −3.0 dB | −5.0 dB | 0.66 |
+| Choir | −25.4 | 15.0 dB | 15 dB | 631 Hz | −3.1 dB | −4.9 dB | 0.39 |
+| Revenant | −24.8 | 9.6 dB | 18 dB | 364 Hz | −2.8 dB | −2.9 dB | 0.08 |
+| Wraith | −26.2 | 15.8 dB | 11 dB | 1194 Hz | −2.2 dB | −3.9 dB | 0.44 |
+| Skull | −25.0 | 11.8 dB | 14 dB | 1052 Hz | −1.8 dB | −2.6 dB | 0.22 |
+| Glass | −25.5 | 12.6 dB | 22 dB | 526 Hz | −2.7 dB | −3.8 dB | 0.72 |
+| Haunting | −25.5 | 14.0 dB | 12 dB | 719 Hz | −2.1 dB | −4.2 dB | 0.26 |
 
-With a sample loaded, each preset's held A3 against none, at bed 0: the
-average third-octave move shows how far the sample changes it. Two samples:
+With a sample loaded, each preset's held A3 against none, at its own bed:
+the average third-octave move shows how far the sample changes it. Two samples:
 a breathy, wordless voice (close to Ghost's own breath), and a loop of kick,
 hats and a tone.
 
 | Preset | Level, none / the voice (dBFS) | Centroid, none / the voice | Harmonic to noise, none / the voice | Third-octave move, the voice | Third-octave move, the loop |
 | --- | --- | --- | --- | --- | --- |
-| Seance | −26.6 / −27.7 | 707 / 624 Hz | 16 / 6 dB | 13.8 dB | 19.0 dB |
-| Whisper | −25.3 / −26.8 | 1707 / 1270 Hz | 8 / 4 dB | 3.0 dB | 6.7 dB |
-| Choir | −27.6 / −27.7 | 376 / 564 Hz | 15 / 7 dB | 18.3 dB | 19.4 dB |
-| Revenant | −24.5 / −25.7 | 290 / 488 Hz | 7 / 5 dB | 17.7 dB | 21.1 dB |
-| Wraith | −26.1 / −26.4 | 842 / 755 Hz | 9 / 6 dB | 4.4 dB | 6.9 dB |
-| Skull | −25.0 / −26.0 | 554 / 735 Hz | 18 / 9 dB | 10.3 dB | 18.9 dB |
-| Glass | −24.5 / −25.6 | 302 / 636 Hz | 9 / 8 dB | 16.1 dB | 19.0 dB |
+| Seance | −26.7 / −27.9 | 828 / 680 Hz | 14 / 6 dB | 9.3 dB | 14.5 dB |
+| Whisper | −25.4 / −26.5 | 1965 / 1340 Hz | 8 / 5 dB | 2.8 dB | 6.4 dB |
+| Choir | −27.5 / −28.2 | 515 / 602 Hz | 14 / 7 dB | 12.6 dB | 14.6 dB |
+| Revenant | −24.7 / −26.0 | 438 / 469 Hz | 8 / 5 dB | 9.2 dB | 13.3 dB |
+| Wraith | −26.4 / −26.3 | 1137 / 798 Hz | 10 / 7 dB | 4.7 dB | 6.9 dB |
+| Skull | −24.9 / −26.4 | 1022 / 756 Hz | 14 / 8 dB | 6.6 dB | 14.9 dB |
+| Glass | −25.1 / −26.3 | 567 / 586 Hz | 10 / 8 dB | 9.8 dB | 12.8 dB |
 | Haunting | −27.4 / −25.4 | 742 / 716 Hz | 12 / 5 dB | 9.6 dB | 15.9 dB |
 
 Whisper and Wraith are breath, so a breathy recording changes them least;
@@ -197,11 +202,12 @@ caches its period and loop response.
 A follower holds every setting, pitch and bed near Hexagon's level, about
 −24 dBFS RMS a voice. It falls fast, rises slowly and moves at most 18 dB.
 The excitation is scaled by the loop's true gain at the note, so the lines
-never clip. Every preset's held A3 is within 3 dB of Hexagon's level (the
-table above); trade moves it a little, since each ear's head shadow takes
-more from the half with the higher harmonics. Breath sits 2.6 dB lower than song because it peaks higher and
-sounds louder at the same power. An eight-note chord peaks at 0.56 to 0.86
-of full scale.
+never clip. Every preset's held A3 is within 3 dB of Hexagon's level, with
+a sample or without (the tables above); trade moves it a little, since each
+ear's head shadow takes more from the half with the higher harmonics. Breath
+sits 2.6 dB lower than song, and a recording up to 1.5 dB lower, because
+they peak higher and sound louder at the same power. An eight-note chord
+peaks at 0.53 to 0.87 of full scale, and 0.37 to 0.81 with a sample.
 
 ## Screen
 
@@ -366,8 +372,8 @@ Not yet checked on the device:
 - **Captions:** every value each control can show, and every title, fits its
   header column in the device's face (values within 53 px at 20 px, titles
   within 56 px at 10 px; `tests/header_font.h`, from `tools/header_font.py`).
-- **A loaded sample** changes the default sound (Seance, bed at 0): its
-  third-octave spectrum moves at least 8 dB on average (11.4 dB as tested).
+- **A loaded sample** changes the default sound (Seance, bed at 50%): its
+  third-octave spectrum moves at least 6 dB on average (6.8 dB as tested).
   Every preset also passes the level and chord checks with a sample loaded.
 - **bed, the pool and mono:** the bed plays, and breath plays without one;
   without a sample, bed at full is at least 5 dB noisier and swells and

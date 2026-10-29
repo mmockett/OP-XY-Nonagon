@@ -108,7 +108,7 @@ struct Session {
         std::memset(&state, 0, sizeof state);
         std::memset(&frame, 0, sizeof frame);
         std::memset(&input, 0, sizeof input);
-        const double defaults[8] = {0.6, 0.6, 0.6, 0.4, 0.2, 0.2, 0.4, 0};   // definition.json's defaults (Seance)
+        const double defaults[8] = {0.6, 0.6, 0.6, 0.4, 0.2, 0.2, 0.4, 0.5};   // definition.json's defaults (Seance)
         for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
         for (u32 i = 0; i < 4; ++i) { input.shown[i] = opxy::u8(i); input.parameters[i] = input.slots[i]; }
         input.track = 1;

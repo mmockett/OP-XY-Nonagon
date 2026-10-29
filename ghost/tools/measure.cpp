@@ -1,19 +1,22 @@
 // Measures every preset as ears would hear it: a held A3 (level, crest,
 // spectral centroid, harmonic-to-noise, interaural coherence and phase by
-// band, the mono fold-down) and an eight-note chord's peak.
-//   clang++ -std=c++11 -O2 -I<sdk>/sdk/include tools/measure.cpp -o measure && ./measure
+// band, the mono fold-down) and an eight-note chord's peak. With no sample,
+// or with --sample the recorded voice tests/analysis.h makes.
+//   clang++ -std=c++11 -O2 -I<sdk>/sdk/include tools/measure.cpp -o measure && ./measure [--sample]
 #include "../tests/analysis.h"
 #include <cstdio>
+#include <cstring>
 
-int main() {
+int main(int argc, char** argv) {
     using namespace measure;
+    const bool with_sample = argc > 1 && !std::strcmp(argv[1], "--sample");
     std::printf("%-9s %7s %6s %6s %7s %6s %7s %7s %6s | coherence (phase) by octave band: 110 220 440 880 1760 3520\n",
                 "preset", "RMS dB", "crest", "HNR", "centre", "mono", "dip", "chord", "dB");
     std::printf("  (RMS: the ears' mean power, held A3; crest: peak over RMS; HNR to 5 kHz; mono: the fold-down's level against the ears; dip: its worst third-octave; chord: an 8-note chord's peak and RMS; now: short-window coherence)\n");
     for (const Preset& p : presets) {
         std::vector<double> left, right;
         const double f0 = 220;
-        play({{0, 6, 57}}, p.values, 6.5, left, right, p.values[7] > 0, 0.05, 0.3);
+        play({{0, 6, 57}}, p.values, 6.5, left, right, with_sample, 0.05, 0.3);
         const size_t from = size_t(2.0 * fs);                       // after ring's swell
         std::vector<double> l(left.begin() + from, left.begin() + size_t(6 * fs)), r(right.begin() + from, right.begin() + size_t(6 * fs));
         Spectra s(l, r, 8192);
@@ -35,7 +38,7 @@ int main() {
         std::vector<Note> chord;
         const int notes[8] = {48, 52, 55, 59, 62, 66, 69, 72};
         for (int n : notes) chord.push_back({0, 3, double(n)});
-        play(chord, p.values, 3.5, cl, cr, p.values[7] > 0, 0, 0.3);
+        play(chord, p.values, 3.5, cl, cr, with_sample, 0, 0.3);
         const double chord_peak = std::fmax(peak(cl), peak(cr));
         std::printf("%-9s %7.1f %6.1f %6.1f %6.0fHz %+6.1f %+7.1f %7.2f %6.1f |", p.name, level, crest, hnr, centre, mono,
                     worst_fold_dip(s), chord_peak, 10 * std::log10((rms(cl) * rms(cl) + rms(cr) * rms(cr)) / 2));

@@ -83,7 +83,7 @@
     {
       "id": "bed",
       "label": "bed",
-      "default": 0,
+      "default": 0.5,
       "mapping": {
         "kind": "linear",
         "minimum": 0,
@@ -101,7 +101,7 @@
       "beat": 0.2,
       "orbit": 0.2,
       "near": 0.4,
-      "bed": 0
+      "bed": 0.5
     },
     "Whisper": {
       "ring": 0.25,
@@ -111,7 +111,7 @@
       "beat": 0.0,
       "orbit": 0.22,
       "near": 0.95,
-      "bed": 0
+      "bed": 0.5
     },
     "Choir": {
       "ring": 0.75,
@@ -121,7 +121,7 @@
       "beat": 0.11,
       "orbit": 0.5,
       "near": 0.3,
-      "bed": 0
+      "bed": 0.5
     },
     "Revenant": {
       "ring": 0.95,
@@ -131,7 +131,7 @@
       "beat": 0.49,
       "orbit": 0.0,
       "near": 0.5,
-      "bed": 0
+      "bed": 0.4
     },
     "Wraith": {
       "ring": 0.5,
@@ -141,7 +141,7 @@
       "beat": 0.07,
       "orbit": 0.85,
       "near": 0.6,
-      "bed": 0
+      "bed": 0.5
     },
     "Skull": {
       "ring": 0.7,
@@ -151,7 +151,7 @@
       "beat": 0.0,
       "orbit": 0.0,
       "near": 0.5,
-      "bed": 0
+      "bed": 0.5
     },
     "Glass": {
       "ring": 0.9,
@@ -161,7 +161,7 @@
       "beat": 0.16,
       "orbit": 0.15,
       "near": 0.5,
-      "bed": 0
+      "bed": 0.4
     },
     "Haunting": {
       "ring": 0.7,

@@ -53,10 +53,11 @@ inline u32 orbit_mhz(u32 orbit) {
     const u32 x = (orbit - 16384) * 4 / 3;                    // 0..65535
     return 17u + (((x * x) >> 16) * 483u >> 16);
 }
-// bed: with a sample loaded, its share of what excites the resonators: at
-// least 60%, so a loaded sample always tells, and bed takes it to 100%.
-// Without one, bed is the share of Ghost's own whisper, from 0. Q16.
-inline u32 bed_share(u32 bed, bool sampled) { return sampled ? 39322u + (bed * 26214u >> 16) : bed; }
+// bed: its share of what excites the resonators, Q16. With a sample loaded,
+// the sample's share, bed itself: none at 0, all at 100. Without one, the
+// share of Ghost's own whisper, rising as bed squared, so the default (50%)
+// keeps the plain breath and hum mostly clear of it.
+inline u32 bed_share(u32 bed, bool sampled) { return sampled ? bed : (bed * bed) >> 16; }
 // near: the apparition's distance, 3 m down to 10 cm (at the ear), in cm.
 inline u32 near_cm(u32 near) { return 300u * (exp2_q16(-i32(near * 5025u >> 10)) >> 2) >> 14; }
 

@@ -428,16 +428,17 @@ void render_sample(Voice& voice, const opxy::SampleBlock& block) {
     const u32 begin = block.region.begin;
     const u32 end = block.region.end < voice.sample.frames ? block.region.end : voice.sample.frames;
     const bool sampled = voice.sample.data && end >= begin + 8;
-    const u32 share = bed_share(bed, sampled);                         // a loaded sample takes 40% at least
+    const u32 share = bed_share(bed, sampled);                         // the sample's, or the whisper's
     const i32 own_share = share ? cosine(share << 14) : 32767;         // bed takes over from breath and hum
     // The hum, coherent at the note, builds in the resonators far more than
-    // anything broadband, so it gives way faster: as its share squared, and
-    // the sample, not the hum, sets them ringing.
-    const i32 hum_share = (own_share * own_share) >> 15;
+    // anything broadband, so it gives way faster: as its share to the fourth
+    // (a quarter at an even share), and the sample, not the hum, sets them
+    // ringing.
+    const i32 own_squared = (own_share * own_share) >> 15, hum_share = (own_squared * own_squared) >> 15;
     ex.breath = (((noise_in * (32767 - ((w * 22938) >> 15))) >> 15) * own_share) >> 16;   // 1 - 0.7 w, halved
     ex.hum = (((pulse_in * ((w * 27852) >> 15)) >> 15) * hum_share) >> 15;             // 0.85 w
     ex.bed = ex.whisper = 0;
-    if (bed && !sampled) {
+    if (share && !sampled) {
         // No sample: a whisper of its own, white breath in gusts, a syllable
         // every 60 to 250 ms at its own strength, a quarter of them silent.
         if (!(--voice.gust_next & 0xffff)) {
@@ -446,11 +447,11 @@ void render_sample(Voice& voice, const opxy::SampleBlock& block) {
             voice.gust_next = target << 16 | (40 + (r & 127));
         }
         voice.gust += (i32(voice.gust_next >> 16) - voice.gust) >> 3;
-        ex.whisper = ((((sine(bed << 14) * noise_in) >> 15) * voice.gust) >> 15) * 3 >> 1;   // white is brighter than breath
+        ex.whisper = ((((sine(share << 14) * noise_in) >> 15) * voice.gust) >> 15) * 3 >> 1;   // white is brighter than breath
     }
     // And the note itself comes in those gusts: up to 70% of its level rides
     // them, made up so its average holds.
-    const i32 gusting = bed && !sampled ? i32((bed * 22938u) >> 16) : 0;     // Q15
+    const i32 gusting = share && !sampled ? i32((share * 22938u) >> 16) : 0; // Q15
     const i32 gusts = 32768 - gusting + ((gusting * voice.gust) >> 15) + (gusting >> 1);   // Q15
     if (share && sampled) {
         const u32 volume = block.region.level >> 12;                   // Q15, unity 32768

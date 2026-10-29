@@ -11,7 +11,7 @@
 
 namespace {
 using namespace measure;
-const double seance[8] = {0.6, 0.6, 0.6, 0.4, 0.2, 0.2, 0.4, 0};
+const double seance[8] = {0.6, 0.6, 0.6, 0.4, 0.2, 0.2, 0.4, 0.5};
 
 // One voice held for seconds, its start angle set, into left and right.
 void hold(const double* values, double seconds, std::vector<double>& left, std::vector<double>& right,
@@ -78,7 +78,7 @@ double centroid(double from) { Spectra s(tail(l, from), tail(r, from), 8192); re
 struct Measure { const char* name; const char* unit; std::function<double(double)> f; };
 const Measure measures[] = {
     {"ring: harmonic to noise", "dB", [](double v) { hold(at(0, v), 5, l, r); return hnr(2); }},
-    {"ring: rise to within 3 dB of its level (both ears)", "s", [](double v) { hold(at(0, v), 5, l, r);
+    {"ring: rise to within 3 dB of its level (both ears; bed's gusts still)", "s", [](double v) { double* p = const_cast<double*>(at(0, v)); p[7] = 0; hold(p, 5, l, r);
         const double final_db = power_db(tail(l, 4), tail(r, 4));
         for (size_t t = 0; t + 2205 < l.size(); t += 2205) {
             const std::vector<double> a(l.begin() + t, l.begin() + t + 2205), b(r.begin() + t, r.begin() + t + 2205);
@@ -95,7 +95,7 @@ const Measure measures[] = {
     {"split: the fundamental against the third harmonic, in the odd ear", "dB", [](double v) {
         double p[8]; std::copy(seance, seance + 8, p); p[2] = v; p[3] = 0; hold(p, 4, l, r);
         Spectra s(tail(l, 2), tail(r, 2), 16384); return 10 * std::log10(s.harmonic(s.right, 220, 1) / s.harmonic(s.right, 220, 3)); }},
-    {"trade: a full swap and back, measured with beat still (0: still)", "s", [](double v) { double* p = const_cast<double*>(at(3, v)); p[4] = 0; hold(p, 54, l, r);
+    {"trade: a full swap and back, measured with beat and bed's gusts still (0: still)", "s", [](double v) { double* p = const_cast<double*>(at(3, v)); p[4] = 0; p[7] = 0; hold(p, 54, l, r);
         // Crossings from even-left (above +3 dB) to odd-left (below -3 dB), with hysteresis.
         double first = -1; int side = 0;
         for (double t = 1.0; t < 53.5; t += 0.05) {
