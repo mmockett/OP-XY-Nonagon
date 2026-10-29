@@ -24,8 +24,8 @@ spectrum that never settles: the thermalized chain, tilted so it is lush
 rather than white. With damping, the high partials die first and a note
 settles toward its struck mode, as a string's does.
 
-**Status: experimental.** Fermi passes the SDK's tests but has not yet been
-played on an OP-XY. Its CPU figures are estimates, not measurements on the
+**Status: experimental.** Fermi passes the SDK's tests and runs on an
+OP-XY. Its CPU figures are estimates, not measurements on the
 device.
 
 ## Controls
@@ -192,6 +192,14 @@ at 1:1, each cell 480 × 220 like the screen. The artwork is drawn for that
 size: no part under about 3 px, no lines closer than 3 px, and no lettering
 of its own.
 
+It is drawn for the device's renderer too, which merges an outline's
+neighbouring points within an eighth of a pixel, draws a closing edge under
+a quarter of a pixel as a sliver, and streaks an outline with no area. Every
+line is a closed ribbon, started on its longest edge. A coil's ribbon is a
+pixel wide with a straight lead at each end, so its ends stay a fifth of a
+pixel across at the smallest a coil is drawn, and the bobs never grow so big
+that the coils between them shrink below 6.4 px.
+
 The screen cannot hear the voices. It runs its own copy of the latest note's
 chain with the same code (`chain.h`), a block of time at a time. With the
 controls still it is the same chain, step for step, even in chaos:
@@ -206,7 +214,7 @@ so the chain never tears, however the budget falls. The idle screen is still.
 **Churn** (host, the GIF's 31 s scene): a mean of 8.9 nodes a frame at
 60 fps and 10.4 at 30 fps, peaking at 20 at a note-on or a change of masses.
 The swinging pendulum is 2 of those a frame. Idle: 0. The artwork has 15
-static paths and 115 nodes, and is 39 KB (the preview's limit is 64 KiB).
+static paths and 115 nodes, and is 41 KB (the preview's limit is 64 KiB).
 
 ## How it works
 
@@ -327,7 +335,7 @@ That is about 14,300, and 14,900 at most. A note's first block costs about
 for every note that shares it (about 1,400 instructions, when the seed,
 masses or mode change). Ten voiced partials are what fit this budget.
 
-- `sdk.py test --firmware` compiles for the Blackfin: Fermi is 89.5 KiB of
+- `sdk.py test --firmware` compiles for the Blackfin: Fermi is 89.6 KiB of
   the 2040 KiB module region.
 - There is no division per sample, and one per block (the tilt's gain).
 - **Memory:** a voice is 556 bytes, the voices' shared starting shape 140
@@ -363,6 +371,16 @@ masses or mode change). Ten voiced partials are what fit this budget.
 `tests/screen.cpp` checks:
 - every frame is valid through all masses, mode and energy settings, the
   control corners and a 2-minute note;
+- every frame is drawn as the device draws it: no outline it shows, at the
+  size and turn its node gives it, merges points, closes over a sliver or
+  has no area. It runs over every frame of its scenes and a sweep of each
+  control through a note (6,688 frames), from each node's outline as
+  `tools/make_panel.py` writes it to `tests/outlines.h`;
+- every caption fits its column in the device's face, Univers Next Pro
+  Light (its advance widths in `tests/widths.h`, from `tools/make_widths.py`):
+  a value at 20 px within 53 px and a title at 10 px within 56, over 1.2
+  million captions from a fine sweep of the controls. The widest is −503c at
+  50.6 px;
 - the idle screen is still;
 - churn;
 - the screen's chain matches the voice's.
@@ -386,7 +404,8 @@ clock and voices the energy flow between its modes.
 | `chain.h` | The chain, integrator, damping, projections and the controls' mappings, shared by engine and screen |
 | `core.h`, `engine.cpp` | Voice state and the render: tilt, body, partials |
 | `tables.h` | Mode shapes, dispersion, calibration, tilt, roots, the body and sine waves (`tools/make_tables.py`) |
-| `display.h`, `display.cpp`, `panel.svg.fragment` | The apparatus (`tools/make_panel.py`) |
+| `display.h`, `display.cpp`, `panel.svg.fragment` | The apparatus (`tools/make_panel.py`, which also writes `tests/outlines.h`) |
+| `tools/make_widths.py` | `tests/widths.h`: the header face's advance widths, for the captions' check |
 | `tools/calibrate.py`, `tools/calibration.json` | The energy knob's and the clock's calibration |
 | `tests/sound.cpp`, `tests/screen.cpp` | Host checks |
 | `tools/render.cc`, `tools/phrases.py`, `tools/sweep.py`, `tools/measure.py` | Phrase renders, Hexagon comparisons, the control sweep and the measurements |

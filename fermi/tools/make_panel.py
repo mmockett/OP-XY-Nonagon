@@ -68,6 +68,11 @@ def num(v, places=4):
 
 
 def outline(points, places=2):
+    """A closed outline, started where its longest edge closes it: the device
+    draws a short closing edge as a sliver."""
+    n = len(points)
+    longest = max(range(n), key=lambda i: math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]))
+    points = points[longest:] + points[:longest]
     return "M" + " L".join(f"{num(x, places)},{num(y, places)}" for x, y in points) + " Z"
 
 
@@ -152,15 +157,19 @@ for q in range(4):
     out.append(path(outline(pts, 1), "none", GHOST_GREY, 0.5, node=GHOST + q, at=(cx, ROW_Y)))
 
 # ---- The coils. A conical spring (quadratic: it stiffens one way) and a
-# straight, tall one (cubic: alike both ways), about the origin.
+# straight, tall one (cubic: alike both ways), about the origin, each with a
+# straight lead at either end. Their ribbon is a pixel wide, and the leads
+# end it square, so its ends stay a fifth of a pixel across at the smallest a
+# coil is drawn (6.4 px long, a fifth of its size here) at any turn:
+# narrower, the device would merge them into a streak.
 def coil(radius_at, turns):
-    pts = [(-COIL / 2, 0)]
+    pts = [(-COIL / 2, 0), (-COIL / 2 + 3, 0)]
     for i in range(1, 2 * turns):
         t = i / (2 * turns)
         x = -COIL / 2 + 3 + (COIL - 6) * t
         pts.append((x, (-1 if i % 2 else 1) * radius_at(t)))
-    pts += [(COIL / 2, 0)]
-    return outline(ribbon(pts, 0.3), 1)
+    pts += [(COIL / 2 - 3, 0), (COIL / 2, 0)]
+    return outline(ribbon(pts, 1.0), 1)
 
 
 cone_d = coil(lambda t: 0.8 + 4.4 * t, 3)
@@ -199,8 +208,8 @@ out.append(path(outline(lever, 1), "none", FRAME, FINE, node=DAMPER, at=PIVOT))
 
 # ---- The seed's pin: a pin with a round head and a paper flag, its point
 # pressing the bob the seed nudges hardest.
-head = [(3.4 * math.sin(t), -27 + 3.4 * math.cos(t)) for t in [0.1 + (2 * math.pi - 0.2) * i / 19 for i in range(20)]]
-pin = [(0, 0), (0.4, -3), (0.4, -12), (9, -13), (9, -20), (0.4, -21), (0.4, -23.6)] + head + [(-0.4, -23.6), (-0.4, -3)]
+head = [(3.4 * math.sin(t), -27 + 3.4 * math.cos(t)) for t in [0.12 + (2 * math.pi - 0.24) * i / 19 for i in range(20)]]
+pin = [(0, 0), (0.4, -3), (0.4, -12), (9, -13), (9, -20), (0.4, -21)] + head + [(-0.4, -3)]   # the shaft runs into the head
 out.append(path(outline(pin, 1), "none", CHAIN, BOLD, node=PIN, at=(640, 320)))
 
 # The palette, parked off screen.
@@ -211,3 +220,71 @@ out.append("</g>")
 (ROOT / "panel.svg.fragment").write_text("\n".join(out) + "\n")
 static = sum(1 for s in out if s.startswith(("<path", "<circle")) and "_node_" not in s and "_palette_" not in s)
 print("wrote panel.svg.fragment:", static, "static paths")
+
+
+# ---- Each outline as the device draws it. It merges neighbouring points
+# within an eighth of a pixel, draws a closing edge under a quarter of a pixel
+# as a sliver, and streaks an outline with no area (traced out and back, or
+# turning straight back at a point). The static outlines are checked here;
+# tests/outlines.h gives tests/screen.cpp the nodes' outlines, which it
+# checks as every frame places them.
+def points_of(element):
+    d = element.split(' d="', 1)[1].split('"', 1)[0]
+    pts = []
+    for token in d.replace("M", " ").replace("L", " ").replace("Z", " ").split():
+        x, y = token.split(",")
+        pts.append((float(x), float(y)))
+    return pts
+
+
+def faults(pts):
+    """The device's three faults in an outline, px; [] if none."""
+    found = []
+    n = len(pts)
+    for i in range(n - 1):
+        if abs(pts[i + 1][0] - pts[i][0]) < 0.125 and abs(pts[i + 1][1] - pts[i][1]) < 0.125:
+            found.append(f"points {i} and {i + 1} merge")
+            break
+    if n > 2 and max(abs(pts[0][0] - pts[-1][0]), abs(pts[0][1] - pts[-1][1])) < 0.25:
+        found.append("its closing edge is under a quarter of a pixel")
+    area = 0.5 * abs(sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1] for i in range(n)))
+    if area < 0.05:
+        found.append(f"it has no area ({area:.3f} px^2)")
+    for i in range(n):
+        a, b, c = pts[i - 1], pts[i], pts[(i + 1) % n]
+        u, v = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
+        lu, lv = math.hypot(*u), math.hypot(*v)
+        if lu and lv and (u[0] * v[0] + u[1] * v[1]) / (lu * lv) < -0.995:
+            found.append(f"it turns straight back at point {i}")
+            break
+    return found
+
+
+bad = 0
+for element in out:
+    if element.startswith("<path") and "_node_" not in element and "_palette_" not in element:
+        for f in faults(points_of(element)):
+            print("static outline:", f, element[:80])
+            bad += 1
+nodes = {}
+for element in out:
+    if element.startswith("<path") and "_node_" in element:
+        nodes[int(element.split("_node_")[1].split('"')[0])] = points_of(element)
+flat, index = [], []
+for node in sorted(nodes):
+    index.append((node, len(flat) // 2, len(nodes[node])))
+    for x, y in nodes[node]:
+        flat += [x, y]
+header = ["// Written by tools/make_panel.py: every node's outline in panel.svg.fragment, px,",
+          "// for tests/screen.cpp's check of the frames as the device draws them.",
+          "#pragma once", "namespace outlines {",
+          "struct Outline { unsigned node, first, count; };",
+          f"const Outline nodes[{len(index)}] = {{" + ", ".join(f"{{{n}, {a}, {c}}}" for n, a, c in index) + "};",
+          f"const double points[{len(flat)}] = {{"]
+for i in range(0, len(flat), 12):
+    header.append("    " + ", ".join(num(v) for v in flat[i:i + 12]) + ",")
+header += ["};", "}", ""]
+(ROOT / "tests" / "outlines.h").write_text("\n".join(header))
+print("wrote tests/outlines.h:", len(index), "node outlines;", bad, "static outlines break the device's rules")
+if bad:
+    raise SystemExit(1)

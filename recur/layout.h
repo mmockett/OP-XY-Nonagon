@@ -8,13 +8,13 @@ namespace recur {
 const opxy::u32 small_first = 8, large_first = 72;
 // The share of its size a tile's print pieces take, Q10, by grid (2, 4, 8): inside its square.
 const opxy::i32 tile_fit[3] = {899, 765, 736};
-const opxy::u32 print_first[6] = {76, 102, 122, 141, 160, 180}, print_count[6] = {26, 20, 19, 19, 20, 16};
-const opxy::u32 pin_first = 196, pin_count = 16, bar_first = 212, bar_count = 20,
-                lever_node = 232, teeth_first = 233, teeth = 7,
-                rod_node = 240, weight_node = 241, jaw_first = 242,
-                cover_stage = 244, cover_hint = 245, node_total = 246;
+const opxy::u32 print_first[6] = {76, 102, 122, 141, 160, 180}, print_count[6] = {26, 20, 19, 19, 20, 22};
+const opxy::u32 pin_first = 202, pin_count = 16, bar_first = 218, bar_count = 20,
+                lever_node = 238, teeth_first = 239, teeth = 7,
+                rod_node = 246, weight_node = 247, jaw_first = 248,
+                cover_stage = 250, cover_hint = 251, node_total = 252;
 // The cell (of the 8 grid) each print piece sits in, from print_first[0] on.
-const opxy::u8 piece_cell[120] = {10, 13, 18, 18, 19, 20, 21, 21, 26, 26, 27, 28, 29, 29, 34, 34, 35, 35, 36, 36, 37, 37, 42, 43, 44, 45, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 33, 34, 37, 38, 42, 45, 50, 51, 52, 53, 22, 23, 23, 27, 28, 28, 29, 30, 31, 34, 35, 36, 38, 39, 43, 45, 46, 52, 53, 17, 18, 19, 19, 19, 25, 26, 29, 29, 33, 34, 35, 41, 42, 43, 43, 43, 44, 44, 10, 13, 18, 21, 27, 28, 35, 35, 36, 36, 42, 43, 43, 44, 44, 45, 50, 51, 52, 53, 11, 12, 13, 18, 19, 21, 22, 26, 30, 34, 35, 37, 38, 43, 44, 45};
+const opxy::u8 piece_cell[126] = {10, 13, 18, 18, 19, 20, 21, 21, 26, 26, 27, 28, 29, 29, 34, 34, 35, 35, 36, 36, 37, 37, 42, 43, 44, 45, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 33, 34, 37, 38, 42, 45, 50, 51, 52, 53, 22, 23, 23, 27, 28, 28, 29, 30, 31, 34, 35, 36, 38, 39, 43, 45, 46, 52, 53, 17, 18, 19, 19, 19, 25, 26, 29, 29, 33, 34, 35, 41, 42, 43, 43, 43, 44, 44, 10, 13, 18, 21, 27, 28, 35, 35, 36, 36, 42, 43, 43, 44, 44, 45, 50, 51, 52, 53, 11, 11, 12, 13, 13, 18, 19, 21, 22, 26, 26, 30, 30, 34, 35, 37, 38, 43, 43, 44, 45, 45};
 // The semitone each comb tooth stands for.
 const opxy::u8 tooth_notes[7] = {0, 1, 3, 4, 7, 12, 19};
 // Where things sit, px: the print's corner and side, the lever, the comb, the pendulum, the rule.

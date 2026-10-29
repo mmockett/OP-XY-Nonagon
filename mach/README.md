@@ -26,8 +26,8 @@ The engine never sees a note-off. Holding a note keeps the OP-XY's amp
 envelope open on the whole pass, including what arrives after the object has
 gone. Releasing fades it, as sound already in the air cannot be called back.
 
-**Status: experimental.** Mach passes the SDK's tests but has not yet been
-played on an OP-XY. Its CPU figures are estimates, not measurements on the
+**Status: experimental.** Mach passes the SDK's tests and runs on an
+OP-XY. Its CPU figures are estimates, not measurements on the
 device.
 
 ## Controls
@@ -44,7 +44,7 @@ and the ground do to it.
 
 | Control | Range | Default | Caption | What it does |
 | --- | --- | --- | --- | --- |
-| mach | 0.3 to 3, Mach 1 at the middle | 1.67 | `M1.67` | The object's speed. Below 1 a glide down through the key, steeper near 1, and (with boom on) the bow wave's pulse as it passes, stronger toward 1. Above 1 the cone: a boom, then two images, the backward one higher. At 5/3 they land two octaves apart, at 2 a twelfth, at 3 an octave. |
+| mach | 0.3 to 3, Mach 1 at the middle | 1.67 | `1.67` | The object's speed. Below 1 a glide down through the key, steeper near 1, and (with boom on) the bow wave's pulse as it passes, stronger toward 1. Above 1 the cone: a boom, then two images, the backward one higher. At 5/3 they land two octaves apart, at 2 a twelfth, at 3 an octave. |
 | pass | 3 to 300 m, exponentially | 12 m | `12m` | The closest distance. Near, the glide swoops past in a quarter of a second; far, it takes a second and more. Near is up to 6 dB louder at the pass itself, but brief, and brighter: the air's corner falls as the distance's fourth root. |
 | source | organ, pad, voice, bell, siren | bell | the name | What flies. **Organ:** drawbars 8′ to 1′. **Pad:** a bowed spectrum on two oscillators 0.3% apart. **Voice:** three formants whose vowel opens from "oo" to "ah" and closes to "oh" over the flight, so the backward image sings it in reverse. **Bell:** a minor-third bell (hum, prime, tierce, nominal), struck as the flight begins and again as it passes. **Siren:** winds up into its note, a semitone below over the first 30% of every 0.9 s. |
 | dur | 0.5 to 8 s, exponentially | 2.5 s | `2.5s` | The flight's own time: the window it sounds in, and so how long a note sounds (about twice dur; 11.6 s at 8 s). |
@@ -62,7 +62,7 @@ roots):
 
 | | 0 | 25 | 50 | 75 | 100 | measured |
 | --- | --- | --- | --- | --- | --- | --- |
-| **mach** | `M0.30` +10 to 0 st; boom −19 dBFS | `M0.65` +25 to 0 st; boom −16 dBFS | `M1.00` +7 to 0 st; boom −12 dBFS | `M2.00` +2 to 0 st; back +19 to +29; boom −12 dBFS | `M3.00` +1 to 0 st; back +12 to +21; boom −13 dBFS | the forward image's glide against the key (and the backward one's), 1st to 99th percentile, and the boom's peak |
+| **mach** | `0.30` +10 to 0 st; boom −19 dBFS | `0.65` +25 to 0 st; boom −16 dBFS | `1.00` +7 to 0 st; boom −12 dBFS | `2.00` +2 to 0 st; back +19 to +29; boom −12 dBFS | `3.00` +1 to 0 st; back +12 to +21; boom −13 dBFS | the forward image's glide against the key (and the backward one's), 1st to 99th percentile, and the boom's peak |
 | **pass** | `3.0m` 0.27 s, −31 LUFS | `9.5m` 0.31 s, −28 LUFS | `30m` 0.39 s, −26 LUFS | `95m` 0.66 s, −26 LUFS | `300m` 1.32 s, −26 LUFS | how long the glide takes, and the loudest 400 ms |
 | **source** | organ 385 Hz | pad 345 Hz | voice 355 Hz | bell 258 Hz | siren 271 Hz | spectral centroid |
 | **dur** | `0.5s` 1.1 s | `1.0s` 2.1 s | `2.0s` 4.2 s | `4.0s` 7.5 s | `8.0s` 11.6 s | how long it sounds (within 40 dB of its loudest) |
@@ -245,7 +245,7 @@ These are estimates: Mach has not been measured on an OP-XY.
 
 ## Tests
 
-`sdk.py test` passes, with 44 sound checks and 8 screen checks
+`sdk.py test` passes, with 44 sound checks and 9 screen checks
 (`tests/sound.cpp`, `tests/screen.cpp`).
 
 - **Subsonic:** one root, within 50 ns of the exact retarded time; its heard
@@ -261,7 +261,14 @@ These are estimates: Mach has not been measured on an OP-XY.
 - **The fold** does not click at Mach 1.1 to 3, or with echo: above 21 kHz it
   carries no more energy than steady playing, where a 10% step would show.
 - **Every source** sounds, stays within its declared peak and ends.
-- **Screen:** every frame is valid, and churn stays within budget.
+- **Screen:** every frame is valid and churn stays within budget, over four
+  sessions and a flight at every control's setting (each in twentieths, also
+  below Mach 1 and at Mach 3); and every outline it reshapes draws cleanly on
+  the OP-XY: none without area or turning straight back, no neighbouring
+  points within an eighth of a pixel, no closing edge under a quarter.
+  Every header caption, each control swept in 400ths and all of them at
+  their ends and middles together, fits its column in the OP-XY's font
+  (a value at most 53 px at 20 px, a title 56 at 10).
 
 ## Files
 

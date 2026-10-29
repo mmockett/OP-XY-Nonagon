@@ -22,8 +22,8 @@ move and gathers it on the still nodal lines, a different figure for each
 note it rings. Robert Hooke had seen flour do the same on a bowed glass plate
 in 1680; Chladni made the figures a method and published them.
 
-**Status: experimental.** Sand passes the SDK's tests but has not yet been
-played on an OP-XY. Its CPU figures (below) are the SDK's host estimate and a
+**Status: experimental.** Sand passes the SDK's tests and runs on an
+OP-XY. Its CPU figures (below) are the SDK's host estimate and a
 count from the compiled code, not measurements on the device.
 
 ## Controls
@@ -46,7 +46,7 @@ sits under it, one alternate per encoder.
 | grain | .3mm | the grains' size, e.g. `.3mm` | From fine dust (0.06 mm) to stones (7.7 mm): the sound of a landing, from a soft tick of dust to the ringing knock of a stone. Heavier grains knock the plate harder and weigh more on it, so they darken the tone further. |
 | plate | metal | `metal`, `glass`, `wood` | What the plate is made of: how long it rings, how its upper modes fade, how fast it beats and how many harmonics the bow draws from it. |
 | settle | 0.35 | friction, e.g. `0.35` | How sticky the sand is. Slippery sand lands hard, bounces with a second click and wanders before it finds the narrow quiet lines; sticky sand needs more to lift it, lands dead and settles fast. |
-| tilt | 0deg | degrees, e.g. `5deg` | Tips the plate on its column, its far edge down, up to 10 degrees. While the plate sounds, its resting sand creeps downhill, more readily the steeper it is, and hops slide that way; sand that runs off the low edge comes back at the high edge by the bow, as an hourglass is turned, so the plate trickles as steadily as it is tipped. |
+| tilt | 0% | the plate's slope as a grade, e.g. `9%` | Tips the plate on its column, its far edge down, up to 10 degrees (an 18% grade). While the plate sounds, its resting sand creeps downhill, more readily the steeper it is, and hops slide that way; sand that runs off the low edge comes back at the high edge by the bow, as an hourglass is turned, so the plate trickles as steadily as it is tipped. |
 | shake | 0.0g | the largest jolt, e.g. `1.8g` | Random jolts to every grain while the plate sounds, from 1.2 g, just enough to lift the lightest grain off a still line, to 2.4 g, more often as well as harder, and noise into every mode. The figure blurs and the sand never settles. |
 
 Measured on a held A3, each control at 0, 25, 50, 75 and 100 with the others
@@ -64,7 +64,7 @@ when the rattle stays 20 dB below its start.
 | grain | 0.06 mm: clicks at 5.5 kHz, partials −28 dB | 0.2 mm: 3.3 kHz, −32 dB | 0.7 mm: 2.0 kHz, −34 dB | 2.3 mm: 1.2 kHz, −35 dB | 7.7 mm: 0.7 kHz, ringing, −36 dB |
 | plate | metal: rings 6 s | metal | glass: 3 s, purest | wood: 0.6 s, roughest | wood |
 | settle | μ 0.10: onset −37 dB, settles 2.7 s | 0.23: −38 dB, 1.6 s | 0.35: −40 dB, 1.7 s | 0.48: −42 dB, 1.0 s | 0.60: −45 dB, 0.6 s |
-| tilt | 0 deg: later −78 dB | 3 deg: −64 dB | 5 deg: −45 dB | 8 deg: −39 dB, partials −23 dB | 10 deg: −37 dB, −21 dB |
+| tilt | 0%: later −78 dB | 4%: −64 dB | 9%: −45 dB | 13%: −39 dB, partials −23 dB | 18%: −37 dB, −21 dB |
 | shake | 0.0 g: later −78 dB, partials −32 dB | 1.5 g: −51 dB, −25 dB | 1.8 g: −41 dB, −18 dB | 2.1 g: −37 dB, −14 dB | 2.4 g: −37 dB, −11 dB, +4 dB level |
 
 Tilt and shake colour the sound, so they default to off. Past about 75 on
@@ -246,6 +246,14 @@ the frames a turning tilt moves the plate by half a degree.
   that a legato note keeps the settled sand and a struck one throws it, that
   settle, shake and sand do what they say, the pitch, level and headroom
   above, and that every corner of the controls stays bounded.
+- `tests/screen.cpp`: the screen checks, also run by `sdk.py test`: the
+  screen over every figure, each control at five settings and a note's
+  animation, failing on any shown outline the OP-XY would draw as a streak
+  or a sliver: one with no area or traced back over itself, one that turns
+  straight back at a point, neighbouring points within an eighth of a pixel,
+  or a closing edge under a quarter of a pixel. `make_plate.py` writes the
+  nodal outlines to pass it: each runs round the border one way only, keeps
+  its points apart, and starts at its longest edge.
 
 ## CPU
 

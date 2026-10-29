@@ -176,7 +176,7 @@ def vein_points(u):
     base = (-3, (u - 0.5) * 12)
     root = (base[0] + (tip[0] - base[0]) * 0.2, base[1] + (tip[1] - base[1]) * 0.2)   # short of the body, so they never merge
     return ribbon([root, (root[0] + (tip[0] - root[0]) * 0.55 + (tip[1] - root[1]) * 0.03,
-                          root[1] + (tip[1] - root[1]) * 0.55 - (tip[0] - root[0]) * 0.03), tip], 1.0, 0.6)
+                          root[1] + (tip[1] - root[1]) * 0.55 - (tip[0] - root[0]) * 0.03), tip], 1.2, 0.8)
 
 
 def comb(fore):
@@ -220,12 +220,14 @@ def build():
     for p in range(4):
         side = p & 1
         mid = MIDDLE * (1 if side else -1)
-        if p < 2:
-            pts = [(-3, -13)] + [(x * 0.9, y * 0.9) for x, y in WING] + [(-3, 13)]
-        else:   # the lit band at rest: one line, out along every other margin point and back a hair inside
-            out_at = list(range(0, MARGIN - 1, 2)) + [MARGIN - 1]
-            back_at = [MARGIN - 1 - 2 * k for k in range(31)] + [0]
-            pts = [(WING[i][0] * 0.403, WING[i][1] * 0.403) for i in out_at] + [(WING[i][0] * 0.397, WING[i][1] * 0.397) for i in back_at]
+        # The margin (or the lit band, at 0.4 of its reach), closed through two
+        # root points on the line between its ends, as display.cpp draws it: it
+        # runs straight on through the root, never doubling back.
+        reach = 0.9 if p < 2 else 0.4
+        margin = [(x * reach, y * reach) for x, y in WING]
+        first, last = margin[0], margin[-1]
+        between = lambda t: (last[0] + (first[0] - last[0]) * t, last[1] + (first[1] - last[1]) * t)
+        pts = [between(0.6)] + margin + [between(0.4)]
         if side:
             pts = mirror(pts)
         rel = [((x - mid) / 2, y / 2) for x, y in pts]
@@ -255,12 +257,20 @@ def build():
     for side in range(2):
         s = 1 if side else -1
         stalk = [(s * 1.6, -14), (s * 4, -26), (s * 10, -42), (s * 18, -56), (s * 23, -64)]
-        club = ellipse(s * 24.2, -66.2, 2.2, 3.4, 10)
         shape = ribbon(stalk, 1.3, 1.0)
-        tip = [(x, y) for x, y in club]
-        # One outline: up the stalk's one side, round the club, down the other.
+        # One outline: up the stalk's one side, round the club's far side from
+        # where that side meets it to where the other leaves, down the other:
+        # it never turns back on itself (the OP-XY draws such a join as a spike).
         half = len(shape) // 2
-        pts = shape[:half] + sorted(tip, key=lambda q: math.atan2(q[1] + 66.2, (q[0] - s * 24.2) * s)) + shape[half:]
+        cx, cy, rx, ry = s * 24.2, -66.2, 2.2, 3.4
+        up, down = shape[half - 1], shape[half]
+        start = math.atan2((up[1] - cy) / ry, (up[0] - cx) / rx)
+        end = math.atan2((down[1] - cy) / ry, (down[0] - cx) / rx)
+        sweep = (end - start) % (2 * math.pi)
+        if sweep < math.pi:   # the long way round, over the club's top
+            sweep -= 2 * math.pi
+        arc = [(cx + rx * math.cos(start + sweep * (k + 1) / 11), cy + ry * math.sin(start + sweep * (k + 1) / 11)) for k in range(10)]
+        pts = shape[:half] + arc + shape[half:]
         out.append(node(ANTENNA + side, outline(pts), GREYS[10], width=0.1, at=(CX, CY)))
 
     # The body: head, the thorax with the pin through it, the abdomen. Static.

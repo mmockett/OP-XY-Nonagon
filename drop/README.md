@@ -31,14 +31,14 @@ vapour is breathy and short, like a pipe overblown. At the top of **beat**
 the pulses come at 23 Hz, the rate the papers measured, and the song turns
 back into a flutter.
 
-**Status: experimental.** Drop passes the SDK's tests. It has not yet been
-played on an OP-XY, and its CPU figures (below) are estimates, not
+**Status: experimental.** Drop passes the SDK's tests. It runs on an
+OP-XY, and its CPU figures (below) are estimates, not
 measurements on the device.
 
 ## Controls
 
-Press any encoder to switch pages. The header shows real units, at most five
-characters. Each control's 0, 25, 50, 75 and 100, the others at their
+Press any encoder to switch pages. The header shows real units, each
+narrow enough for its column in the OP-XY's font (`tests/captions.cpp`). Each control's 0, 25, 50, 75 and 100, the others at their
 defaults: what the header says, and what a held A3 measures
 (`tools/sweep.py`: how long it lasts, its pulses a second and their swing,
 its spectral centroid, its share of power over 2.5 kHz and the clicks heard
@@ -47,18 +47,19 @@ a second).
 | Control | 0 | 25 | 50 | 75 | 100 | On the skillet |
 | --- | --- | --- | --- | --- | --- | --- |
 | **heat**: the plate, from 100 °C under the liquid's Leidenfrost point to 200 °C over it | `100C`: boils, gone in 0.8 s, broadband (centroid 6.2 kHz) | `175C`: boils, gone in 0.4 s (2.6 kHz) | `250C`: floats 6.6 s, a song (centroid 312 Hz) | `325C`: floats 4.7 s, its vapour thicker, 415 Hz | `400C`: floats 3.8 s, 562 Hz, over 2.5 kHz −13 dB (−21 at 250 °C) | Rings tempered into the iron round the burner: none at 100 °C, two at 250 °C, four at 400 °C; white frost on a cold plate. Under the point, a spattering puddle |
-| **size**: the drop's radius when it lands | `2.2mm`: a bead, no star, 1.7 s | `5.5mm`: 3 lobes, 3.4 s | `8.9mm`: 5 lobes, 4.8 s | `12mm`: 6 lobes, 6.1 s | `16mm`: 8 lobes, 7.3 s | The water mark where the next drop lands; the drops |
-| **liquid**: water, ethanol, liquid nitrogen | `water`: point 200 °C, beat ×1.0, 6.6 s, 312 Hz | `ethnl`: 4.5 s | `ethnl`: point 165 °C, beat ×1.27, 3.1 s, thinner vapour, darker (277 Hz) | `LN2`: 2.3 s | `LN2`: point −100 °C, beat ×1.54, 1.7 s, thicker vapour, an airy 447 Hz | Its lobes' width: the same size control makes a 14 mm water drop, an 8 mm ethanol one or a 6 mm nitrogen one; frost on nitrogen's cold plate |
+| **size**: the drop as it lands, shown as its mass (2.2 to 16 mm across its radius) | `46mg`: a bead, no star, 1.7 s | `0.48g`: 3 lobes, 3.4 s | `1.2g`: 5 lobes, 4.8 s | `2.3g`: 6 lobes, 6.1 s | `3.8g`: 8 lobes, 7.3 s | The water mark where the next drop lands; the drops |
+| **liquid**: water, ethanol, liquid nitrogen | `water`: point 200 °C, beat ×1.0, 6.6 s, 312 Hz | `ethnl`: 4.5 s | `ethnl`: point 165 °C, beat ×1.27, 3.1 s, thinner vapour, darker (277 Hz) | `LN2`: 2.3 s | `LN2`: point −100 °C (173 K), beat ×1.54, 1.7 s, thicker vapour, an airy 447 Hz | Its lobes' width: the same size control makes a 14 mm water drop, an 8 mm ethanol one or a 6 mm nitrogen one; frost on nitrogen's cold plate |
 | **beat**: the star's beat | `0.5Hz`: 5 pulses a second | `1.3Hz`: 8 | `3.4Hz`: 19, a flutter | `8.8Hz`: 14, pulses crowding into each beat | `23Hz`: 20, the papers' beats | The stars' lobes: deep and slowly breathing at 0.5 Hz, a shallow tremor at 23 Hz; their vapour flashes at each pulse |
 | **groove**: the ratchet's teeth swing the pulses | `even`: straight (swing 0.54) | `55%`: 0.57 | `61%`: 0.63 | `66%`: 0.68, running at 7 cm/s, a tooth hopped now and then (centroid 395 Hz) | `72%`: 0.73, a hard shuffle at 9 cm/s, hops dropping a pulse | The sawtooth teeth cut into the pan, brighter as they deepen; the drops run round them |
-| **vapour**: the layer's thickness | `20um`: rings 0.9 s, centroid 246 Hz, over 2.5 kHz −25 dB | `65um`: 282 Hz, −23 dB | `110um`: 374 Hz, −19 dB | `155um`: 552 Hz, −14 dB | `200um`: rings 0.09 s, 1.01 kHz, −10 dB | The drops lift off the iron: at 20 µm each sits on its dark shadow; thicker, it hovers higher, to 20 px over it |
+| **vapour**: the layer's thickness | `10um`: rings 0.9 s, centroid 246 Hz, over 2.5 kHz −25 dB | `32um`: 282 Hz, −23 dB | `55um`: 374 Hz, −19 dB | `77um`: 552 Hz, −14 dB | `99um`: rings 0.09 s, 1.01 kHz, −10 dB | The drops lift off the iron: at 10 µm each sits on its dark shadow; thicker, it hovers higher, to 20 px over it |
 | **life**: the floating life of an eight-lobe water drop at 250 °C | `0.46s`: gone before its first lobe | `1.5s`: its lobes step down 7 to 2 in 1.7 s | `5.1s` | `17s` | `56s`: a step every few seconds | Each drop's steam: a tall billowing plume swaying over a fast-shrinking drop at 0.5 s, smaller to 15 s, none past it |
 | **crackle**: brief contacts with the iron, a second at this heat | `0/s`: none; over 2.5 kHz −23 dB | `9/s`: −21 dB, 7 clicks a second heard | `26/s`: −18 dB, 20 a second | `49/s`: −14 dB, 41 | `75/s`: −11 dB, 65 a second (six times as many near the point) | Spatter dried on the iron round the landing places, there with no note playing: none to twelve splashes; sparks at the drops' edges |
 
 Heat, liquid, beat, groove, vapour, life and crackle act on drops already
 sounding: turn heat under the point during a long note and the floating drop
 falls onto the iron and sizzles away. Liquid nitrogen's heat runs from −200
-to +100 °C, so its sizzle is as reachable as water's. The header's vapour
+to +100 °C, so its sizzle is as reachable as water's; for a liquid whose
+point is under 100 °C the header gives the plate in kelvin, 73 to 373 K. The header's vapour
 is the layer as it is: a hotter plate thickens it, ethanol thins it and
 liquid nitrogen thickens it.
 
@@ -202,9 +203,15 @@ nodes.
 It is drawn for the screen's 480 × 222 pixels in three weights. The drops
 lead, brightest and boldest (the palette gives its brightest greys its
 widest stroke). The skillet's outline is a step down, its inner edges
-another, and six faint strokes turn its outside wall. Every line is a
-single stroke; only the drops' shadows and the spatter are filled. There is
-no text but the header.
+another, and six faint strokes turn its outside wall. Only the drops'
+shadows and the spatter are filled. There is no text but the header.
+
+Every path is drawn as the OP-XY draws one cleanly: a line is a thin closed
+ribbon with a width of its own, not a trace out and back; no two
+neighbouring points lie within an eighth of a pixel; and each path starts
+on its longest edge, a star at a lobe's tip, so its closing edge is never a
+sliver. A drop under 3 px in radius leaves the screen, and its vapour's
+crescent shows from 9 px. `tests/frame_rules.cpp` checks this.
 
 Each control changes a part of the skillet or the drops on it, as the
 controls table says and `docs/controls.png` shows: heat the tempered rings
@@ -237,9 +244,9 @@ still when idle; reduced motion stops the breathing, flashing, spray, sparks
 and running; a reset snaps everything into place.
 
 **Churn** (host, 60 fps, nodes changing a frame while drops show): a drop's
-life 2.8, peak 7; three drops 7.1, peak 16; a sizzle 9.5, peak 12 (the
-spray); the ratchet 5.3, peak 8; a 16 s run of everything 3.5 on average
-(8.2 while drops show), peak 19. Idle: 0.
+life 2.7, peak 7; three drops 6.8, peak 16; a sizzle 9.4, peak 12 (the
+spray); the ratchet 5.1, peak 8; a 16 s run of everything 3.3 on average
+(7.7 while drops show), peak 19. Idle: 0.
 
 ## Level
 
@@ -262,12 +269,12 @@ OP-XY.
   (a load of 7). `sdk.py test`'s single runs read 10,500.
 - The pipe and filters take 16-bit products; there is one division a block
   (the allpass) and none a sample.
-- **Memory.** Compiled for the Blackfin (`--firmware`), Drop takes 76.9 KiB
+- **Memory.** Compiled for the Blackfin (`--firmware`), Drop takes 79.8 KiB
   of module memory, eight voices of 4,300 bytes.
 
 ## Tests
 
-`sdk.py test` runs three host tests. UBSan is clean.
+`sdk.py test` runs five host tests. UBSan is clean.
 
 - **`tests/sound.cpp`**, 30 checks, among them:
   - At 160 °C the drop is gone in 0.35 s, broadband (spectral flatness
@@ -286,6 +293,17 @@ OP-XY.
 - **`tests/screen.cpp`**: a valid frame at every step of five scripted
   scenes, a still screen when idle, the screen's drops keeping the voices'
   lobes, and churn within budget.
+- **`tests/frame_rules.cpp`**: every path the screen draws (the static
+  art, each shown node at its scale and the drops' outlines), over each
+  control at 0, 25, 50, 75 and 100 while a note and then a chord live and
+  die, has area, no neighbouring points within an eighth of a pixel, no
+  turn straight back and a closing edge of a quarter of a pixel or more:
+  what the OP-XY draws as streaks otherwise.
+- **`tests/captions.cpp`**: every caption the header can show (each
+  control swept in 1,024 steps over nine settings of the others, and
+  200,000 settings at random) is at most 53 px wide at 20 px in the
+  OP-XY's font, Univers Next Pro Light, and every title at most 56 px at
+  10 px: none runs into the next column.
 - **`tests/scenes.cpp`**: one phrase per preset (a melody, the Kettle's
   Am F C G, a lead, an eighth-note bass line from A1, the ratchet's rhythm,
   sizzle percussion, the nitrogen whisper and the last drop), through a
@@ -301,7 +319,7 @@ OP-XY.
 | `core.h`, `engine.cpp` | Voice and shared state, and the render |
 | `tables.h` | log2/exp2 tables and the liquids (`tools/make_tables.py`) |
 | `display.h`, `display.cpp`, `panel.svg.fragment` | The screen (`tools/make_panel.py`) |
-| `tests/sound.cpp`, `tests/screen.cpp`, `tests/scenes.cpp` | The host checks above |
+| `tests/sound.cpp`, `tests/screen.cpp`, `tests/frame_rules.cpp`, `tests/captions.cpp`, `tests/scenes.cpp` | The host checks above |
 | `tools/ears.py` | The presets' listening measurements above |
 | `tools/sweep.py`, `tools/sweep.cpp` | The controls' measurements above |
 | `tools/cpu.py` | The SDK's CPU estimate, steady on a busy computer |

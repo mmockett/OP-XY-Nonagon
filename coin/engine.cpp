@@ -525,7 +525,10 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
         lane.glide = glide;
         lane.hit = hit;
         lane.bounce = bounce;
-        lane.slip = slip;
+        // Only the first disk's ring takes slip's noise: in every disk it
+        // would cost the Blackfin 5 instructions a sample each (its hiss and
+        // jittered strikes are every disk's).
+        lane.slip = k == 0 ? slip : 0;
         lane.cut_at = cut_at;
         lane.slap = d.rolling && cut_at < block_frames ? slap : 0;
         lane.shift = shift;

@@ -118,22 +118,38 @@ const i32 crowd[16] = {362, 1881, 4048, 6705, 9775, 13208, 16970, 21033, 25376, 
 // asymptotic to the cone's two arms, drawn at twice its points' size: up and
 // down are the arms' lengths in pixels, b its stand-off (Q4 pixels), width the
 // band it is drawn as (Q10 pixels: a thump broad and soft, a crack fine).
+//
+// Drawn as the OP-XY draws an outline cleanly: along each arm its points are a
+// quarter of a pixel apart at least (an eighth at its half size; the device
+// merges closer neighbours), so the two at the nose never meet; and the
+// outline starts one point along the upper arm, so it closes over a long
+// edge, not over the arm's end (a closing edge under a quarter of a pixel
+// draws as a sliver). width must be at least a quarter of a pixel.
 inline void shock_points(Frame::path_type& path, i32 mach, i32 b4, i32 up, i32 down, i32 width) {
     const i32 k = flight::mul16(mach, mach) - flight::one;
     const i32 cot = static_cast<i32>(flight::isqrt(static_cast<u32>(k) << 12)) << 2;           // sqrt(M^2 - 1), Q16
     const i32 sin_mu = static_cast<i32>((1u << 31) / static_cast<u32>(mach >> 1));             // 1 / M, Q16
+    i32 reach[2][16];                                                          // each arm's points out from the nose, Q10 pixels
+    for (u32 a = 0; a < 2; ++a)
+        for (u32 at = 0; at < 16; ++at) {
+            const i32 yy = ((((a ? down : up) * sin_mu) >> 6) * (crowd[at] >> 6)) >> 10;
+            const i32 least = at ? reach[a][at - 1] + 256 : 128;
+            reach[a][at] = yy > least ? yy : least;
+        }
     for (u32 i = 0; i < 32; ++i) {
-        // 16 points up one arm to the nose, 16 down the other
+        // 16 points up one arm to the nose, 16 down the other; each lands one
+        // place earlier, so the outline starts at the upper arm's second point
         const u32 at = i < 16 ? 15 - i : i - 16;
-        const i32 arm = i < 16 ? up : down;
-        const i32 yy = (((arm * sin_mu) >> 6) * (crowd[at] >> 6)) >> 10;     // Q10 pixels
+        const i32 yy = reach[i < 16 ? 0 : 1][at];
         const i32 y = i < 16 ? -yy : yy;
         const i32 yc = (((yy >> 4) * (cot >> 4)) >> 8) >> 6;                   // y cot mu, Q4 pixels
         const i32 x = (b4 - static_cast<i32>(flight::isqrt(static_cast<u32>(b4 * b4 + yc * yc)))) << 6;   // Q10
-        path.points[i].x = opxy::draw::clamp(x >> 1, -64 * unit, 64 * unit);
-        path.points[i].y = opxy::draw::clamp(y >> 1, -64 * unit, 64 * unit);
-        path.points[63 - i].x = opxy::draw::clamp((x + width) >> 1, -64 * unit, 64 * unit);
-        path.points[63 - i].y = path.points[i].y;
+        opxy::draw::Point& outer = path.points[(i + 63) & 63];
+        opxy::draw::Point& inner = path.points[62 - i];
+        outer.x = opxy::draw::clamp(x >> 1, -64 * unit, 64 * unit);
+        outer.y = opxy::draw::clamp(y >> 1, -64 * unit, 64 * unit);
+        inner.x = opxy::draw::clamp((x + width) >> 1, -64 * unit, 64 * unit);
+        inner.y = outer.y;
     }
 }
 
@@ -353,7 +369,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     // A ribbon the device outlines with a 1 px line, so it reads as one line:
     // 2.6 px, dim and rounded (its front standing up to 16 px further off) as
     // a thump; 1.4 px, bright and sharp as a crack; a dim hairline off.
-    const i32 width = sc.boom <= 0 ? 200 : 400 + (((32768 - sc.boom) * 1200) >> 15);      // Q10 px between its edges
+    const i32 width = sc.boom <= 0 ? 300 : 400 + (((32768 - sc.boom) * 1200) >> 15);      // Q10 px between its edges
     const u32 shock_grey = sc.boom <= 0 ? 5u : static_cast<u32>(9 + ((sc.boom * 6) >> 15));
     const i32 blunt = sc.boom <= 0 ? 0 : ((32768 - sc.boom) * 256) >> 15;                // Q4 px: up to 16
     const i32 look = (static_cast<i32>(shape) << 16) + width + (blunt << 12);
@@ -368,7 +384,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 up = reach_edge(ax, ly, -cos_mu, -sin_mu, most) & ~3, down = reach_edge(ax, ly, -cos_mu, sin_mu, most) & ~3;
         if (up < 8 || down < 8) { hide(frame, n); last[2] = -1; continue; }
         if (last[2] != up || last[3] != down || state.shock_mach != shape_mach || state.shock_look != look) {
-            shock_points(frame.paths[n], shape_mach, which ? 8 + (blunt >> 1) : standoff, up, down, which ? (width * 3) >> 2 : width);
+            shock_points(frame.paths[n], shape_mach, which ? 8 + (blunt >> 1) : standoff, up, down, which && width > 400 ? (width * 3) >> 2 : width);
             frame.paths[n].key = ++state.key;
             last[2] = up; last[3] = down;
         }
@@ -392,16 +408,18 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
                 // From where the cone meets the plate, back up as its mirror.
                 const i32 len = reach_edge(gx, py, -cos_mu, -sin_mu, 120) & ~3;
                 i32* last = state.shock[2];
-                if (len >= 8) {
+                if (len >= 12) {
                     if (last[2] != len || last[3] != (cos_mu >> 8)) {
+                        // A ribbon half a pixel wide, starting one point along
+                        // its edge so it closes over a long edge (as a shock).
                         Frame::path_type& path = frame.paths[node::reflected];
                         for (u32 i = 0; i < 32; ++i) {
                             const i32 a = (len * unit * static_cast<i32>(i)) / 31;
                             const i32 x = -(((a >> 4) * (cos_mu >> 4)) >> 8), y = -(((a >> 4) * (sin_mu >> 4)) >> 8);
-                            path.points[i].x = x >> 1;
-                            path.points[i].y = y >> 1;
-                            path.points[63 - i].x = (x + ((500 * sin_mu) >> 16)) >> 1;
-                            path.points[63 - i].y = (y - ((500 * cos_mu) >> 16)) >> 1;
+                            path.points[(i + 63) & 63].x = x >> 1;
+                            path.points[(i + 63) & 63].y = y >> 1;
+                            path.points[62 - i].x = (x + ((500 * sin_mu) >> 16)) >> 1;
+                            path.points[62 - i].y = (y - ((500 * cos_mu) >> 16)) >> 1;
                         }
                         path.key = ++state.key;
                         last[2] = len; last[3] = cos_mu >> 8;
@@ -478,8 +496,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     static const char* const names[SOURCES] = {"organ", "pad", "voice", "bell", "siren"};
     char values[8][header_capacity] = {};
     {
+        // mach: the Mach number itself, "1.67" (with an M it would run into
+        // the next column in the OP-XY's font)
         char* o = values[MACH];
-        *o++ = 'M';
         decimal(o, flight::mach(input.slots[MACH]), 2);
         *o = 0;
         o = values[PASS];

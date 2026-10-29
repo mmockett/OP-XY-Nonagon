@@ -27,11 +27,13 @@ Ghost is an OP-XY sample engine with stereo output, id `ghost`. It needs the
 SDK's sample-overview change, which gives sample engines their own screen and
 is still in review as
 [etcetc000/open-xy pull request 182](https://github.com/etcetc000/open-xy/pull/182).
-It plays without a sample, on breath and hum alone; a loaded sample feeds its
-bed, and without one the bed is a whisper of Ghost's own.
+It plays without a sample, on breath and hum alone. A loaded sample always
+sets the resonators ringing, at least 60% of what excites them, and bed takes
+it to all of it, so the ghost takes on the recording's grain, envelope and
+colour; without one, bed is a whisper of Ghost's own.
 
-**Status: experimental.** Ghost passes the SDK's tests but has not yet been
-played on an OP-XY, and its CPU figures (below) are estimates, not
+**Status: experimental.** Ghost passes the SDK's tests and runs on an
+OP-XY, and its CPU figures (below) are estimates, not
 measurements on the device.
 
 ## Controls
@@ -47,14 +49,14 @@ Press any encoder to switch pages. Shift + turn makes fine steps.
 
 | Control | Range | Default | Caption | What it does |
 | --- | --- | --- | --- | --- |
-| ring | 0.15 s to 12 s, exponential | 2.1 s | ring time, `150ms` to `12.0s` | How long the resonance rings: from a breathy whisper to glass. Long rings also swell in. |
+| ring | 0.15 s to 12 s, exponential | 2.1 s | ring time, `0.15s` to `12.0s` | How long the resonance rings: from a breathy whisper to glass. Long rings also swell in. |
 | voice | breath, oo, oh, ah, eh, ee | ah | the vowel, `air` (breath) to `ee` | What excites the resonators: breath alone at 0, then a hummed voice through two formants for each vowel, the loop brightening toward ee. |
 | split | 0 to 100% | 60% | `60%` | How far the harmonics divide between the ears, even to one and odd to the other. Past 75% the fundamental goes too, so the pitch is only in your head. |
 | trade | still, then a swap and back from every 24 s down to every 1.5 s (12 s at 25, 5 s at 50) | 7 s | `still`, `7.0s`, `1.5s` | How fast the halves swap ears, so the note drifts inside the skull, from a slow tide to a flicker. |
 | beat | 0 to 6 Hz, curved (0.9 Hz at 25, 2.2 Hz at 50) | 0.7 Hz | `0.7Hz` | The right ear sharp by this much: a binaural beat on the fundamental, and on each harmonic its multiple. |
 | orbit | front; spread to 100%; then a circle from every minute down to every 2 s (14 s at 50) | 80% spread | `front`, `80%`, `2.0s` | Its first quarter spreads the notes from the front round your head. The rest circles them, close by the right ear and far on the left. |
 | near | 3 m to 10 cm, exponential | 76 cm | `3.0m`, `76cm`, `9cm` | Distance: far is quieter and much darker (4 octaves darker at 3 m); near is brighter, louder, and much louder in the facing ear, as a whisper at the ear is. |
-| bed | 0 to 100%, equal power | 0% | `40%` | The loaded sample against breath and hum. It is mostly whitened, so it keeps its grain and envelope but rings the note, not its own pitch. With no sample, Ghost's own whisper: white breath in gusts, a syllable every 60 to 250 ms, and the note comes and goes with them. |
+| bed | 0 to 100%, equal power | 0% | the share: `60%` to `100%` with a sample, `0%` to `100%` without | The loaded sample against breath and hum: 60% of what excites the resonators at 0, all of it at 100, so a loaded sample always tells. The hum gives way faster (as its share squared) and the vowel's formants thin, so the recording, not the hum, sets the note ringing, in its own colour. A little whitening (half its samples, at random, at 0.4) adds the grain that rings every harmonic of the note. With no sample, Ghost's own whisper from 0: white breath in gusts, a syllable every 60 to 250 ms, and the note comes and goes with them. |
 
 Each control measured on a held A3, the others at the defaults (Seance)
 (`tools/controls.cpp`):
@@ -78,8 +80,8 @@ Each control measured on a held A3, the others at the defaults (Seance)
 | bed, no sample: harmonic to noise | 21 dB | 14 dB | 12 dB | 12 dB | 12 dB |
 | bed, no sample: how far the level swells and sinks (25 ms, 10th to 90th percentile) | 4.2 dB | 4.6 dB | 5.7 dB | 7.8 dB | 8.7 dB |
 | bed, no sample: spectral centroid | 716 Hz | 858 Hz | 898 Hz | 965 Hz | 933 Hz |
-| bed, a recorded voice loaded: harmonic to noise | 21 dB | 17 dB | 14 dB | 10 dB | 11 dB |
-| bed, a recorded voice loaded: spectral centroid | 726 Hz | 738 Hz | 849 Hz | 909 Hz | 919 Hz |
+| bed, a recorded voice loaded (its share 60 to 100%): harmonic to noise | 8 dB | 5 dB | 9 dB | 9 dB | 2 dB |
+| bed, a recorded voice loaded: spectral centroid | 694 Hz | 774 Hz | 726 Hz | 714 Hz | 699 Hz |
 
 `tools/controls.cpp --fifths` measures each at 21 points and finds its
 flattest fifth of travel. Each control moves through at least one of its
@@ -118,6 +120,26 @@ Every preset, measured on a held A3 (`tools/measure.cpp`):
 | Skull | −24.7 | 8.9 dB | 21 dB | 589 Hz | −2.0 dB | −3.0 dB | 0.22 |
 | Glass | −25.4 | 9.3 dB | 29 dB | 284 Hz | −2.8 dB | −3.6 dB | 0.74 |
 | Haunting | −27.0 | 13.3 dB | 11 dB | 689 Hz | −2.0 dB | −4.4 dB | 0.40 |
+
+With a sample loaded, each preset's held A3 against none, at bed 0: the
+average third-octave move shows how far the sample changes it. Two samples:
+a breathy, wordless voice (close to Ghost's own breath), and a loop of kick,
+hats and a tone.
+
+| Preset | Level, none / the voice (dBFS) | Centroid, none / the voice | Harmonic to noise, none / the voice | Third-octave move, the voice | Third-octave move, the loop |
+| --- | --- | --- | --- | --- | --- |
+| Seance | −26.6 / −27.7 | 707 / 624 Hz | 16 / 6 dB | 13.8 dB | 19.0 dB |
+| Whisper | −25.3 / −26.8 | 1707 / 1270 Hz | 8 / 4 dB | 3.0 dB | 6.7 dB |
+| Choir | −27.6 / −27.7 | 376 / 564 Hz | 15 / 7 dB | 18.3 dB | 19.4 dB |
+| Revenant | −24.5 / −25.7 | 290 / 488 Hz | 7 / 5 dB | 17.7 dB | 21.1 dB |
+| Wraith | −26.1 / −26.4 | 842 / 755 Hz | 9 / 6 dB | 4.4 dB | 6.9 dB |
+| Skull | −25.0 / −26.0 | 554 / 735 Hz | 18 / 9 dB | 10.3 dB | 18.9 dB |
+| Glass | −24.5 / −25.6 | 302 / 636 Hz | 9 / 8 dB | 16.1 dB | 19.0 dB |
+| Haunting | −27.4 / −25.4 | 742 / 716 Hz | 12 / 5 dB | 9.6 dB | 15.9 dB |
+
+Whisper and Wraith are breath, so a breathy recording changes them least;
+a loop's rhythm comes through even there. A recording sits up to 1.5 dB
+lower than song, as breath does, since it peaks higher for its power.
 
 - **The mono fold-down** loses about 3 dB, which is what two decorrelated ears
   lose when summed, not a cancellation. Its worst third of an octave is at
@@ -194,13 +216,18 @@ bold lines, deep from front to back and grey by depth, nearest brightest:
 - in the middle, the great pane of glass, its top edge and two glints;
 - at the back, the floor receding to the back wall, and the wall's corners.
 
-No two of these lines cross (`tools/make_panel.py` checks). The apparition
+No two of these lines cross, and every outline keeps the OP-XY's drawing
+rules, which go beyond the SDK's: one subpath of at most 64 points, no two
+neighbouring points within an eighth of a pixel (they merge), no closing
+edge under a quarter of a pixel (it draws as a sliver), and some area with
+no turn straight back (either draws as streaks). `tools/make_panel.py`
+checks the artwork, and `tools/frames.cpp` every frame it draws. The apparition
 leads, brighter and bolder than all of it, and like each figure on the stage
 it stands over a black silhouette, so it hides what is behind it: the
 curtains, the glass, its twin, the chalk path at its feet. Each nimbus ring
 is black inside too, so the stage behind a head never shows through it. Nothing drawn ever reaches the
 footlights or the pilasters (`tools/frames.cpp clear` checks this over
-15,488 settings). Nothing is finer than about 4 px apart. The contact sheets
+30,976 settings). Nothing is finer than about 4 px apart. The contact sheets
 are at 1:1 (`docs/controls-1x.png`) and twice that (`docs/controls.png`).
 
 The note's apparition stands in the glass where the sound is in your head:
@@ -222,7 +249,7 @@ Every control acts on the apparition or the stage:
 | beat | The apparition's outline trembles, up to 6 px, the tremble running at the beat's rate while held. |
 | orbit | The chalk path on the floor where it can walk: a mark at the front at 0, an arc as the notes spread, the whole circle once they circle. The apparition walks it while held. |
 | near | Its size and depth, from small at the back wall to large behind the footlights. The chalk path follows it. |
-| bed | Its robe frays, up to 8 px: into the sample's own waveform (the 64 peaks of its overview), or with no sample into the whisper's ragged gusts. The fray scrolls while held. |
+| bed | Its robe frays, up to 8 px with its share: into the sample's own waveform (the 64 peaks of its overview), or with no sample into the whisper's ragged gusts. The fray scrolls while held. |
 
 A second and third held note bring two more apparitions, each where its
 own note began.
@@ -276,7 +303,8 @@ per sample:
 | The notch (past 75% split) | 16.5 |
 
 With about 1.1k a block of per-block work, a voice comes to:
-- **about 13k instructions a block at the default (Seance);**
+- **about 13k instructions a block at the default (Seance), 13.7k with a
+  sample loaded,** which the bed then reads;
 - **about 14.9k at the heaviest setting** (a stereo bed, split past 75%,
   beat, trade and orbit all moving).
 
@@ -322,8 +350,8 @@ Not yet checked on the device:
 
 `tests/sound.cpp` checks:
 
-- **Every preset:** a held A3 within −29 to −21 dBFS, never over half scale,
-  and an eight-note chord under 0.95.
+- **Every preset,** with no sample and with one: a held A3 within −29 to
+  −21 dBFS, never over half scale, and an eight-note chord under 0.95.
 - **The mono fold-down:** no third of an octave more than 10 dB down, and at
   most 6 dB lost in all.
 - **Tuning:** within 3 cents at 110, 220, 440 and 880 Hz.
@@ -335,6 +363,12 @@ Not yet checked on the device:
 - **The head:** a near source on the right is louder there and later on the
   left, the far ear's highs are shadowed, and behind is darker.
 - **orbit:** it closes a circle in 2 s.
+- **Captions:** every value each control can show, and every title, fits its
+  header column in the device's face (values within 53 px at 20 px, titles
+  within 56 px at 10 px; `tests/header_font.h`, from `tools/header_font.py`).
+- **A loaded sample** changes the default sound (Seance, bed at 0): its
+  third-octave spectrum moves at least 8 dB on average (11.4 dB as tested).
+  Every preset also passes the level and chord checks with a sample loaded.
 - **bed, the pool and mono:** the bed plays, and breath plays without one;
   without a sample, bed at full is at least 5 dB noisier and swells and
   sinks at least 3 dB more; a seventeenth note waits for a line; mono
@@ -347,9 +381,10 @@ the top of its file.
 - `tools/render.cpp` writes each preset's phrase as a WAV into a folder you
   give it.
 - `tools/bench.cpp` gives the host CPU estimate.
-- `tools/frames.cpp` checks the screen frame by frame, counts its churn and
-  writes frames as JSON; `frames clear` checks that nothing drawn reaches
-  the footlights, the hint or the pilasters. `tools/frame2svg.py` draws a frame as SVG; it needs
+- `tools/frames.cpp` checks the screen frame by frame, against the SDK's
+  rules and the OP-XY's, counts its churn and writes frames as JSON;
+  `frames clear` sweeps every control, with a sample and without, and checks
+  that nothing drawn reaches the footlights, the hint or the pilasters. `tools/frame2svg.py` draws a frame as SVG; it needs
   `XY_FONT` set to the path of the OP-XY's face, UniversNextPro-Light.ttf,
   which is not in this repository. `tools/make_gif.py` makes `docs/ghost.gif`
   and `tools/make_sheet.py` makes `docs/controls.png` and `docs/controls-1x.png`

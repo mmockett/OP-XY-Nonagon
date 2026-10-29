@@ -53,6 +53,8 @@ const i32 kRise = 1, kRiseMost = 12;
 const i32 kTremor = 3, kTremorMore = 8;
 // The plate tips up to 10 degrees at full Tilt, drawn in half-degree steps.
 const i32 kTiltMost = 100, kTiltStep = 5;  // tenths of a degree
+// 1000 tan of each whole degree, 0 to 11, for the tilt's caption.
+const u32 kGrade[12] = {0, 17, 35, 52, 70, 87, 105, 123, 141, 158, 176, 194};
 // More Bow engages more of the bow: it lies up to this far over the plate at
 // full Bow. Below a light bow it lifts clear of the edge, up to this far at 0.
 // Below half Bow the mallet comes in, from this far away, and hovers this far
@@ -162,8 +164,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
 
     // The header: both pages, in the units the sound uses: the figure's mode
     // pair, the bow's force, how many grains are on the plate and their size,
-    // the material by name, the sand's friction (mu), the plate's tilt and
-    // Shake's largest jolt (in g).
+    // the material by name, the sand's friction (mu), the plate's slope and
+    // Shake's largest jolt (in g). Each fits its column in the OP-XY's font
+    // (tests/screen.cpp measures them).
     const char* const titles[8] = {"Figure", "Bow", "Sand", "Grain", "Plate", "Settle", "Tilt", "Shake"};
     char values[8][header_capacity];
     for (u32 i = 0; i < 8; ++i) header_amount(values[i], header_capacity, input.slots[i]);
@@ -171,11 +174,15 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     number(values[2], header_capacity, static_cast<u32>(sand * static_cast<i32>(kGrains) + 16384) >> 15, 0, "");
     // The grain's size, from 0.06 mm (fine dust) to 7.7 mm (a stone), as tenths or whole millimetres.
     const u32 across = 6 * exp2_q16(grain * 14) >> 16;  // hundredths of a mm
-    if (across < 100) number(values[3], header_capacity, (across + 5) / 10, 1, "mm", true);
+    if (across < 95) number(values[3], header_capacity, (across + 5) / 10, 1, "mm", true);
     else number(values[3], header_capacity, (across + 50) / 100, 0, "mm");
     copy(values[4], header_capacity, plate_index == 0 ? "metal" : plate_index == 1 ? "glass" : "wood");
     number(values[5], header_capacity, static_cast<u32>(10 + (settle * 50 + 16384) / 32767), 2, "");
-    number(values[6], header_capacity, static_cast<u32>((tilt * 10 + 16384) / 32767), 0, "deg");
+    // The plate's slope as a grade (100 tan of its tilt, in percent): 10 degrees
+    // is 18%, and "10deg" would not fit the header in the OP-XY's font.
+    const u32 slope = static_cast<u32>((tilt * kTiltMost + 16384) / 32767), degree = slope / 10;  // tenths of a degree
+    const u32 grade = (kGrade[degree] * (10 - slope % 10) + kGrade[degree + 1] * (slope % 10) + 50) / 100;
+    number(values[6], header_capacity, grade, 0, "%");
     number(values[7], header_capacity, static_cast<u32>((shake_jolt(shake) * 10 + 2048) >> 12), 1, "g");
     // The bow's force on the plate's edge, up to 2 newtons.
     number(values[1], header_capacity, static_cast<u32>((bow * 20 + 16384) / 32767), 1, "N");

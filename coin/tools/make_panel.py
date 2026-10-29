@@ -49,8 +49,8 @@ SPECK, SPECKS = 43, 6                           # four specks and two veins
 COMPANION = 49                                  # three disks: face, edge, reflection, glint
 AIR, AIRS = 61, 5
 RIPPLE, RIPPLES = 66, 8                         # the ring's ripples across the mirror
-GHOST, GHOSTS = 74, 12                          # wobble's ghost of the rim, in dashes
-NODES = 86
+GHOST, GHOSTS = 74, 8                           # wobble's ghost of the rim, in dashes
+NODES = 82
 POINTS = 64
 
 
@@ -212,10 +212,10 @@ for i in range(RIPPLES):
     pts = [(x - CX, y - CY) for x, y in arc(r, math.radians(200), math.radians(340), 0, 32)]
     out.append(path(outline(ribbon(pts, 0.7), 3), "none", G(8), STROKE, RIPPLE + i, (CX, CY)))
 
-# ---- Wobble's ghost: twelve dashes, each 16 px along +x about its middle
+# ---- Wobble's ghost: eight dashes, each 24 px along +x about its middle
 # (display.cpp lays them along the rim of the disk rocked further over).
 for i in range(GHOSTS):
-    out.append(path(outline(ribbon([(-8, 0), (8, 0)], 0.5), 3), "none", G(9), STROKE, GHOST + i, (CX, CY)))
+    out.append(path(outline(ribbon([(-12, 0), (12, 0)], 0.5), 3), "none", G(9), STROKE, GHOST + i, (CX, CY)))
 
 for i, grey in enumerate(GREYS):
     out.append(f'<circle id="{ID}_palette_{i}" cx="640" cy="0" r="1" fill="{grey}" stroke="{grey}" stroke-width="{STROKE}"/>')
@@ -254,19 +254,15 @@ for i in range(16):
     a = 2 * math.pi * i / 16
     milled += [(0.9, a), (0.9, a + 0.16), (0.68, a + 0.23), (0.68, a + 0.36)]
 bevel = [(0.84, 2 * math.pi * i / 64) for i in range(64)]   # glass: display.cpp draws the underside's rim instead
-# Wood: grain across the face, four wavy lines out and back as one ribbon,
-# the way back under a pixel from the way out, so each reads as one line.
-grain_xy = []
-for line in range(4):
-    y = -0.6 + 0.4 * line
-    xs = [-0.8 + 1.6 * k / 7 for k in range(8)]
-    if line % 2:
-        xs = xs[::-1]
-    for x in xs:
-        span = math.sqrt(max(0.0, 0.85 ** 2 - y * y))
-        grain_xy.append((x * span / 0.8, y + 0.05 * math.sin(5 * x + line)))
-back = [(x + 0.004, y + 0.012) for x, y in grain_xy[::-1]]
-grain = [(math.hypot(x, y), math.atan2(y, x)) for x, y in grain_xy + back]
+# Wood: an end-grain growth ring, wavy and a little off centre: one closed
+# line with area, as the device needs (a line traced out and back merges into
+# a streak when the face is seen at a low angle).
+grain = []
+for i in range(POINTS):
+    t = 2 * math.pi * i / POINTS
+    r = 0.52 + 0.05 * math.sin(3 * t + 0.7) + 0.025 * math.sin(7 * t + 1.9)
+    x, y = 0.1 + r * math.cos(t), 0.05 + r * math.sin(t)
+    grain.append((math.hypot(x, y), math.atan2(y, x)))
 patterns = [polar(resample(rose, POINTS)), polar(milled), polar(bevel), polar(grain)]
 for p in patterns:
     assert len(p) == POINTS and len(set(p)) == POINTS

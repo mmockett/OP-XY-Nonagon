@@ -2,6 +2,8 @@
 // python sdk.py test --machine <folder>.
 #include <algorithm>
 #include "analysis.h"
+#include "header_font.h"
+#include "../captions.h"
 #include <cstdio>
 #include <cstdlib>
 
@@ -59,10 +61,12 @@ double peak_near(const Spectra& s, const std::vector<double>& ch, double hz) {
 int main() {
     std::vector<double> left, right;
 
-    {   // Every preset: a held A3 at about Hexagon's level (-24 dBFS), never over
-        // half scale, and an eight-note chord that stays below full scale.
+    {   // Every preset, with no sample and with one: a held A3 at about
+        // Hexagon's level (-24 dBFS), never over half scale, and an eight-note
+        // chord that stays below full scale.
+        for (u32 sampled = 0; sampled < 2; ++sampled)
         for (const Preset& p : presets) {
-            play({{0, 4, 57}}, p.values, 4.3, left, right, p.values[7] > 0, 0.05, 0.2);
+            play({{0, 4, 57}}, p.values, 4.3, left, right, sampled != 0, 0.05, 0.2);
             std::vector<double> l(left.begin() + size_t(1.5 * fs), left.begin() + size_t(4 * fs)), r(right.begin() + size_t(1.5 * fs), right.begin() + size_t(4 * fs));
             const double level = 10 * std::log10((rms(l) * rms(l) + rms(r) * rms(r)) / 2);
             check(level > -29 && level < -21, "every preset sounds at about Hexagon's level");
@@ -70,7 +74,7 @@ int main() {
             std::vector<Note> chord;
             const int notes[8] = {48, 52, 55, 59, 62, 66, 69, 72};
             for (int n : notes) chord.push_back({0, 2.5, double(n)});
-            play(chord, p.values, 3, left, right, p.values[7] > 0, 0, 0.3);
+            play(chord, p.values, 3, left, right, sampled != 0, 0, 0.3);
             check(std::fmax(peak(left), peak(right)) < 0.95, "an eight-note chord stays below full scale");
             // The mono fold-down: no third of an octave loses more than 10 dB
             // against the ears, and the whole loses at most 6 dB.
@@ -210,6 +214,22 @@ int main() {
         const double b = rms(left);
         check(a > 0.01 && b > 0.01, "the bed plays, and without a sample breath does");
     }
+    {   // A loaded sample tells at the defaults (bed at 0): the held note's
+        // third-octave spectrum moves by 8 dB or more on average.
+        std::vector<double> bands[2];
+        for (u32 k = 0; k < 2; ++k) {
+            play({{0, 4, 57}}, presets[0].values, 4.3, left, right, k == 1, 0.05, 0.2);
+            std::vector<double> l(left.begin() + size_t(1.5 * fs), left.begin() + size_t(4 * fs)), rr(right.begin() + size_t(1.5 * fs), right.begin() + size_t(4 * fs));
+            Spectra s(l, rr, 8192);
+            double total = 0;
+            for (double f = 50; f < 10000; f *= 1.26) { bands[k].push_back(s.sum(s.mono, f, f * 1.26) + 1e-20); total += bands[k].back(); }
+            for (double& e : bands[k]) e = 10 * std::log10(e / total);
+        }
+        double moved = 0;
+        for (size_t i = 0; i < bands[0].size(); ++i) moved += std::fabs(bands[1][i] - bands[0][i]) / bands[0].size();
+        std::printf("a loaded sample at the defaults moves the spectrum %.1f dB a third-octave\n", moved);
+        check(moved > 8, "a loaded sample changes the default sound");
+    }
     {   // Without a sample, bed is Ghost's own whisper: noisier, and in gusts.
         double v[8] = {0.6, 0.6, 0.6, 0, 0, 0, 0.5, 0};
         double noise[2], spread[2];
@@ -250,6 +270,32 @@ int main() {
         bool sound = false;
         for (u32 i = 0; i < opxy::block_frames; ++i) sound = sound || r.out[i] != 0;
         check(sound, "mono output sounds");
+    }
+    {   // Every caption fits its header column on the device, in its own
+        // face (tests/header_font.h): each control's value, swept in 4097
+        // steps, within 53 px at 20 px, and each title within 56 px at 10 px.
+        struct Width {
+            static double of(const char* text, double px) {
+                double units = 0;
+                for (; *text; ++text) units += header_font_advance[(*text >= 32 && *text <= 126 ? *text : '?') - 32];
+                return units * px / header_font_units;
+            }
+        };
+        double widest = 0;
+        char which[opxy::draw::header_capacity] = "";
+        for (u32 c = 0; c < 8; ++c)
+            for (u32 v = 0; v <= 4096; ++v) {
+                opxy::draw::Input input = {};
+                input.slots[c] = v == 4096 ? 0x7fffffff : i32(v << 19);
+                char values[8][opxy::draw::header_capacity] = {};
+                ghost::captions::fill(input, (v & 1) != 0, values);   // with a sample and without
+                const double w = Width::of(values[c], 20);
+                if (w > widest) { widest = w; opxy::draw::copy(which, sizeof which, values[c]); }
+            }
+        double widest_title = 0;
+        for (const char* title : ghost::captions::titles) widest_title = std::fmax(widest_title, Width::of(title, 10));
+        std::printf("captions: the widest value \"%s\" %.1f px (53 allowed), the widest title %.1f px (56)\n", which, widest, widest_title);
+        check(widest <= 53 && widest_title <= 56, "every caption fits its column on the device");
     }
     if (failures) { std::printf("%d failures\n", failures); return 1; }
     std::printf("ghost: all sound checks passed\n");

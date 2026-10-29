@@ -35,8 +35,8 @@ const i32 frame_gap = 128;        // Q10 seconds: the wings are solved at most e
 const i32 flick_time = 205;       // Q10 seconds: the antennae flick out and back
 const i32 sweep_per_tilt = 70;    // tenths of a degree the forewing sweeps back a unit of tilt (21 degrees at 3)
 const i32 tail_longest = 40;      // px: the tail at the longest glow, while the screen's foot allows
+const u32 tail_hold = 6;          // margin points either side of the tail's tip that hold its reach
 const i32 foot = 88;              // px below the centre the tail may reach (212, its strap and stroke within 216)
-const i32 lit_half = 98;          // the lit band's two edges, a hair either side of its share (0.003 of the reach): one line
 const i32 block_q16 = 95;         // a block, Q16 seconds
 const i32 bump = 3932;            // a state's lobe spans 0.12 of the spectrum either way, Q15
 const i32 lobe_low = 23593;       // the margin's reach at a gap and at a band, Q15: 0.72 to 1
@@ -95,12 +95,17 @@ inline void flux_caption(char* out, u32 alpha) {
     out[0] = '.';
     digits(out + 1, v, 3);
 }
-// Glow: "40ms" to "990ms", then "1.0s" to "8.0s".
+// Glow: "40ms" to "99ms", then ".10s" to ".99s", then "1.0s" to "8.0s"
+// (three digits of milliseconds would not fit the column).
 inline void glow_caption(char* out, i32 glow) {
     const u32 ms = (exp2_q16(glow + 653083) + 32768u) >> 16;   // seconds x 1000 (log2 1000, Q16)
-    if (ms < 995) {
+    if (ms < 100) {
         digits(out, ms, 1);
         append(out, "ms");
+    } else if (ms < 995) {
+        out[0] = '.';
+        digits(out + 1, ((ms + 5) * 6554u) >> 16, 2);   // hundredths of a second
+        append(out, "s");
     } else {
         decimal(out, mul16u(ms + 50, 656), 1);   // tenths of a second
         append(out, "s");
@@ -113,18 +118,14 @@ inline void site_caption(char* out, i32 at) {
     else if (d >= 8) copy(out, header_capacity, "end");
     else digits(out, d, 1);
 }
-// Decibels down: "-21dB", "0dB".
+// Decibels down, as a cut: "20dB", "0dB" (a minus sign would not fit the
+// column in the OP-XY's font at two digits).
 inline void down_caption(char* out, u32 db) {
-    if (db) {
-        out[0] = '-';
-        digits(out + 1, db, 1);
-    } else {
-        digits(out, 0, 1);
-    }
+    digits(out, db, 1);
     append(out, "dB");
 }
-// Strike: "pad" at none, "pluck" at full, else the held hum's level under
-// the strike, against a pad's: 20 log10 (1 - strike).
+// Strike: "pad" at none, "pluck" at full, else how far the held hum lies
+// under a pad's level: -20 log10 (1 - strike).
 inline void strike_caption(char* out, i32 knob, i32 struck) {
     if (!knob) {
         copy(out, header_capacity, "pad");
@@ -147,6 +148,22 @@ inline void wingbeat_caption(char* out, i32 control) {
     append(out, "Hz");
 }
 
+
+const char* const titles[8] = {"flux", "coupling", "spread", "strike", "glow", "site", "tilt", "wingbeat"};
+
+// Every control's caption, in real units, from the controls (Q31). Each fits
+// its column in the OP-XY's font (tests/captions.cpp measures every one).
+inline void captions(const i32* p, char values[8][header_capacity]) {
+    flux_caption(values[FLUX], warp(flux(p[FLUX]), snap_pull));
+    decimal(values[COUPLING], static_cast<u32>((coupling(p[COUPLING]) * 100 + 2048) >> 12), 2);
+    digits(values[SPREAD], static_cast<u32>((spread_semitones(p[SPREAD]) + 128) >> 8), 1);
+    append(values[SPREAD], "st");
+    strike_caption(values[STRIKE], q15(p[STRIKE]), strike(p[STRIKE]));
+    glow_caption(values[GLOW], glow_log2(p[GLOW]));
+    site_caption(values[SITE], site(p[SITE]));
+    down_caption(values[TILT], static_cast<u32>((tilt(p[TILT]) * 8 + 32768) >> 16));   // the top partial's darkening
+    wingbeat_caption(values[WINGBEAT], p[WINGBEAT]);
+}
 
 // ---------------------------------------------------------------- the wings
 
@@ -190,53 +207,49 @@ inline void seal(Frame& frame, DisplayState& state, u32 path, bool changed) {
     frame.paths[path].key = state.keys[path];
 }
 
-// A wing's margin at the reaches (Q12), one a margin point: the root's two
-// points and the margin, swept and scaled, with the tail drawn out `tail` px
-// (Q10) along its direction, as far as the screen's foot allows.
-inline void margin_outline(Frame& frame, DisplayState& state, u32 side, const i32* reaches, i32 scale, i32 sweep, i32 tail) {
+// A wing's outline: the margin at the reaches (Q12, one a margin point, or
+// all at `reach` when there are none), swept and scaled, with the tail drawn
+// out `tail` px (Q10) along its direction as far as the screen's foot allows,
+// closed through two root points on the line between the margin's ends, 0.4
+// of the way in from each. So the outline runs straight on through the root
+// and never turns back on itself: the OP-XY draws a join that doubles back
+// as a spike across the whole screen.
+inline void wing_outline(Frame& frame, DisplayState& state, u32 path, u32 side, const i32* reaches, i32 reach, i32 scale,
+                         i32 sweep, i32 tail) {
     const Turn back = rotation(-sweep);
-    i32 tx, ty;
-    swept(plate::tail_tip, reaches[plate::tail_tip], sweep, back, tx, ty);
-    scaled(tx, ty, scale);
-    const i32 room = (foot << 10) - ty;
-    const i32 most = room > 0 ? (room * 1103) >> 10 : 0;   // room / tail_dy
-    const i32 length = tail < most ? tail : most;
-    bool changed = false;
-    for (u32 i = 0; i < 64; ++i) {
-        i32 x, y;
-        if (i == 0 || i == 63) {
-            x = plate::pivot_x * unit;
-            y = i ? 13 * unit : -13 * unit;
-            scaled(x, y, scale);
-        } else {
-            swept(i - 1, reaches[i - 1], sweep, back, x, y);
-            scaled(x, y, scale);
-            const i32 t = plate::tail[i - 1];
-            if (t && length > 0) {
-                const i32 d = ((length >> 5) * (t >> 5)) >> 5;   // Q10 px
-                x += (d * plate::tail_dx) >> 10;
-                y += (d * plate::tail_dy) >> 10;
-            }
-        }
-        finish(frame, side, side, i, x, y, changed);
+    i32 length = 0;
+    if (tail > 0) {
+        i32 tx, ty;
+        swept(plate::tail_tip, reaches ? reaches[plate::tail_tip] : reach, sweep, back, tx, ty);
+        scaled(tx, ty, scale);
+        const i32 room = (foot << 10) - ty;
+        const i32 most = room > 0 ? (room * 1103) >> 10 : 0;   // room / tail_dy
+        length = tail < most ? tail : most;
     }
-    seal(frame, state, side, changed);
-}
-
-// A wing's lit band: out along every other margin point a hair outside
-// `share` and back a hair inside, one line, swept and scaled.
-inline void lit_outline(Frame& frame, DisplayState& state, u32 side, i32 share, i32 width, i32 scale, i32 sweep) {
-    const Turn back = rotation(-sweep);
-    const i32 outer = (share + width) >> 3, inner = (share - width) >> 3;
-    bool changed = false;
-    for (u32 n = 0; n < 64; ++n) {
-        const u32 i = n < 31 ? 2 * n : n == 31 ? 61 : n < 63 ? 61 - 2 * (n - 32) : 0;
+    i32 xs[64], ys[64];
+    for (u32 i = 1; i < 63; ++i) {
         i32 x, y;
-        swept(i, n < 32 ? outer : inner, sweep, back, x, y);
+        swept(i - 1, reaches ? reaches[i - 1] : reach, sweep, back, x, y);
         scaled(x, y, scale);
-        finish(frame, 2 + side, side, n, x, y, changed);
+        const i32 t = plate::tail[i - 1];
+        if (t && length > 0) {
+            const i32 d = ((length >> 5) * (t >> 5)) >> 5;   // Q10 px
+            x += (d * plate::tail_dx) >> 10;
+            y += (d * plate::tail_dy) >> 10;
+        }
+        xs[i] = x;
+        ys[i] = y;
     }
-    seal(frame, state, 2 + side, changed);
+    // The root's points: on the line from the margin's last point (the
+    // hindwing's, below) to its first (the forewing's, above).
+    const i32 dx = xs[1] - xs[62], dy = ys[1] - ys[62];
+    xs[63] = xs[62] + ((dx * 13107) >> 15);   // 0.4 of the way
+    ys[63] = ys[62] + ((dy * 13107) >> 15);
+    xs[0] = xs[62] + ((dx * 19661) >> 15);    // 0.6
+    ys[0] = ys[62] + ((dy * 19661) >> 15);
+    bool changed = false;
+    for (u32 i = 0; i < 64; ++i) finish(frame, path, side, i, xs[i], ys[i], changed);
+    seal(frame, state, path, changed);
 }
 
 // The margin at share u (Q15) of its length, Q10 px from the centre (left wing).
@@ -306,6 +319,15 @@ inline void draw_wings(DisplayState& state, u32 alpha, i32 lambda, i32 at) {
         const i32 r = lobe_low + (((32768 - lobe_low) * swell[i]) >> 15);
         state.reach[i] = (r < floor_reach ? floor_reach : r) >> 3;   // Q12
     }
+    // Under the tail's strap the margin holds its reach at the tip, easing
+    // back to the lobes over four points either side, so no notch between
+    // lobes folds the strap's edge back on itself.
+    const i32 held_reach = state.reach[plate::tail_tip];
+    for (u32 i = plate::tail_tip - tail_hold - 4; i <= plate::tail_tip + tail_hold + 4; ++i) {
+        const i32 d = static_cast<i32>(i > plate::tail_tip ? i - plate::tail_tip : plate::tail_tip - i) - tail_hold;   // past the hold
+        const i32 keep = d <= 0 ? 32768 : 32768 - d * 6554;   // 1 to 0.2 over the four
+        state.reach[i] += ((held_reach - state.reach[i]) * keep) >> 15;
+    }
     // The eyespots: the most localized states, at their energy along the
     // margin and their distance from the chain's middle out from the root.
     i32 centre[partials], spread[partials];
@@ -342,8 +364,8 @@ inline void draw_wings(DisplayState& state, u32 alpha, i32 lambda, i32 at) {
 inline void place_wing(Frame& frame, DisplayState& state, u32 side, i32 scale, i32 light) {
     const i32 seen = light * 2 - ((light * light) >> 15);   // light (2 - light): a fading ring stays in view
     const i32 sweep = state.sweep;
-    margin_outline(frame, state, side, state.reach, scale, sweep, state.tail);
-    lit_outline(frame, state, side, state.lit_share, lit_half, scale, sweep);
+    wing_outline(frame, state, side, side, state.reach, 0, scale, sweep, state.tail);
+    wing_outline(frame, state, 2 + side, side, 0, state.lit_share >> 3, scale, sweep, 0);
     i32 x, y;
     on_screen(side, -plate::wing_middle * unit, 0, scale, x, y);
     place(frame, plate::edges + side, x, y, 2 * unit, EDGE, stroke);
@@ -553,17 +575,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     }
 
     // The two-page header, captions in real units.
-    const char* const titles[8] = {"flux", "coupling", "spread", "strike", "glow", "site", "tilt", "wingbeat"};
     char values[8][header_capacity] = {};
-    flux_caption(values[FLUX], warp(flux(p[FLUX]), snap_pull));
-    decimal(values[COUPLING], static_cast<u32>((lambda * 100 + 2048) >> 12), 2);
-    digits(values[SPREAD], static_cast<u32>((spread_semitones(p[SPREAD]) + 128) >> 8), 1);
-    append(values[SPREAD], "st");
-    strike_caption(values[STRIKE], knob, struck);
-    glow_caption(values[GLOW], glow);
-    site_caption(values[SITE], site(p[SITE]));
-    down_caption(values[TILT], static_cast<u32>((tilt(p[TILT]) * 8 + 32768) >> 16));   // the top partial's darkening
-    wingbeat_caption(values[WINGBEAT], p[WINGBEAT]);
-    page_header(state.header, input, frame, titles, values, plate::header);
+    captions(p, values);
+    page_header(state.header, input, frame, screen::titles, values, plate::header);
 }
 }

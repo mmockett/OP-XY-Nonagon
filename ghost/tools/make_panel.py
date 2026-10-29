@@ -38,8 +38,53 @@ def distinct(points):
     return kept
 
 
-def outline(points):
-    return "M" + " L".join(f"{num(x)},{num(y)}" for x, y in distinct(points)) + " Z"
+# The OP-XY's drawing rules, beyond the SDK's (MNMD, docs/SCREEN.md): one
+# subpath of at most 64 points; neighbouring points an eighth of a pixel or
+# more apart on some axis (nearer, they merge); a closing edge a quarter of a
+# pixel or more (shorter, it draws as a long sliver); some area, and no turn
+# straight back (either draws as streaks).
+APART = 1 / 8
+
+
+def span(a, b):
+    return max(abs(b[0] - a[0]), abs(b[1] - a[1]))
+
+
+def drawable(points, exact=False):
+    """The outline with near points dropped (unless exact: a reshaping
+    outline's 64 points stay as they are), started where both its edges are
+    longest; exits if it still breaks a rule."""
+    kept = []
+    for p in distinct(points):
+        if exact or not kept or span(kept[-1], p) >= APART:
+            kept.append(p)
+    while not exact and len(kept) > 2 and span(kept[-1], kept[0]) < APART:
+        kept.pop()
+    m = len(kept)
+    start = 0 if exact else max(range(m), key=lambda i: min(span(kept[i - 1], kept[i]), span(kept[i], kept[(i + 1) % m])))
+    kept = kept[start:] + kept[:start]
+    area, fault = 0.0, None
+    for i in range(m):
+        a, b, c = kept[i - 1], kept[i], kept[(i + 1) % m]
+        ux, uy, vx, vy = b[0] - a[0], b[1] - a[1], c[0] - b[0], c[1] - b[1]
+        if span(a, b) < APART:
+            fault = f"points {i - 1} and {i} merge"
+        if ux * vx + uy * vy < 0 and abs(ux * vy - uy * vx) < 0.02 * math.hypot(ux, uy) * math.hypot(vx, vy):
+            fault = f"turns straight back at point {i}"
+        area += (b[0] * c[1] - c[0] * b[1]) / 2
+    if m > 64:
+        fault = f"{m} points"
+    elif span(kept[-1], kept[0]) < 2 * APART:
+        fault = "closes over less than a quarter of a pixel"
+    elif abs(area) < 0.05:
+        fault = "has no area"
+    if fault:
+        sys.exit(f"make_panel.py: an outline near ({kept[0][0]:.1f}, {kept[0][1]:.1f}) {fault}")
+    return kept
+
+
+def outline(points, exact=False):
+    return "M" + " L".join(f"{num(x)},{num(y)}" for x, y in drawable(points, exact)) + " Z"
 
 
 count = [0]
@@ -68,6 +113,10 @@ def bezier(p0, p1, p2, p3, n=16):
 
 
 def ribbon(line, width, taper=False):
+    # At most 31 points along it, so the ribbon keeps under 64; a taper keeps
+    # its ends 0.3 px wide, so they close over more than a quarter of a pixel.
+    if len(line) > 31:
+        line = [line[round(i * (len(line) - 1) / 30)] for i in range(31)]
     left, right = [], []
     n = len(line)
     for i, (x, y) in enumerate(line):
@@ -75,7 +124,7 @@ def ribbon(line, width, taper=False):
         dx, dy = b[0] - a[0], b[1] - a[1]
         length = math.hypot(dx, dy) or 1
         nx, ny = -dy / length, dx / length
-        w = width / 2 * (max(0.2, math.sin(math.pi * i / (n - 1))) if taper else 1)
+        w = max(0.15, width / 2 * math.sin(math.pi * i / (n - 1))) if taper else width / 2
         left.append((x + nx * w, y + ny * w))
         right.append((x - nx * w, y - ny * w))
     return left + right[::-1]
@@ -202,12 +251,29 @@ if bad:
 # on the stage ever reaches:
 # "load a sample", "shift +" and the Sample key's icon, in Grains' face and
 # greys. Node 21, a black cover, hides it once a sample is loaded.
-HINT = (154.0, 326.0, 200.0, 220.0)       # the cover: x0, x1, y0, y1
-BASE, ICON = 215.0, 15.0
-hint = [f'<text transform="matrix(1 0 0 1 158.6 {num(BASE)})" fill="#CBCBCB" {FONT} font-size="15px">load a sample</text>',
-        f'<text transform="matrix(1 0 0 1 264.8 {num(BASE)})" fill="#7D7D7D" {FONT} font-size="13px">shift +</text>']
+# Laid out by the face's own advance widths (tests/header_font.h), each
+# widened by 15%, as the OP-XY draws artwork text wider than its advances,
+# with a 10 px gap between the parts even then.
+import re
+_font = (ROOT / "tests/header_font.h").read_text()
+_units = int(re.search(r"header_font_units = (\d+)", _font).group(1))
+_advance = [int(v) for v in re.search(r"header_font_advance\[95\] = \{([^}]*)\}", _font).group(1).replace("\n", " ").split(",") if v.strip()]
+
+
+def text_width(text, px):
+    return sum(_advance[ord(c) - 32] for c in text) * px / _units * 1.15
+
+
+BASE, ICON, GAP = 215.0, 15.0, 10.0
+load_w, shift_w = text_width("load a sample", 15), text_width("shift +", 13)
+LOAD_X = 240 - (load_w + GAP + shift_w + GAP + ICON) / 2
+SHIFT_X = LOAD_X + load_w + GAP
+ICON_X = SHIFT_X + shift_w + GAP
+HINT = (LOAD_X - 4, ICON_X + ICON + 4, 200.0, 220.0)   # the cover: x0, x1, y0, y1
+hint = [f'<text transform="matrix(1 0 0 1 {num(LOAD_X)} {num(BASE)})" fill="#CBCBCB" {FONT} font-size="15px">load a sample</text>',
+        f'<text transform="matrix(1 0 0 1 {num(SHIFT_X)} {num(BASE)})" fill="#7D7D7D" {FONT} font-size="13px">shift +</text>']
 # Grains' icon (a 28 px key at 256, 129), scaled to ICON.
-k, KX, KY = ICON / 28, 306.3, BASE - 12.5
+k, KX, KY = ICON / 28, ICON_X, BASE - 12.5
 icon = lambda x, y: (KX + (x - 256) * k, KY + (y - 129) * k)
 hint.append(path([icon(x, y) for x, y in ((257.4237, 129), (282.5763, 129), (284, 130.4237), (284, 155.5763), (282.5763, 157),
                                          (257.4237, 157), (256, 155.5763), (256, 130.4237))], "#7D7D7D", 0.8))
@@ -270,7 +336,7 @@ figure = ["#pragma once", "// Generated by tools/make_panel.py; edit the generat
 ring = [(6 * math.cos(2 * math.pi * i / 64), 6 * math.sin(2 * math.pi * i / 64)) for i in range(64)]
 dynamic = [
     # The chalk path on the floor (path 3), under everything: where the apparition walks.
-    f'<path id="{ID}_node_3" transform="matrix(1 0 0 1 240 174)" d="{outline(ring)}" fill="none" stroke="#555555" stroke-width="0.6"/>',
+    f'<path id="{ID}_node_3" transform="matrix(1 0 0 1 240 174)" d="{outline(ring, True)}" fill="none" stroke="#555555" stroke-width="0.6"/>',
 ]
 # Halos (12..14 the apparition's, 17..19 its twin's): a nimbus round each
 # head, rings drawn at their origin, filled black and drawn largest first, so
@@ -285,12 +351,12 @@ mask = outline([(x * 0.95, y) for x, y in bowed])
 dynamic += [
     # The ghost's twin first, behind it, and its mouth; the ghost; its mouth (paths 1, 0, 2).
     f'<path id="{ID}_node_23" transform="matrix(1 0 0 1 240 190)" d="{mask}" fill="#000000" stroke="#000000" stroke-width="0.5"/>',
-    f'<path id="{ID}_node_1" transform="matrix(1 0 0 1 240 190)" d="{outline(bowed)}" fill="none" stroke="#555555" stroke-width="0.6"/>',
+    f'<path id="{ID}_node_1" transform="matrix(1 0 0 1 240 190)" d="{outline(bowed, True)}" fill="none" stroke="#555555" stroke-width="0.6"/>',
     # The twin's mouth (node 20): an oval at its origin, sized to the vowel.
     f'<path id="{ID}_node_20" d="{outline(ellipse(0, 0, 3, 3.5, 24))}" fill="none" stroke="#555555" stroke-width="0.5"/>',
     f'<path id="{ID}_node_22" transform="matrix(1 0 0 1 240 190)" d="{mask}" fill="#000000" stroke="#000000" stroke-width="0.5"/>',
-    f'<path id="{ID}_node_0" transform="matrix(1 0 0 1 240 190)" d="{outline(bowed)}" fill="none" stroke="#999999" stroke-width="0.6"/>',
-    f'<path id="{ID}_node_2" transform="matrix(1 0 0 1 240 136)" d="{outline(ring)}" fill="none" stroke="#999999" stroke-width="0.5"/>',
+    f'<path id="{ID}_node_0" transform="matrix(1 0 0 1 240 190)" d="{outline(bowed, True)}" fill="none" stroke="#999999" stroke-width="0.6"/>',
+    f'<path id="{ID}_node_2" transform="matrix(1 0 0 1 240 136)" d="{outline(ring, True)}" fill="none" stroke="#999999" stroke-width="0.5"/>',
 ]
 # Two more apparitions for a second and third held note: the bowed figure, smaller.
 small = outline([(x * 0.8, y * 0.8) for x, y in bowed])

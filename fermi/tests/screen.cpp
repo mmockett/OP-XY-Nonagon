@@ -6,10 +6,20 @@
 //   - Churn: nodes changed a frame stay at a mean of 20 or fewer, with a low peak.
 //   - The screen's chain is the voice's chain: with the controls still, the
 //     two hold the same state after the same time.
+//   - Every frame is drawn as the device draws it: no outline it shows, at
+//     the size and turn its node gives it, has neighbouring points within an
+//     eighth of a pixel (the device merges them), a closing edge under a
+//     quarter of a pixel (a sliver), or no area (a streak). Checked in every
+//     frame of every scene here, and over a sweep of each control.
+//   - Every caption fits its column in the device's face (tests/widths.h):
+//     a value at 20 px within 53 px, a title at 10 px within 56, over a fine
+//     sweep of every control and their combinations.
 // Given a file name, it also writes a scene's frames as JSON lines for
 // tools/make_gif.py.
 #include "../engine.cpp"
 #include "../display.cpp"
+#include "outlines.h"
+#include "widths.h"
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -22,6 +32,52 @@ void check(bool ok, const char* what) {
 }
 opxy::i32 q31(double v) { return v >= 1 ? 0x7fffffff : static_cast<opxy::i32>(v * 2147483647.0); }
 
+// The device's faults in one outline (px); the first found, or null.
+const char* fault(const double* x, const double* y, unsigned n) {
+    for (unsigned i = 0; i + 1 < n; ++i)
+        if (std::fabs(x[i + 1] - x[i]) < 0.125 && std::fabs(y[i + 1] - y[i]) < 0.125) return "neighbouring points merge";
+    if (n > 2 && std::fmax(std::fabs(x[0] - x[n - 1]), std::fabs(y[0] - y[n - 1])) < 0.25) return "its closing edge is under a quarter of a pixel";
+    double area = 0;
+    for (unsigned i = 0; i < n; ++i) area += x[i] * y[(i + 1) % n] - x[(i + 1) % n] * y[i];
+    if (std::fabs(area) / 2 < 0.05) return "it has no area";
+    for (unsigned i = 0; i < n; ++i) {
+        const unsigned a = (i + n - 1) % n, c = (i + 1) % n;
+        const double ux = x[i] - x[a], uy = y[i] - y[a], vx = x[c] - x[i], vy = y[c] - y[i];
+        const double lu = std::hypot(ux, uy), lv = std::hypot(vx, vy);
+        if (lu > 0 && lv > 0 && (ux * vx + uy * vy) / (lu * lv) < -0.995) return "it turns straight back";
+    }
+    return nullptr;
+}
+// Every shown outline in a frame, placed as its node places it; returns the faults.
+unsigned device_faults(const fermi::Frame& frame, const char* when, unsigned& reported) {
+    unsigned found = 0;
+    static double x[256], y[256];
+    for (const outlines::Outline& o : outlines::nodes) {
+        const opxy::draw::Node& d = frame.nodes[o.node];
+        if (d.x == opxy::draw::hidden_x * opxy::draw::unit) continue;
+        unsigned n = 0;
+        if (o.node < fermi::Frame::path_count) {   // a reshaping outline: its points, Q10 about the node
+            for (unsigned i = 0; i < fermi::Frame::point_count; ++i, ++n) {
+                x[n] = frame.paths[o.node].points[i].x / 1024.0;
+                y[n] = frame.paths[o.node].points[i].y / 1024.0;
+            }
+        } else {
+            for (unsigned i = 0; i < o.count; ++i, ++n) { x[n] = outlines::points[2 * (o.first + i)]; y[n] = outlines::points[2 * (o.first + i) + 1]; }
+        }
+        const double k = d.scale / 1024.0, a = d.cos / 1024.0 * k, b = d.sin / 1024.0 * k;
+        for (unsigned i = 0; i < n; ++i) {
+            const double px = x[i], py = y[i];
+            x[i] = a * px - b * py + d.x / 1024.0;
+            y[i] = b * px + a * py + d.y / 1024.0;
+        }
+        if (const char* what = fault(x, y, n)) {
+            ++found;
+            if (reported < 12) { std::printf("  %s: node %u (scale %.3f): %s\n", when, o.node, k, what); ++reported; }
+        }
+    }
+    return found;
+}
+
 struct Screen {
     fermi::DisplayState state;
     fermi::Frame frame, before;
@@ -30,6 +86,8 @@ struct Screen {
     unsigned frames = 0;
     double churn_sum = 0;
     unsigned churn_peak = 0;
+    unsigned faults = 0, reported = 0;
+    const char* scene_name = "a scene";
     std::FILE* out = nullptr;
     Screen() {
         std::memset(&state, 0, sizeof state);
@@ -61,6 +119,7 @@ struct Screen {
             explain();
             check(false, "an invalid frame");
         }
+        faults += device_faults(frame, scene_name, reported);
         const unsigned c = changed();
         if (count) {
             ++frames;
@@ -163,6 +222,106 @@ void valid_everywhere() {
     check(s.state.chain.ticks > 8u * 100000, "a long run does not run the chain on");
     std::printf("screen: valid through %s (a 2-minute note runs its chain %u units)\n",
                 failures ? "SOME" : "every masses, mode and energy setting, the control corners and long runs", s.state.chain.ticks / 8);
+}
+
+void drawn_as_the_device_draws() {
+    // Each control swept over nine settings, the others at their defaults,
+    // idle and through a note; then the smallest and largest bobs and coils.
+    const double defaults[8] = {0.5, 2.5 / 7, 0, 0.39, 0.15, 0.125, 0, 0.5 / 64};
+    unsigned faults = 0, frames = 0, reported = 0;
+    auto run = [&](Screen& s) {
+        s.reported = reported;
+        s.tick(1 / 30.0, false);
+        for (int f = 0; f < 15; ++f) s.tick(1 / 30.0, false);
+        s.note();
+        for (int f = 0; f < 45; ++f) s.tick(1 / 30.0, false);
+        s.release();
+        for (int f = 0; f < 15; ++f) s.tick(1 / 30.0, false);
+        faults += s.faults;
+        frames += 76;
+        reported = s.reported;
+    };
+    for (int k = 0; k < 8; ++k)
+        for (int v = 0; v <= 8; ++v) {
+            Screen s;
+            s.scene_name = "the sweep";
+            for (int j = 0; j < 8; ++j) s.controls[j] = defaults[j];
+            s.controls[k] = v / 8.0;
+            run(s);
+        }
+    for (int masses = 0; masses < 7; masses += 6)
+        for (int corner = 0; corner < 8; ++corner) {
+            Screen s;
+            s.scene_name = "the corners";
+            for (int j = 0; j < 8; ++j) s.controls[j] = defaults[j];
+            s.controls[1] = (masses + 0.5) / 7;
+            s.controls[4] = corner & 1 ? 1 : 0;   // beads or heavy bobs
+            s.controls[2] = corner & 2 ? 1 : 0;   // the coils' kind
+            s.controls[0] = corner & 4 ? 1 : 0;
+            s.controls[5] = corner & 4 ? 3.5 / 4 : 0.5 / 4;
+            run(s);
+        }
+    std::printf("screen: %u frames over a sweep of every control and the bobs' and coils' extremes, %u outlines the device would "
+                "streak or merge\n", frames, faults);
+    check(faults == 0, "an outline breaks the device's drawing rules");
+}
+
+// A caption's width in the header's face, px at the given size.
+double width(const char* text, double px) {
+    double units = 0;
+    for (const char* c = text; *c; ++c) units += *c >= 32 && *c < 127 ? widths::advance[*c - 32] : widths::units;
+    return units * px / widths::units;
+}
+void captions_fit() {
+    // The header: titles at 10 px with 58 px to the next column, values at
+    // 20 px with 55 (the last column's room to the screen's edge); 2 px kept
+    // clear. Every caption over a fine sweep: the controls the energy and
+    // time captions read (masses, mode, springs, energy, time) together,
+    // dispersion with masses and mode, and damping and seed alone.
+    static const char* const titles[8] = {"energy", "masses", "springs", "time", "dispersion", "mode", "damping", "seed"};
+    unsigned checked = 0, wide = 0;
+    double widest = 0;
+    char widest_text[opxy::draw::header_capacity] = "";
+    for (const char* t : titles)
+        if (width(t, 10) > 56) { std::printf("  the title \"%s\" is %.1f px wide\n", t, width(t, 10)); ++wide; }
+    double c[8] = {0.5, 2.5 / 7, 0, 0.39, 0.15, 0.125, 0, 0.5 / 64};
+    auto take = [&]() {
+        opxy::draw::Input in;
+        std::memset(&in, 0, sizeof in);
+        for (int j = 0; j < 8; ++j) in.slots[j] = q31(c[j]);
+        fermi::chain::Setup s;
+        fermi::chain::configure(s, in.slots);
+        char values[8][opxy::draw::header_capacity];
+        fermi::screen::captions(values, s, in);
+        for (int j = 0; j < 8; ++j) {
+            const double w = width(values[j], 20);
+            ++checked;
+            if (w > widest) { widest = w; std::strcpy(widest_text, values[j]); }
+            if (w > 53 && wide < 12) std::printf("  the %s caption \"%s\" is %.1f px wide\n", titles[j], values[j], w);
+            wide += w > 53;
+        }
+    };
+    for (int m = 0; m < 7; ++m)
+        for (int mode = 0; mode < 4; ++mode) {
+            c[1] = (m + 0.5) / 7;
+            c[5] = (mode + 0.5) / 4;
+            for (int sp = 0; sp <= 8; ++sp)
+                for (int e = 0; e <= 32; ++e)
+                    for (int t = 0; t <= 16; ++t) {
+                        c[2] = sp / 8.0; c[0] = e / 32.0; c[3] = t / 16.0;
+                        take();
+                    }
+            c[0] = 0.5; c[2] = 0; c[3] = 0.39;
+            for (int d = 0; d <= 256; ++d) { c[4] = d / 256.0; take(); }
+            c[4] = 0.15;
+        }
+    c[1] = 2.5 / 7; c[5] = 0.125;
+    for (int d = 0; d <= 1024; ++d) { c[6] = d / 1024.0; take(); }
+    c[6] = 0;
+    for (int k = 0; k < 64; ++k) { c[7] = (k + 0.5) / 64; take(); }
+    std::printf("screen: %u captions checked in the header's face, the widest \"%s\" at %.1f of 53 px; %u too wide\n",
+                checked, widest_text, widest, wide);
+    check(wide == 0, "a caption runs into the next column");
 }
 
 void still_when_idle() {
@@ -284,6 +443,8 @@ int main(int argc, char** argv) {
         return 0;
     }
     valid_everywhere();
+    drawn_as_the_device_draws();
+    captions_fit();
     still_when_idle();
     churn();
     same_chain();

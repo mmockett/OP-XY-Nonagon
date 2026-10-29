@@ -1,11 +1,15 @@
 // Recur's screen checks, compiled for the host and run by
 // python sdk.py test --machine <folder>: every point of a print's pieces
 // lies inside the square of the tile carrying it, at rest and at every frame
-// of a scramble, on each grid and map; and every frame is valid.
+// of a scramble, on each grid and map; every outline keeps to what the OP-XY
+// can draw, across a sweep of every control on each map, the scrambles and
+// the cover with no sample; and every frame is valid.
 #include "../display.cpp"
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -95,6 +99,76 @@ double check_frame(const recur::Frame& frame, u32 map, u32 bits, const char* whe
     }
     return worst;
 }
+
+// What the OP-XY does with an outline beyond the SDK's rules: it merges
+// neighbouring points within an eighth of a pixel, draws a closing edge under
+// a quarter of a pixel as a sliver, and draws an outline with no area (a line
+// traced out and back, or a turn straight back at a point) as a streak. Each
+// outline is checked as authored and, for every shown node, as drawn at its
+// scale. Returns false on the first that breaks a rule.
+bool outline_ok(const std::vector<Point>& pts, double scale, u32 node, const char* where) {
+    const size_t n = pts.size();
+    if (n < 3) return true;
+    double area = 0;
+    for (size_t i = 0; i < n; ++i) {
+        const Point &a = pts[(i + n - 1) % n], &b = pts[i], &c = pts[(i + 1) % n];
+        const double ix = (b.x - a.x) * scale, iy = (b.y - a.y) * scale, ox = (c.x - b.x) * scale, oy = (c.y - b.y) * scale;
+        const double in = std::sqrt(ix * ix + iy * iy), out = std::sqrt(ox * ox + oy * oy);
+        area += (a.x * b.y - b.x * a.y) * scale * scale;
+        if (out < 0.125) {
+            std::printf("FAIL %s: node %u points %zu and %zu are %.3f px apart and merge\n", where, node, i, (i + 1) % n, out);
+            return false;
+        }
+        if (i + 1 == n && out < 0.25) {
+            std::printf("FAIL %s: node %u closes over %.3f px\n", where, node, out);
+            return false;
+        }
+        if ((ix * ox + iy * oy) / (in * out) < -0.999) {
+            std::printf("FAIL %s: node %u turns straight back at point %zu\n", where, node, i);
+            return false;
+        }
+    }
+    if (std::fabs(area) / 2 < 0.1) {
+        std::printf("FAIL %s: node %u has no area (%.3f px^2)\n", where, node, std::fabs(area) / 2);
+        return false;
+    }
+    return true;
+}
+
+// The header's captions in the OP-XY's face, Univers Next Pro Light: each
+// character's advance in thousandths of an em (the device lays text out by
+// advance, without kerning), for the characters Recur writes. A value at
+// 20 px must fit 53 px before the next column's title, a title at 10 px 56 px.
+struct Advance { char c; int width; };
+const Advance advances[] = {
+    {' ', 280}, {'%', 915}, {'+', 676}, {'-', 329}, {'.', 280}, {'/', 293}, {'0', 560}, {'1', 560}, {'2', 560},
+    {'3', 560}, {'4', 560}, {'5', 560}, {'6', 560}, {'7', 560}, {'8', 560}, {'9', 560}, {'a', 536}, {'b', 581},
+    {'c', 522}, {'d', 581}, {'e', 532}, {'f', 318}, {'g', 589}, {'h', 574}, {'i', 235}, {'j', 235}, {'k', 513},
+    {'l', 235}, {'m', 894}, {'n', 574}, {'o', 571}, {'p', 581}, {'q', 581}, {'r', 345}, {'s', 480}, {'t', 325},
+    {'u', 574}, {'v', 512}, {'w', 820}, {'x', 506}, {'y', 507}, {'z', 445}};
+// A caption's width in px at size px, or a negative width for a character not in the table.
+double caption_width(const char* text, int px) {
+    int total = 0;
+    for (; *text; ++text) {
+        int w = -100000;
+        for (const Advance& a : advances) if (a.c == *text) w = a.width;
+        total += w;
+    }
+    return total * px / 1000.0;
+}
+std::set<std::string> values_seen, titles_seen;
+void collect_captions(const recur::Frame& frame) {
+    for (u32 t = 0; t < 16; ++t) ((t & 7) < 4 ? titles_seen : values_seen).insert(frame.texts[t].chars);
+}
+
+bool outlines_ok(const recur::Frame& frame, const char* where) {
+    for (u32 node = 0; node < recur::node_total; ++node)
+        if (shown(frame.nodes[node]) && !outline_ok(outlines[node], frame.nodes[node].scale / 1024.0, node, where)) {
+            ++failures;
+            return false;
+        }
+    return true;
+}
 }
 
 int main() {
@@ -107,6 +181,38 @@ int main() {
     const double defaults[8] = {0, 0.5, 0.583333, 0.083333, 0, 0.4375, 0.7, 0.071429};
     double worst = -1e9;
     u32 frames = 0, invalid = 0;
+    // Every outline as authored, then as drawn: each control from 0 to 1 by
+    // quarters on each map at rest, and the cover with no sample.
+    for (u32 node = 0; node < recur::node_total; ++node)
+        if (!outline_ok(outlines[node], 1, node, "as authored")) ++failures;
+    for (u32 map = 0; map < recur::map_count && !failures; ++map)
+        for (u32 c = 0; c < 8 && !failures; ++c)
+            for (u32 v = 0; v <= 4; ++v) {
+                opxy::draw::Input input = {};
+                for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
+                input.slots[recur::kMap] = choice_of(map, recur::map_count);
+                input.slots[c] = c == recur::kMap ? choice_of(v, recur::map_count) : at(v * 0.25);
+                input.track = 1;
+                input.elapsed = 17;
+                frame = recur::Frame();
+                recur::display_reset(state);
+                for (u32 f = 0; f < 30; ++f, ++frames) recur::display(state, input, frame);
+                char where[64];
+                std::snprintf(where, sizeof where, "map %u, control %u at %u%%", map, c, v * 25);
+                if (!outlines_ok(frame, where)) break;
+            }
+    {
+        opxy::draw::Input input = {};
+        for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
+        input.track = 1;
+        input.elapsed = 17;
+        overview.assigned = 0;
+        frame = recur::Frame();
+        recur::display_reset(state);
+        for (u32 f = 0; f < 5; ++f, ++frames) recur::display(state, input, frame);
+        outlines_ok(frame, "with no sample");
+        overview.assigned = 1;
+    }
     for (u32 map = 0; map < recur::map_count; ++map)
         for (u32 g = 0; g < recur::grid_count; ++g) {
             opxy::draw::Input input = {};
@@ -135,8 +241,62 @@ int main() {
                 invalid += !opxy::draw::valid(frame);
                 w = check_frame(frame, map, bits, "in a scramble");
                 worst = w > worst ? w : worst;
+                if (!failures) outlines_ok(frame, "in a scramble");
             }
         }
+    // Every caption the header can show: each control swept in hundredths on
+    // each map, grid and slice (with the sample from a tenth of a second to
+    // twenty minutes long), and with no sample.
+    {
+        const u32 lengths[] = {4410, 176400, 1323000, 8820000, 52920000};
+        for (u32 map = 0; map < recur::map_count; ++map)
+            for (u32 g = 0; g < recur::grid_count; ++g)
+                for (u32 sl = 0; sl < recur::slice_count; ++sl)
+                    for (u32 length : lengths)
+                        for (u32 c = 0; c < 8; ++c) {
+                            if ((c == recur::kMap || c == recur::kGrid || c == recur::kSlice) && length != lengths[1]) continue;
+                            opxy::draw::Input input = {};
+                            for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
+                            input.slots[recur::kMap] = choice_of(map, recur::map_count);
+                            input.slots[recur::kGrid] = choice_of(g, recur::grid_count);
+                            input.slots[recur::kSlice] = choice_of(sl, recur::slice_count);
+                            input.track = 1;
+                            input.elapsed = 17;
+                            overview.frames = overview.end = length;
+                            for (u32 v = 0; v <= 100; ++v) {
+                                input.slots[c] = at(v / 100.0);
+                                recur::display(state, input, frame);
+                                ++frames;
+                                collect_captions(frame);
+                            }
+                        }
+        overview.frames = overview.end = 176400;
+        overview.assigned = 0;
+        opxy::draw::Input input = {};
+        for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
+        input.track = 1;
+        for (u32 v = 0; v <= 100; ++v) {
+            input.slots[recur::kPos] = at(v / 100.0);
+            recur::display(state, input, frame);
+            collect_captions(frame);
+        }
+        overview.assigned = 1;
+        double widest = 0, widest_title = 0;
+        for (const std::string& s : values_seen) {
+            const double w = caption_width(s.c_str(), 20);
+            if (std::getenv("CAPTIONS")) std::printf("%s\n", s.c_str());
+            if (w < 0 || w > 53) { std::printf("FAIL: the caption '%s' is %.1f px wide at 20 px, over 53\n", s.c_str(), w); ++failures; }
+            widest = w > widest ? w : widest;
+        }
+        for (const std::string& s : titles_seen) {
+            const double w = caption_width(s.c_str(), 10);
+            if (std::getenv("CAPTIONS")) std::printf("title: %s\n", s.c_str());
+            if (w < 0 || w > 56) { std::printf("FAIL: the title '%s' is %.1f px wide at 10 px, over 56\n", s.c_str(), w); ++failures; }
+            widest_title = w > widest_title ? w : widest_title;
+        }
+        std::printf("%zu captions, the widest %.1f of 53 px; %zu titles, the widest %.1f of 56 px\n", values_seen.size(), widest,
+                    titles_seen.size(), widest_title);
+    }
     if (invalid) { std::printf("FAIL: %u invalid frames\n", invalid); ++failures; }
     std::printf("%u frames; every print piece inside its tile's square, at worst %.2f px inside its edge\n", frames, -worst);
     return failures ? 1 : 0;

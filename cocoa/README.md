@@ -21,15 +21,17 @@ compressible as air while it keeps water's weight, so its sound speed
 collapses (Wood's equation, 1930), and the liquid column's note with it. As
 the bubbles rise out, the note climbs back to the key.
 
-**Status: experimental.** Cocoa passes the SDK's tests but has not yet been
-played on an OP-XY. Its CPU figures (below) are the SDK's host estimate and a
+**Status: experimental.** Cocoa passes the SDK's tests and runs on an
+OP-XY. Its CPU figures (below) are the SDK's host estimate and a
 count from the compiled code, not measurements on the device.
 
 ## Controls
 
 Press any encoder to switch pages. Every figure in the table's second line
 is measured on an A3, with the other controls at the default
-(`tests/controls.cpp`). [docs/controls-1x.png](docs/controls-1x.png) shows each
+(`tests/controls.cpp`). Each caption fits its column in the OP-XY's own
+font, which `tests/screen.cpp` checks across every control's range.
+[docs/controls-1x.png](docs/controls-1x.png) shows each
 control at 0, 50 and 100 on the screen at 1:1, as the device shows it;
 [docs/controls.png](docs/controls.png) is the same at twice the size.
 
@@ -37,10 +39,10 @@ control at 0, 50 and 100 on the screen at 1:1, as the device shows it;
 | --- | --- | --- | --- | --- |
 | 1 | powder | `0st` `-3st` `-12st` `-27st` `-48st`<br>first tap −0.0 / −3.0 / −11.9 / −26.9 / −47.7 semitones | `-5st` (32) | How much air a stir puts in, as how far under the key the first tap rings. Squared, so the first half of the control scoops up to an octave and the rest reaches four. On screen, the drink darkens from pale milk (every fourth line) to thick chocolate (every line), and a stir fills it with more bubbles. |
 | 1 | taps | `once` `1.1Hz` `2.4Hz` `5.4Hz` `12Hz`<br>0 / 1.0 / 2.3 / 5.3 / 11.8 taps a second | `once` | Once: one tap a note, an instrument. Above that the spoon keeps tapping while the note sounds, each tap softer as they come faster, so tapping holds a single tap's level. On screen, the spoon rests lifted 24° for a single tap and 2° for the fastest. |
-| 1 | fizz | `120um` `210um` `380um` `680um` `1.2mm`<br>the drink clear after 11.6 / 3.7 / 1.2 / 0.37 / 0.13 s | `600um` (70) | Bubble size, which sets how fast the drink clears. Fine bubbles make long climbs with high pops; large ones short scoops with low pops. On screen, the rising bubbles and the foam grow from 0.5 to 2 times. |
+| 1 | fizz | `15s` `4.8s` `1.5s` `0.47s` `0.15s`<br>the drink clear after 11.6 / 3.7 / 1.2 / 0.37 / 0.13 s | `0.60s` (70) | Bubble size, 120 µm to 1.2 mm, which sets how fast the drink clears; the caption is how long its finest bubbles take to rise out, so it follows fill too. Fine bubbles make long climbs with high pops; large ones short scoops with low pops. On screen, the rising bubbles and the foam grow from 0.5 to 2 times. |
 | 1 | cup | `china` `china` `glass` `tin` `tin`<br>a tap rings 569 / 569 / 1148 / 437 / 437 ms (to −40 dB) | `china` | The mug: china's tock (wall at 1.65 / 4.5 / 9 kHz, the drink ringing 0.9 s), a glass tumbler's long ting (1.15 / 3.2 / 6.1 kHz, 1.8 s) or an enamelled tin mug's short clank (0.72 / 1.9 / 3.4 kHz, 0.7 s). On screen: a thick china wall with a C handle, a heavy-based glass tumbler, or a thin tin mug with a rolled rim and a strap handle. |
-| 2 | fill | `20mm` `35mm` `50mm` `65mm` `80mm`<br>a tap rings 213 / 345 / 488 / 630 / 772 ms (to −40 dB) | `59mm` (65) | The drink's depth. A shallow drink loses its ring to the floor and sounds short and woody; a deep one rings on. Depth also tunes the column's upper modes (at 59 mm they sit at 1, 2.00, 3, 3.46, 3.73 and 5 times the key: shallow drinks cluster them into bells, deep ones spread them) and lowers and damps the cup's clink. |
-| 2 | spoon | `4.0ms` `1.5ms` `550us` `200us` `80us`<br>upper modes −30.3 / −18.3 / −9.9 / −5.5 / −2.4 dB under the fundamental | `370us` (60) | From a wooden spoon to a silver one, as its contact time. A soft spoon strikes the fundamental and little else; a hard one brings the upper modes up to twice their level and rings the cup's clink harder. Its tone follows the key, so it brightens alike at every pitch, and the fundamental keeps its level. On screen, a short, fat, grained wooden spoon becomes a long, slim silver one with a shine in its bowl. |
+| 2 | fill | `22%` `39%` `56%` `72%` `89%`<br>a tap rings 213 / 345 / 488 / 630 / 772 ms (to −40 dB) | `66%` (65) | The drink's depth, 20 to 80 mm, as how full the 90 mm mug is. A shallow drink loses its ring to the floor and sounds short and woody; a deep one rings on. Depth also tunes the column's upper modes (at 59 mm they sit at 1, 2.00, 3, 3.46, 3.73 and 5 times the key: shallow drinks cluster them into bells, deep ones spread them) and lowers and damps the cup's clink. |
+| 2 | spoon | `4ms` `1ms` `.5ms` `.2ms` `80us`<br>upper modes −30.3 / −18.3 / −9.9 / −5.5 / −2.4 dB under the fundamental | `.4ms` (60) | From a wooden spoon to a silver one, as its contact time. A soft spoon strikes the fundamental and little else; a hard one brings the upper modes up to twice their level and rings the cup's clink harder. Its tone follows the key, so it brightens alike at every pitch, and the fundamental keeps its level. On screen, a short, fat, grained wooden spoon becomes a long, slim silver one with a shine in its bowl. |
 | 2 | pops | `off` `7/s` `15/s` `22/s` `30/s`<br>pops −∞ / −26.7 / −21.4 / −18.0 / −15.5 dB against the rest of four notes | `4/s` (15) | Bubbles bursting at the surface, from 300 Hz to 7 kHz: how often (the caption is the rate from a fresh stir's foam) and how loud. Each stir raises a head of foam that crackles away over about a second, more for more powder; a bubbly drink adds pops as fast as its air leaves. On screen, the foam grows from none to two rows. |
 | 2 | stir | `0%` `50%` `71%` `87%` `100%`<br>a second note 0.25 s on scoops −0.2 / −1.5 / −2.8 / −3.9 / −4.9 semitones; the drink sways 0 / 3.7 / 7.4 / 11.1 / 14.8 cents | `77%` (60) | How hard each note stirs. It takes a drink still settling that share of the way to fresh (at 0 an overlapping note only taps; the first note after a pause always stirs fresh), and it sets the drink sloshing: the pitch sways at the mug's sloshing mode (3.4 Hz at 59 mm), up to 20 cents, dying away over about a second. On screen, below 50 a heap of powder lies on the floor with clumps in the drink; above it the drink turns in swirls, one more each quarter, and its surface dips into a vortex. |
 
@@ -248,6 +250,18 @@ note is in tune. It is still until a note or a control moves it. It is drawn
 for the 480 × 220 screen at 1:1: nothing that matters under 3 px, no lines
 closer than 5 px, no difference carried by grey alone.
 
+It also keeps to what the OP-XY draws badly beyond the SDK's own checks.
+On the device a reshaping outline that is turned is placed otherwise than
+in the browser, so the three reshaping outlines (the mug, the drink's
+surface and the spoon) are always drawn upright, and the screen turns the
+spoon's points itself. Neighbouring points within an eighth of a pixel
+merge, a closing edge under a quarter of a pixel draws as a long sliver,
+and an outline with no area or turning straight back on itself draws
+streaks. So every line is a closed ribbon at least 0.4 px wide, and every
+outline starts in the middle of a long edge. `tools/make_panel.py` checks
+every outline it writes; `tests/screen.cpp` checks every outline the screen
+draws, over every control at five settings, each through a note.
+
 - **The spoon stands in the drink.** Its bowl rests on the floor. Each tap
   rocks it onto the floor in time with the sound, rippling the surface and
   sending a ring across the floor. **Taps** sets how high it rests: lifted
@@ -259,6 +273,8 @@ closer than 5 px, no difference carried by grey alone.
   crosses a line of it: each spoon's rest is worked out against each cup's
   own outline, and each tap rocks it about the lip, so it stays clear at
   every cup, spoon and tap (`tests/screen.cpp` checks a gap of at least 1 px).
+  The spoon is one outline, bowl and handle together, so it holds together
+  at every angle.
 - **The drink shows the pitch.** A note's stir dips the surface further and
   fills the drink with bubbles: five rings to a class, larger for
   larger bubbles (**fizz**), each class rising at its own speed from the
@@ -287,7 +303,7 @@ and the pops still, and a reset snaps everything into place.
 
 **Churn.** `tests/screen.cpp` plays a 22 s scene at 60 fps (a long climb,
 page 2 and its controls, a second note, a chord at fast taps, then cup and
-fill changes): 5.7 nodes change a frame on average, 33 at most. The idle screen changes nothing. Bubbles move in 2 px steps, at most
+fill changes): 5.2 nodes change a frame on average, 32 at most. The idle screen changes nothing. Bubbles move in 2 px steps, at most
 14 a frame, and the drink's lines change at most six a frame.
 
 ## Files
@@ -302,7 +318,7 @@ fill changes): 5.7 nodes change a frame on average, 33 at most. The idle screen 
 | `tests/sound.cpp` | The physics and playing checks |
 | `tests/controls.cpp` | Each control at 0/25/50/75/100, measured (the table above) |
 | `tests/scenes.cpp` | The preset phrases; writes the WAVs when given a folder |
-| `tests/screen.cpp` | The screen: validity, churn, stillness, reduced motion, reset, the spoon clear of the cup; writes frames for the GIF and the contact sheet |
+| `tests/screen.cpp` | The screen: validity, what the device draws badly, the captions' widths, churn, stillness, reduced motion, reset, the spoon clear of the cup; writes frames for the GIF and the contact sheet |
 | `tools/measure.py` | The level measurements, from WAVs |
 | `tools/make_gif.py` | Renders `docs/cocoa.gif` and, with `--sheet`, `docs/controls-1x.png` and `docs/controls.png` from the real display code, in the device's face |
 
@@ -333,7 +349,7 @@ Not yet measured on an OP-XY. At the heaviest setting:
   the default, with the cup rung out, is about 9,700.
 
 **Memory.** A voice is 304 bytes, `Shared` 96 and the display state 236.
-`sdk.py test --firmware` compiles it for the Blackfin in 66.9 KiB of module
+`sdk.py test --firmware` compiles it for the Blackfin in 64.6 KiB of module
 memory, 8 KiB of it the sine table.
 
 ## Prior art

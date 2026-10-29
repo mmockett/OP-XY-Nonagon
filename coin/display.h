@@ -4,7 +4,7 @@
 
 namespace coin {
 // Matches resources.display in definition.json: paths, points, nodes, texts, palette.
-using Frame = opxy::draw::Frame<4, 64, 86, 16, 16>;
+using Frame = opxy::draw::Frame<4, 64, 82, 16, 16>;
 
 // Nodes, as tools/make_panel.py writes them into panel.svg.fragment.
 namespace node {
@@ -18,7 +18,7 @@ const u32 disk = 0, edge = 1, reflection = 2, face = 3,   // the note's disk: th
           companion = 49,                                 // three disks for many: face, edge, reflection, glint
           air = 61, airs = 5,                             // the air squeezed from under the low edge
           ripple = 66, ripples = 8,                       // the ring's ripples across the mirror
-          ghost = 74, ghosts = 12;                        // wobble's ghost of the rim, in dashes
+          ghost = 74, ghosts = 8;                         // wobble's ghost of the rim, in dashes
 }
 
 // The projection (make_panel.py has the same): X right, Y away, Z up, pixels
@@ -30,7 +30,7 @@ const i32 reference = 77;                // the motion lines' radius as authored
 const i32 ripple = 86;                   // the first ripple's radius as authored, px: 16 beyond size 1:8's rim
 const i32 ripple_step = 14629;           // and the step out to each next, Q10 px (100 / 7)
 const i32 reach = 186;                   // the last ripple's radius, px: inside the mirror's edge
-const i32 dash = 16;                     // a ghost dash's length as authored, px
+const i32 dash = 24;                     // a ghost dash's length as authored, px
 const i32 companion = 50;                // a companion disk's radius as authored, px
 const i32 mirrored = 410;                // the concave mirror flattens its image to 0.4, Q10
 }

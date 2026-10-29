@@ -31,8 +31,8 @@ spin control, not a held key. The OP-XY's amp envelope applies on top:
 Coin's presets give it full sustain and the longest release, so a spin plays
 out after the key is let go.
 
-**Status: experimental.** Coin passes the SDK's tests but has not yet been
-played on an OP-XY, and its CPU figures (below) are estimates, not
+**Status: experimental.** Coin passes the SDK's tests and runs on an
+OP-XY, and its CPU figures (below) are estimates, not
 measurements on the device.
 
 ## Controls
@@ -53,7 +53,7 @@ how it rolls and rings.
 | size | 1:2, 1:4, 1:8, 1:16, 1:32 | 1:4 | the ratio, `1:4` | Where the whirr starts: the held strike rate, 1 to 5 whole octaves under the disk's ring. A small coin buzzes an octave under its note, a heavy disk rattles five under. Whole octaves keep the ring on a strike harmonic, so the note is in tune; the sweep rises through each subharmonic to the note. |
 | disk | steel, brass, glass, wood | steel | the material | How its three modes (at 1, 1.73 and 2.33 times the key, a free plate's) ring and beat, and how long it rings once flat: steel long and bright, brass warmer and 0.6 times as long, glass pure with strong upper modes and 1.5 times as long, wood a short knock, 0.35 times. |
 | base | glass, wood, stone | glass | the material | What it rolls on: the base's own resonance (glass 1.2 kHz, wood 205 Hz, stone 640 Hz), its rolling noise, and how much it damps the disk through the contact: wood two and a half times as much as glass, stone 1.3 times. |
-| wobble | 0 to 100 | 25 | amount | Eccentricity, felt early (it acts as w(2 − w)). An off-centre weight, carried round by the disk's slow turn, swings the contact rate, a warble in the whirr of up to 0.06 octave, and the strikes' strength (0.375 to 1.625 times) and the rolling noise with it; a bounce follows each strike, and a disk kept at hold wobbles more (0.003 to 0.015 octave). In its top half the disk also slips: noise into its ring (a squeal) and a little hiss. |
+| wobble | 0 to 100 | 25 | amount | Eccentricity, felt early (it acts as w(2 − w)). An off-centre weight, carried round by the disk's slow turn, swings the contact rate, a warble in the whirr of up to 0.06 octave, and the strikes' strength (0.375 to 1.625 times) and the rolling noise with it; a bounce follows each strike, and a disk kept at hold wobbles more (0.003 to 0.015 octave). In its top half the disk also slips: its strikes jitter, it hisses, and noise rings in the first disk's ring (a squeal). |
 | air | rolling friction to viscous air | rolling friction | the rush, `0.17s` or `24ms` | The dissipation law, and so the rush's curve: the rate rises as (t0 − t)^(−n), n = 1/3 for rolling friction, 1/4 at 50, 1/6 for Moffatt's viscous air layer. With air the spin hangs low longer and then rushes, and the air pushed from under the disk breathes, louder and brighter as it speeds up. The caption is how long the whirr's last octave onto the note takes, at the current spin and size (`-` at hold). |
 | ring | 0.12 to 4 s, exponentially | 0.89 s | seconds, `0.89s` | How long the disk rings at its note once it lies flat (its T60), from a dead slap to a bell, for steel; the other materials scale it, and the caption shows the result. Its upper modes fade two and three times as fast. |
 | many | 1 to 4 | 1 | the count | Disks in a note, detuned about it and stopping at 1, 0.86, 1.14 and 0.75 times the settle time. The detunes are centred, so the chorus stays in tune: ±3.5 cents for two; 0 and ±6 for three; ±3 and ±9 for four. |
@@ -176,6 +176,17 @@ the effects (motion lines, ripples, air, the ghost, wood's grain, stone's
 specks) a step further; the reflection last. There are no labels, ticks or
 decorative marks, and every part reads at 1:1.
 
+Every outline is one the OP-XY draws cleanly: no point within an eighth of
+a pixel of the next, no turn straight back, a closing edge of at least a
+quarter of a pixel, and some area (a line traced out and back over itself
+draws as a streak). The disk's outlines drop any point that would break
+this, and start where both their edges are longest; where the side meets
+the upper rim tangentially, the edge's corner is cut. The camera sits 16°
+up, so a disk leaning away further would turn its face edge-on and its rim
+into a line: it leans away at most 11°, and its face's engraving is left out
+when seen at under 12°. `tests/frames.cpp` checks every outline and node
+through each control's range and a note's animation.
+
 The note's first disk is the four reshaping outlines, projected each frame:
 its face's rim, its edge (the side facing the camera), its reflection (the
 concave mirror flattens it) and what is engraved on its face. As it settles,
@@ -199,7 +210,7 @@ is the same at the screen's own size):
 | --- | --- |
 | spin | The lean the disk stands at, ready to throw: 4° for the shortest spin to 28° at hold |
 | size | The disk: a thin coin (radius 44 px, 0.16 of it thick) to a heavy disk (88 px, 0.38 thick) |
-| disk | Its face: steel's large engraved rose, brass's coarse milled ring, glass's underside seen through it, wood's grain; and its greys |
+| disk | Its face: steel's large engraved rose, brass's coarse milled ring, glass's underside seen through it, wood's wavy growth ring |
 | base | The base: glass shows the disk's reflection, wood a flat-sawn grain across its top, stone four specks and two veins |
 | wobble | A dashed ghost of the rim where the off-centre weight throws it, hopped up and rocked over: none at 0, 6 px and 5° at 50, 12 px and 10° at 100; and a lead balance weight clamped to the rim, growing from 0.7 to 2 times its size |
 | air | Streaks of air fanning from under the low edge: none at rolling friction, five long ones in viscous air |
@@ -214,9 +225,16 @@ screen keeps time. Motion eases on the frame's time. Reduced motion stops
 the turning, blur and drift; a reset snaps everything into place.
 
 Churn at 30 fps, over a 13 s scene of spins with three disks, size, disk and
-base changes and a held note: a mean of 8.7 nodes a frame and a peak of 21
-(12.8 while the disks roll, the ghost moving a third of its dashes a frame);
-with reduced motion, 4.6 and 22. A still screen changes nothing.
+base changes and a held note: a mean of 7.4 nodes a frame and a peak of 19
+(10.8 while the disks roll); with reduced motion, 3.7 and 20. A still screen
+changes nothing. Wobble costs little: its ghost is eight dashes, two moved a
+frame, and with four disks spinning wobble 100 changes about one node a frame
+more than wobble 0 (two at hold); the disk's outlines change as often at any
+wobble.
+
+The header's captions fit their columns in the OP-XY's font (values at most
+53 px wide at 20 px, titles 56 at 10 px); `tests/captions.cpp` checks every
+caption the screen can show.
 
 ## CPU
 
@@ -233,14 +251,16 @@ the firmware build), at the heaviest setting, four disks rolling:
 - **Planning,** once a block (each disk's law, increments, the weight's
   swing, the breath and a few divisions), is about 2,150.
 
-That is **about 14,650 instructions a block**. The resonances use Q31
+That is **about 14,650 instructions a block**, and about 14,970 with wobble
+in its top half, when the first disk's ring takes slip's noise (5 more a
+sample; only the first disk takes it, as all four would add 1,280). The resonances use Q31
 multiplies, one instruction each on the Blackfin.
 
 The host estimate in `sdk.py test` reads higher (17,700 to 18,400 on a quiet
 host), because the host's portable Q31 multiply takes about ten instructions
 where the Blackfin takes one: the loops that are cheapest on the Blackfin
 are the ones the host times as dearest. The firmware compile
-(`sdk.py test --firmware`) passes, and Coin takes 47.1 KiB of module memory.
+(`sdk.py test --firmware`) passes, and Coin takes 47.5 KiB of module memory.
 
 ## Files
 
@@ -253,6 +273,10 @@ are the ones the host times as dearest. The firmware compile
   The artwork and face patterns are written by `tools/make_panel.py`; run it
   after changing a shape, and commit all three.
 - `tests/sound.cpp`: the sound and screen checks, run by `sdk.py test`.
+- `tests/frames.cpp`: every frame's outlines and nodes against what the
+  OP-XY draws cleanly, run by `sdk.py test`.
+- `tests/captions.cpp`: every header caption against the OP-XY's font, run
+  by `sdk.py test`.
 - `tests/scenes.cpp`: each preset's phrase, checked by `sdk.py test`, and
   written as WAVs into a folder you give it:
   `c++ -std=c++11 -O2 -I <sdk>/sdk/include tests/scenes.cpp -o scenes && ./scenes <folder>`.

@@ -16,8 +16,11 @@ also has its vapour layer's bright underside, its dark shadow and a plume of
 steam, and the screen has spray, sparks, spatter dried on the iron, a water
 mark where the next drop lands, the ratchet's teeth and the heat's rings.
 
-Lines are closed rings or single strokes (a ribbon a hair wide); only the
-shadows and the spatter are filled."""
+Lines are closed rings or ribbons with a width of their own, each path
+started on its longest edge: the OP-XY draws a path traced out and back, or
+with points within an eighth of a pixel, or closing over less than a
+quarter, as streaks (tests/frame_rules.cpp). Only the shadows and the
+spatter are filled."""
 import math
 import pathlib
 import re
@@ -66,7 +69,20 @@ def num(v, places=4):
 
 
 def outline(points, places=4):
-    return "M" + " L".join(f"{num(x, places)},{num(y, places)}" for x, y in points) + " Z"
+    """A closed path as the OP-XY draws one well: repeated points (as written,
+    at `places`) dropped, and started on its longest edge, so that its
+    closing edge is never a sliver."""
+    pts = []
+    for x, y in points:
+        p = (num(x, places), num(y, places))
+        if not pts or p != pts[-1]:
+            pts.append(p)
+    while len(pts) > 1 and pts[-1] == pts[0]:
+        pts.pop()
+    f = [(float(x), float(y)) for x, y in pts]
+    start = max(range(len(f)), key=lambda i: math.hypot(f[i][0] - f[i - 1][0], f[i][1] - f[i - 1][1]))
+    pts = pts[start:] + pts[:start]
+    return "M" + " L".join(f"{x},{y}" for x, y in pts) + " Z"
 
 
 def path(d, fill, stroke="none", width=None, node=None, at=None):
@@ -115,7 +131,7 @@ def spout(theta):
 def rim(r, z, a0=0.0, a1=360.0, n=96, lip=True):
     pts = []
     for i in range(n):
-        t = a0 + (a1 - a0) * i / (n - (0 if a1 - a0 < 360 else 1) - (1 if a1 - a0 < 360 else 0))
+        t = a0 + (a1 - a0) * i / (n - 1 if a1 - a0 < 360 else n)   # a whole turn does not repeat its start
         rr = r + (spout(t) if lip else 0)
         a = math.radians(t)
         pts.append(project(rr * math.cos(a), rr * math.sin(a), z))
@@ -159,28 +175,36 @@ EDGE, EDGE_W = 7, 0.7
 FAINT, FAINT_W = 4, 0.6
 
 
-def stroke(points):
-    """An open line as one closed path: a ribbon a hair wide."""
-    return outline(ribbon(points, 0.05), 1)
+RIBBON = 0.5   # px: a line's own width, so it has area (the OP-XY streaks a line traced out and back)
+
+
+def stroke(points, h=RIBBON):
+    """An open line as one closed path: a ribbon h wide."""
+    return outline(ribbon(points, h), 1)
+
+
+def engrave_line(points, grey, width):
+    """A line in the static art, its stroke less the ribbon's own width."""
+    engrave(stroke(points), grey, round(max(0.2, width - RIBBON), 2))
 
 
 # The outside: up the left side, round the bottom's front edge, up the right.
 left_top = project(-RIM_OUT, 0, DEPTH)
 right_top = project(RIM_OUT, 0, DEPTH)
 bottom = rim(BASE_R, BASE_Z, 180, 360, 64, lip=False)
-engrave(stroke([left_top] + bottom + [right_top]), OUTLINE, OUTLINE_W)
+engrave_line([left_top] + bottom + [right_top], OUTLINE, OUTLINE_W)
 # The rim, outside and in, with its spouts.
 engrave(outline(rim(RIM_OUT, DEPTH, n=112), 1), OUTLINE, OUTLINE_W)
 engrave(outline(rim(RIM_IN, DEPTH, n=112), 1), EDGE, EDGE_W)
 # The floor's edge, where it can be seen behind the front wall.
-engrave(stroke(rim(FLOOR_R, 0, -16, 196, 72, lip=False)), EDGE, EDGE_W)
+engrave_line(rim(FLOOR_R, 0, -16, 196, 72, lip=False), EDGE, EDGE_W)
 # Three faint strokes down each end of the outside wall, where it turns away.
 for u in (0.93, 0.8, 0.62, -0.62, -0.8, -0.93):
     t = 180 + math.degrees(math.acos(u))
     a = math.radians(t)
     r_top = RIM_OUT + spout(t) - 1.5
-    engrave(stroke([project(r_top * math.cos(a), r_top * math.sin(a), DEPTH - 3),
-                    project((BASE_R + 1) * math.cos(a), (BASE_R + 1) * math.sin(a), BASE_Z + 3)]), FAINT, FAINT_W)
+    engrave_line([project(r_top * math.cos(a), r_top * math.sin(a), DEPTH - 3),
+                  project((BASE_R + 1) * math.cos(a), (BASE_R + 1) * math.sin(a), BASE_Z + 3)], FAINT, FAINT_W)
 
 
 # The helper handle opposite: a lug 26 mm out from the rim, 48 mm across, its
@@ -193,8 +217,8 @@ def lug(n=30):
 
 engrave(outline([project(x, y, DEPTH + 0.5) for x, y in lug()], 1), OUTLINE, OUTLINE_W)
 front_lug = [p for p in lug() if p[1] <= 0.5]
-engrave(stroke([project(*front_lug[0], DEPTH + 0.5)] + [project(x, y, DEPTH - 6.5) for x, y in front_lug] +
-               [project(*front_lug[-1], DEPTH + 0.5)]), EDGE, EDGE_W)
+engrave_line([project(*front_lug[0], DEPTH + 0.5)] + [project(x, y, DEPTH - 6.5) for x, y in front_lug] +
+             [project(*front_lug[-1], DEPTH + 0.5)], EDGE, EDGE_W)
 
 
 # The handle: a flat bar 145 mm long rising 8 degrees, 32 mm wide at the rim
@@ -221,7 +245,7 @@ def lift(x):
 plan = handle_plan()
 engrave(outline([project(x, y, lift(x)) for x, y in plan], 1), OUTLINE, OUTLINE_W)
 front = [p for p in plan if p[1] < 0 or p[0] > 250]
-engrave(stroke([project(x, y, lift(x) - 9) for x, y in front] + [project(*front[-1], lift(front[-1][0]))]), EDGE, EDGE_W)
+engrave_line([project(x, y, lift(x) - 9) for x, y in front] + [project(*front[-1], lift(front[-1][0]))], EDGE, EDGE_W)
 hole = []
 for i in range(40):                         # a teardrop, its point toward the rim
     a = 2 * math.pi * i / 40
@@ -292,13 +316,13 @@ for k in range(3):
 # The drops' rims: 64-point outlines.
 for k in range(3):
     ring = [(x, y) for x, y in flat_ring(UNIT_R, POINTS)]
-    out.append(path(outline(ring, 0), "none", G(15), 1.5, RIMS + k, (site[0] + 60 * k, site[1])))
+    out.append(path(outline(ring, 1), "none", G(15), 1.5, RIMS + k, (site[0] + 60 * k, site[1])))
 # Each drop's vapour layer: its bright underside, seen as a crescent of light
 # along its front, between the drop and the iron.
 for k in range(3):
     arc = [(UNIT_R * 0.96 * math.cos(math.radians(t)), -UNIT_R * 0.96 * SIN_E * math.sin(math.radians(t)))
            for t in [196 + 148 * i / 23 for i in range(24)]]
-    out.append(path(stroke(arc), "none", G(10), 0.9, UNDERSIDE + k, site))
+    out.append(path(stroke(arc, 0.6), "none", G(10), 0.9, UNDERSIDE + k, site))
 # Each drop's steam: a billowing plume rising from its top, 48 px tall,
 # puffs widening as they rise; the screen scales it with how fast the drop
 # evaporates. Its outline is the union of the puffs, edge by edge.

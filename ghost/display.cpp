@@ -62,24 +62,70 @@ void shape_figure(Frame& frame, u32 voice, u32 beat, u32 tremble, u32 bed, const
     const i32 t = i32(pose * 1024);                                            // Q15
     const i32 shake_q10 = i32(shake) * 6 * unit / 32;                          // up to 6 px
     const i32 fray_q10 = i32(fray) * 8 * unit / 32;                           // up to 8 px
+    // The pose, then each point pushed along the outline's outward normal (an
+    // x push slides points along level edges, the hem and raised arms, until
+    // they fold back, which the OP-XY draws as streaks). Inward pushes are
+    // halved, so concave turns never fold either; the hem keeps its own
+    // ripple, up and down, clear of the footlights.
+    Point posed[64];
     for (u32 i = 0; i < 64; ++i) {
         const i32 bx = figure_bowed[2 * i], by = figure_bowed[2 * i + 1];
         const i32 sx = figure_singing[2 * i], sy = figure_singing[2 * i + 1];
-        i32 x = (bx + (((sx - bx) * t) >> 15)) * 256, y = (by + (((sy - by) * t) >> 15)) * 256;   // quarter px to Q10
-        const i32 outward = x < 0 ? -1 : 1;
-        // beat: nine waves round the outline, pushing it in and out.
-        x += outward * ((sine(i * 0x09000000u + tremble * 0x20000000u) * shake_q10) >> 15);
-        // bed: the recording's peaks along the robe, scrolling as it plays.
-        if (fray) {
-            const u32 at = (i + step * 3) & 63;
-            // Without a sample, gusts: random strengths, each the mean of two.
-            const i32 peak = sampled ? i32(overview.peaks[at]) : i32((hash(at * 0x9e3779b9u + 7) >> 27) + (hash(((at + 1) & 63) * 0x9e3779b9u + 7) >> 27)) >> 1;
-            x += outward * ((peak - mean) * fray_q10 / widest);
-        }
-        if (held && i < hem_points) y += sine(step * 0x20000000u + i * 0x18000000u) * 6 * 256 / 32767;
-        frame.paths[apparition].points[i].x = frame.paths[twin].points[i].x = clamp(x, -63 * unit, 63 * unit);
-        frame.paths[apparition].points[i].y = frame.paths[twin].points[i].y = y;
+        posed[i].x = (bx + (((sx - bx) * t) >> 15)) * 256;                    // quarter px to Q10
+        posed[i].y = (by + (((sy - by) * t) >> 15)) * 256;
     }
+    for (u32 i = 0; i < 64; ++i) {
+        i32 x = posed[i].x, y = posed[i].y;
+        if (i < hem_points) {
+            if (held) y += sine(step * 0x20000000u + i * 0x18000000u) * 6 * 256 / 32767;
+        } else {
+            // beat: nine waves round the outline, pushing it in and out.
+            i32 push = (sine(i * 0x09000000u + tremble * 0x20000000u) * shake_q10) >> 15;
+            // bed: the recording's peaks along the robe, scrolling as it plays.
+            if (fray) {
+                const u32 at = (i + step * 3) & 63;
+                // Without a sample, gusts: random strengths, each the mean of two.
+                const i32 peak = sampled ? i32(overview.peaks[at]) : i32((hash(at * 0x9e3779b9u + 7) >> 27) + (hash(((at + 1) & 63) * 0x9e3779b9u + 7) >> 27)) >> 1;
+                push += (peak - mean) * fray_q10 / widest;
+            }
+            if (push < 0) push /= 2;
+            // The normal: across the chord between the neighbours, turned
+            // away from the figure's middle (half its height, on its axis).
+            const Point& before = posed[(i + 63) & 63], &after = posed[(i + 1) & 63];
+            i32 nx = before.y - after.y, ny = after.x - before.x;
+            if (nx * (x >> 4) + ny * ((y + 30 * unit) >> 4) < 0) { nx = -nx; ny = -ny; }
+            const i32 ax = nx < 0 ? -nx : nx, ay = ny < 0 ? -ny : ny;
+            const i32 length = (ax > ay ? ax + ay / 2 : ay + ax / 2) | 1;     // within 12%
+            x += push * nx / length;
+            y += push * ny / length;
+        }
+        frame.paths[apparition].points[i].x = clamp(x, -63 * unit, 63 * unit);
+        frame.paths[apparition].points[i].y = clamp(y, -63 * unit, 63 * unit);
+    }
+    // Where pushes bring a point within an eighth of a pixel of the last, or
+    // make the outline turn straight back at it, it and its neighbours return
+    // to their places in the pose, whose points are all half a pixel or more
+    // apart.
+    Point* p = frame.paths[apparition].points;
+    for (u32 pass = 0; pass < 8; ++pass) {
+        bool moved = false;
+        for (u32 i = 0; i < 64; ++i) {
+            const u32 before = (i + 63) & 63, after = (i + 1) & 63;
+            const Point& a = p[before], &b = p[i], &c = p[after];
+            const i32 dx = b.x - a.x, dy = b.y - a.y;
+            const bool merged = dx > -unit / 8 && dx < unit / 8 && dy > -unit / 8 && dy < unit / 8;
+            const i32 ux = dx >> 4, uy = dy >> 4, vx = (c.x - b.x) >> 4, vy = (c.y - b.y) >> 4;   // 1/64 px
+            const i32 cross = ux * vy - uy * vx, dot = ux * vx + uy * vy;
+            const i32 lengths = ((ux < 0 ? -ux : ux) + (uy < 0 ? -uy : uy)) * ((vx < 0 ? -vx : vx) + (vy < 0 ? -vy : vy));
+            const bool back = dot < 0 && (cross < 0 ? -cross : cross) < lengths / 25;
+            if (!merged && !back) continue;
+            const u32 near[3] = {before, i, after};
+            for (u32 k = 0; k < 3; ++k)
+                if (p[near[k]].x != posed[near[k]].x || p[near[k]].y != posed[near[k]].y) { p[near[k]] = posed[near[k]]; moved = true; }
+        }
+        if (!moved) break;
+    }
+    for (u32 i = 0; i < 64; ++i) frame.paths[twin].points[i] = p[i];
     frame.paths[apparition].key = frame.paths[twin].key = key;
 }
 
@@ -97,14 +143,24 @@ Mouth mouth_for(u32 voice) {
     m.cy = (mouth_bowed[1] + (((mouth_singing[1] - mouth_bowed[1]) * t) >> 15)) * 256;
     return m;
 }
+// A small ellipse as an outline the OP-XY draws cleanly: 20 points, each a
+// quarter of a pixel or more from the next even at 1.6 x 0.8 px, the rest
+// repeating the last (a repeated point only pads; points nearer than an
+// eighth of a pixel would merge on the device). It starts at the top, where
+// its edges are longest, so its closing edge is long too.
+void ellipse_points(Frame::path_type& p, i32 cx, i32 cy, i32 rx, i32 ry) {   // rx, ry Q10
+    for (u32 i = 0; i < 64; ++i) {
+        const u32 k = i < 20 ? i : 19;
+        const u32 angle = (k + 5) * 214748365u;                               // twentieths of a turn, from the top
+        p.points[i].x = cx + ((cosine(angle) * rx) >> 15);
+        p.points[i].y = cy + ((sine(angle) * ry) >> 15);
+    }
+}
 void shape_mouth(Frame& frame, u32 voice) {
     const u32 key = ((voice + 1024) >> 11) + 7;
     if (frame.paths[mouth].key == key) return;
     const Mouth m = mouth_for(voice);
-    for (u32 i = 0; i < 64; ++i) {
-        frame.paths[mouth].points[i].x = (cosine(i << 26) * m.rx * unit / 10) >> 15;
-        frame.paths[mouth].points[i].y = m.cy + ((sine(i << 26) * m.ry * unit / 10) >> 15);
-    }
+    ellipse_points(frame.paths[mouth], 0, m.cy, m.rx * unit / 10, m.ry * unit / 10);
     frame.paths[mouth].key = key;
 }
 
@@ -120,10 +176,7 @@ void shape_floor(Frame& frame, u32 orbit, u32 near) {
     Frame::path_type& p = frame.paths[floor_path];
     if (!o) {   // a mark where the notes stand: a small ring at the front
         const Spot at = spot(place(0, 0, orbit16, near16));
-        for (u32 i = 0; i < 64; ++i) {
-            p.points[i].x = (at.x - path_x * unit) / 2 + ((cosine(i << 26) * 7 * unit) >> 16);
-            p.points[i].y = (at.y - path_y * unit) / 2 + ((sine(i << 26) * 2 * unit) >> 16);
-        }
+        ellipse_points(p, (at.x - path_x * unit) / 2, (at.y - path_y * unit) / 2, 7 * unit / 2, unit);
     } else {
         // A ribbon along the arc: out along its front edge, back along its rear.
         for (u32 i = 0; i < 32; ++i) {
@@ -165,7 +218,7 @@ inline void display_reset(DisplayState& state) {
 inline void display(DisplayState& state, const Input& input, Frame& frame) {
     const SampleOverview& overview = *opxy_sample_overview();
     char values[8][header_capacity] = {};
-    captions::fill(input, values);
+    captions::fill(input, overview.assigned != 0, values);
     const opxy::u8 pages[2][4] = {{kRing, kVoice, kSplit, kTrade}, {kBeat, kOrbit, kNear, kBed}};
     page_header(state.header, input, frame, captions::titles, values, header_first, pages);
 
@@ -218,7 +271,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     const u32 beat_rate = beat_mhz(beat);
     const u32 beat_phase = moving && beat_rate ? state.beat_ms * beat_rate * 4295u : 0;
     const u32 tremble = beat_phase >> 29;
-    shape_figure(frame, sung, beat, tremble, bed, overview, state.step, moving);
+    shape_figure(frame, sung, beat, tremble, bed_share(bed, overview.assigned && overview.loaded), overview, state.step, moving);
     shape_mouth(frame, sung);
     shape_floor(frame, orbit, near);
     const u32 presence = state.presence >> 12;                                 // 0..16

@@ -5,7 +5,17 @@
 //     average and at most, and holds them to the budget;
 //   - checks the idle screen is still, and reduced motion and a reset snap;
 //   - checks the spoon never crosses a line of the cup: every cup, spoon from
-//     wood to silver, taps' every rest, a tap's whole swing.
+//     wood to silver, taps' every rest, a tap's whole swing;
+//   - checks every shown outline against what the OP-XY draws badly, beyond
+//     the SDK's rules (MNMD's docs/SCREEN.md): neighbouring points within an
+//     eighth of a pixel merge, a closing edge under a quarter pixel draws as
+//     a sliver, and an outline with no area or turning straight back on
+//     itself draws streaks; and that a reshaping outline is never turned or
+//     scaled other than by 2, as the device draws one only so. Over every
+//     control at five settings, each through a note;
+//   - checks every header caption fits its column in the OP-XY's font: each
+//     control swept across its range (fizz with fill, whose caption follows
+//     both), and every title.
 // Given a file, it also writes every fifth frame there as JSON lines, for
 // tools/make_gif.py.
 #include "../display.cpp"
@@ -67,7 +77,7 @@ unsigned drawn(const Frame& f, unsigned p, double (*xy)[2]) {
 double spoon_to_cup(const Frame& f) {
     double cup[64][2], spoon[64][2], least = 1e9;
     drawn(f, node::vessel, cup);
-    for (unsigned part = node::bowl; part <= node::handle; ++part) {
+    for (unsigned part = node::spoon; part <= node::spoon; ++part) {
         drawn(f, part, spoon);
         for (unsigned i = 0; i < 64; ++i) {
             const double* s0 = spoon[i];
@@ -88,6 +98,80 @@ double spoon_to_cup(const Frame& f) {
         }
     }
     return least;
+}
+
+// Why a shown outline would draw badly on the device, or null.
+const char* device_fault(const Frame& f, unsigned p) {
+    using namespace opxy::draw;
+    using cocoa::Frame;
+    const Node& n = f.nodes[p];
+    if (n.x >= hidden_x * unit) return nullptr;
+    if (n.cos != unit || n.sin != 0) return "a reshaping outline is turned";
+    const Point* q = f.paths[p].points;
+    const long apart = unit / 8;
+    double area = 0;
+    for (unsigned i = 0; i < Frame::point_count; ++i) {
+        const Point& a = q[i];
+        const Point& b = q[(i + 1) % Frame::point_count];
+        const Point& c = q[(i + 2) % Frame::point_count];
+        const long dx = b.x - a.x, dy = b.y - a.y;
+        const bool closing = i + 1 == Frame::point_count;
+        if (!closing && dx > -apart && dx < apart && dy > -apart && dy < apart) return "neighbouring points merge";
+        if (closing && dx > -2 * apart && dx < 2 * apart && dy > -2 * apart && dy < 2 * apart) return "its closing edge is under a quarter pixel";
+        const double ux = dx, uy = dy, vx = c.x - b.x, vy = c.y - b.y;
+        const double lu = std::hypot(ux, uy), lv = std::hypot(vx, vy);
+        if (lu > 0 && lv > 0 && (ux * vx + uy * vy) / (lu * lv) < -0.995) return "it turns straight back on itself";
+        area += (double)a.x * b.y - (double)b.x * a.y;
+    }
+    if (std::fabs(area) / 2 / (unit * unit) < 0.2) return "it has no area";
+    return nullptr;
+}
+int device_faults = 0;
+void device_check(const Frame& f, const char* when) {
+    for (unsigned p = 0; p < Frame::path_count; ++p) {
+        const char* why = device_fault(f, p);
+        if (why && device_faults < 8) { std::printf("FAIL device: outline %u at %s: %s\n", p, when, why); ++failures; }
+        if (why) ++device_faults;
+    }
+}
+
+// Univers Next Pro Light's advance widths for ' ' to '~', per 1000 em: the
+// device's header lays text out by these, without kerning (measured with
+// MNMD's local/tools/caption_width.py). A value at 20 px has 53 px before
+// the next column's title, a title at 10 px 56 px.
+const unsigned advance[95] = {
+    280, 320, 358, 560, 560, 915, 693, 207, 292, 292, 439, 676, 280, 329, 280, 293, 560, 560, 560, 560, 560, 560, 560, 560,
+    560, 560, 280, 280, 675, 676, 675, 485, 983, 693, 656, 664, 728, 602, 555, 715, 742, 275, 494, 621, 557, 944, 751, 745,
+    602, 745, 659, 617, 546, 744, 650, 1020, 638, 613, 565, 291, 293, 291, 675, 514, 293, 536, 581, 522, 581, 532, 318, 589,
+    574, 235, 235, 513, 235, 894, 574, 571, 581, 581, 345, 480, 325, 574, 512, 820, 506, 507, 445, 381, 251, 381, 675};
+double text_width(const char* text, double px) {
+    double w = 0;
+    for (const char* c = text; *c; ++c) w += (*c >= 32 && *c < 127 ? advance[*c - 32] : 1000) * px / 1000;
+    return w;
+}
+void captions_fit() {
+    double widest = 0, widest_title = 0;
+    unsigned seen = 0;
+    char worst[16] = "";
+    for (int k = 0; k < 8; ++k) {
+        const double w = text_width(screen::titles[k], 10);
+        widest_title = w > widest_title ? w : widest_title;
+        if (w > 56) { std::printf("FAIL the title %s is %.1f px wide, over 56\n", screen::titles[k], w); ++failures; }
+    }
+    for (int k = 0; k < 8; ++k)
+        for (int j = 0; j <= 1024; ++j)
+            for (int f = 0; f <= (k == FIZZ ? 16 : 0); ++f) {
+                opxy::i32 slots[8] = {};
+                slots[k] = static_cast<opxy::i32>(j / 1024.0 * 2147483647.0);
+                if (k == FIZZ) slots[FILL] = static_cast<opxy::i32>(f / 16.0 * 2147483647.0);
+                char values[8][opxy::draw::header_capacity];
+                screen::captions(slots, values);
+                const double w = text_width(values[k], 20);
+                ++seen;
+                if (w > widest) { widest = w; std::snprintf(worst, sizeof worst, "%s", values[k]); }
+                if (w > 53) { std::printf("FAIL the caption %s is %.1f px wide, over 53\n", values[k], w); ++failures; return; }
+            }
+    std::printf("captions: %u, the widest %s at %.1f px of 53; titles at most %.1f px of 56\n", seen, worst, widest, widest_title);
 }
 
 struct Run {
@@ -200,6 +284,28 @@ int main(int argc, char** argv) {
         std::fclose(out);
         return failures ? 1 : 0;
     }
+    captions_fit();
+    // Every control at five settings, the others at the default, through a
+    // note's first second and a half: every outline as the device draws it.
+    {
+        const double defaults[8] = {0.32, 0.0, 0.7, 0.1667, 0.65, 0.6, 0.15, 0.6};
+        unsigned frames = 0;
+        for (int k = 0; k < 8; ++k)
+            for (int v = 0; v <= 4; ++v) {
+                Run r;
+                for (int q = 0; q < 8; ++q) r.c[q] = defaults[q];
+                r.c[k] = v / 4.0;
+                char when[64];
+                for (int f = 0; f < 100; ++f) {
+                    if (f == 10) { r.in.note_serial = 1; r.in.held_notes = 1; }
+                    r.tick();
+                    std::snprintf(when, sizeof when, "control %d at %d%%, frame %d", k, v * 25, f);
+                    device_check(r.frame, when);
+                    ++frames;
+                }
+            }
+        std::printf("device: %u frames, %d outlines that would draw badly\n", frames, device_faults);
+    }
     // The spoon against the cup: every cup, 33 spoons, five tap rates, at rest
     // and through a held note's taps (a second at 60 fps).
     {
@@ -267,9 +373,9 @@ int main(int argc, char** argv) {
     run.in.note_serial = static_cast<opxy::u32>(++notes);
     run.in.held_notes = 1;
     run.tick();
-    const opxy::draw::Node spoon = run.frame.nodes[node::handle];
+    const opxy::draw::Node spoon = run.frame.nodes[node::spoon];
     for (int f = 0; f < 120; ++f) run.tick();
-    check(spoon.x == run.frame.nodes[node::handle].x || run.frame.nodes[node::handle].y != spoon.y, "the spoon swings with reduced motion");
+    check(spoon.x == run.frame.nodes[node::spoon].x || run.frame.nodes[node::spoon].y != spoon.y, "the spoon swings with reduced motion");
     check(run.frame.nodes[node::pop].x == opxy::draw::hidden_x * opxy::draw::unit, "pops show with reduced motion");
     // A reset snaps: the first frame after it sets everything.
     run.in.reduced_motion = 0;

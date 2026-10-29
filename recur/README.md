@@ -36,8 +36,8 @@ sample's overview, and is still in review as
 With no sample loaded, its screen shows a cover reading "load a sample ·
 shift +" and the Sample key's icon.
 
-**Status: experimental.** Recur passes the SDK's tests but has not yet been
-played on an OP-XY, and its CPU figure (below) is a host estimate, not a
+**Status: experimental.** Recur passes the SDK's tests and runs on an
+OP-XY, and its CPU figure (below) is a host estimate, not a
 measurement on the device.
 
 ## Controls
@@ -55,7 +55,7 @@ The values below are each control at 0, 25, 50, 75 and 100.
 
 | Control | 0 / 25 / 50 / 75 / 100 | Default | Caption | What it does |
 | --- | --- | --- | --- | --- |
-| pos | the window at the sample's start, a quarter, half and three quarters of the way, and ending at its end | 0 | seconds to the window's start | Where the window sits, from the start of the sample to its end. A window longer than the sample wraps round it, and pos turns it. |
+| pos | the window at the sample's start, a quarter, half and three quarters of the way, and ending at its end | 0 | seconds to the window's start (`0.62s`, `12.4s`, `123s`; whole minutes, `17m`, from 1000 s) | Where the window sits, from the start of the sample to its end. A window longer than the sample wraps round it, and pos turns it. |
 | grid | 2x2, 2x2, 4x4, 8x8, 8x8 | 4x4 | `2x2` to `8x8` | Slices a side: 4, 16 or 64 slices to deal. The maps' periods grow with it (the cat: 3, 3, 6). |
 | slice | hiss, 1/64, 1/32, 1/8, 1/4 | 1/16 | `hiss`, `1/64` to `1/4` | Each slice, a 64th to a quarter note at the project's tempo; the window is grid² of them (4 x 4 sixteenths is a bar). hiss makes the cells single samples, on a square 16 times the grid's side (32, 64 or 128). |
 | map | cat, baker, gold, shear, hex (pell between gold and shear) | cat | the map's name | The map that deals the slices. Each has its own pattern and period (below). |
@@ -213,8 +213,8 @@ spends at most 20 changes on tiles and the pieces they carry, so a big
 reshuffle ripples across the tray. The display cannot read the tempo, so it
 times slices at 120 BPM. Reduced motion and reset snap. Churn over a
 scripted run averages 6.5 nodes a frame (7.7 while notes play) and peaks
-at 25. The screen uses 246 of the 256 nodes the SDK allows, no reshaping
-outlines, and 41.6 KB of artwork.
+at 25. The screen uses 252 of the 256 nodes the SDK allows, no reshaping
+outlines, and 41.9 KB of artwork.
 
 The tiles are 68 plain squares shared by every print (the 8 grid's 64, the
 first 16 of them doubled in size for the 4 grid, and 4 large ones). Each
@@ -260,7 +260,16 @@ sample, depth 50). The estimate varies from run to run.
 `tests/screen.cpp`, also run by `sdk.py test`, checks that every point of
 every print piece lies inside the square of the tile carrying it, at rest
 and at every frame of a scramble, for each map on each grid, and that every
-frame is valid.
+frame is valid. It also checks every outline against what the OP-XY can
+draw, as authored and as drawn at its scale, over a sweep of every control
+on each map, the scrambles and the cover with no sample: no neighbouring
+points within an eighth of a pixel (the device merges them), no closing
+edge under a quarter of a pixel, and no outline without area or turning
+straight back at a point (the device draws those as streaks). And it sweeps
+every control in hundredths on each map, grid and slice, with samples from a
+tenth of a second to twenty minutes long, and measures every caption the
+header shows in the OP-XY's face: a value must fit 53 px at 20 px, a title
+56 px at 10 px.
 
 ## Files
 

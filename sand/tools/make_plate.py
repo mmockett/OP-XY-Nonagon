@@ -182,19 +182,10 @@ CORNERS = [(0.0, (0.0, 0.0)), (1.0, (1.0, 0.0)), (2.0, (1.0, 1.0)), (3.0, (0.0, 
 
 
 def border_run(t0, t1):
-    """Corners passed going the short way round from t0 to t1."""
+    """Corners passed going round from t0 to t1, always the same way, so that
+    no outline ever runs back along the border over itself."""
     forward = (t1 - t0) % 4
-    out = []
-    if forward <= 2:
-        for c, p in CORNERS + [(c + 4, p) for c, p in CORNERS]:
-            if t0 < c < t0 + forward:
-                out.append(p)
-    else:
-        back = 4 - forward
-        for c, p in sorted(CORNERS + [(c - 4, p) for c, p in CORNERS], reverse=True):
-            if t0 - back < c < t0:
-                out.append(p)
-    return out
+    return [p for c, p in CORNERS + [(c + 4, p) for c, p in CORNERS] if t0 < c < t0 + forward]
 
 
 def length(line):
@@ -235,9 +226,7 @@ def walk(curves):
     here = border_t(first[-1])
     while left:
         def gap(c, end):
-            t = border_t(c[end])
-            d = abs(t - here)
-            return min(d, 4 - d)
+            return (border_t(c[end]) - here) % 4
         best = min(((gap(c, e), i, e) for i, c in enumerate(left) for e in (0, -1)))
         c = left.pop(best[1])
         if best[2] == -1:
@@ -309,6 +298,41 @@ def figure_outlines(figure):
     outlines = [outline_points(walk(g), POINTS) for g in groups]
     outlines += [resample(r, POINTS, closed=True) for r in rings]
     return outlines
+
+
+# What the OP-XY does with a reshaping outline: it merges neighbouring points
+# within an eighth of a pixel, draws a turn straight back at a point as a long
+# streak, and a closing edge under a quarter of a pixel as a sliver. So each
+# outline keeps its neighbours at least TIDY_APART apart, has its out-and-back
+# spikes (a walk running along the border and back) cut off, is refilled to
+# its points by splitting its longest edges, and starts at its longest edge.
+TIDY_APART = 0.3      # path px (0.6 px on screen)
+TIDY_STRAIGHT = 0.01  # sin^2 of the sharpest turn back kept (about 6 degrees short of a reversal)
+
+
+def tidy(points, count):
+    pts = list(points)
+    while True:
+        n = len(pts)
+        cut = next((i for i in range(n) if math.dist(pts[i - 1], pts[i]) < TIDY_APART), None)
+        if cut is None:
+            for i in range(n):
+                a, b, c = pts[i - 1], pts[i], pts[(i + 1) % n]
+                d = (b[0] - a[0], b[1] - a[1])
+                e = (c[0] - b[0], c[1] - b[1])
+                cross, dot = d[0] * e[1] - d[1] * e[0], d[0] * e[0] + d[1] * e[1]
+                if dot < 0 and cross * cross < TIDY_STRAIGHT * (d[0] ** 2 + d[1] ** 2) * (e[0] ** 2 + e[1] ** 2):
+                    cut = i
+                    break
+        if cut is None:
+            break
+        del pts[cut]
+    while len(pts) < count:
+        i = max(range(len(pts)), key=lambda k: math.dist(pts[k], pts[(k + 1) % len(pts)]))
+        a, b = pts[i], pts[(i + 1) % len(pts)]
+        pts.insert(i + 1, ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2))
+    i = max(range(len(pts)), key=lambda k: math.dist(pts[k], pts[(k + 1) % len(pts)]))
+    return pts[i + 1:] + pts[:i + 1]  # the longest edge closes the outline
 
 
 def distinct(points):
@@ -430,7 +454,7 @@ def build_header():
         lines.append("    {")
         for p in range(PATHS):
             if p < len(outlines):
-                pts = distinct([path_units(pt) for pt in outlines[p]])
+                pts = distinct(tidy([path_units(pt) for pt in outlines[p]], POINTS))
             else:
                 pts = [(round(256 * math.cos(2 * math.pi * k / POINTS)), round(256 * math.sin(2 * math.pi * k / POINTS))) for k in range(POINTS)]
             lines.append("        {" + ", ".join(f"{{{x}, {y}}}" for x, y in pts) + "},")
@@ -656,6 +680,13 @@ def build_panel():
     silhouette = corners[:3] + [(x, y + THICK) for x, y in (top(1, 1), top(0, 1), top(0, 0))]
     for k in range(2):
         out.append(node_path(silhouette, TREMOR + k, "none", GREYS[8], DETAIL_WIDTH))
+    # The figure's nodal lines, under the plate's edge, which hides where they
+    # run along the border between one line and the next: authored as distinct
+    # rings; the first frame reshapes and places them.
+    for p in range(PATHS):
+        pts = [((8 + p) * math.cos(2 * math.pi * k / POINTS), (8 + p) * math.sin(2 * math.pi * k / POINTS)) for k in range(POINTS)]  # 0.8 px apart or more
+        out.append(path(outline(pts), "none", LINE, 0.5, p, PIVOT, ' stroke-linejoin="round"'))
+
     for k, t in enumerate(MATERIAL_THICK):
         out.append(node_path(thickness(t), THICKNESS + k, "none", SECOND, SECOND_WIDTH))
     out.append(node_path(corners, PLATE_TOP, "none", MAIN, MAIN_WIDTH))
@@ -667,12 +698,6 @@ def build_panel():
         out.append(node_line([top(*a), top(*b)], 1.4, GREYS[10], SHEEN + k))
     for k, y in enumerate([0.3, 0.7]):
         out.append(node_line(zigzag(y, 0.03, 0.035), DETAIL_WIDTH, GREYS[6], MATTE + k))
-
-    # The figure's nodal lines: authored as small distinct rings; the first
-    # frame reshapes and places them.
-    for p in range(PATHS):
-        pts = [((4 + p) * 0.5 * math.cos(2 * math.pi * k / POINTS), (4 + p) * 0.5 * math.sin(2 * math.pi * k / POINTS)) for k in range(POINTS)]
-        out.append(path(outline(pts), "none", LINE, 0.5, p, PIVOT, ' stroke-linejoin="round"'))
 
     # The clamp at the plate's centre: its washer and the knurled nut.
     c = rel((PX, PY))

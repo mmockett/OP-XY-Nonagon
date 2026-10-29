@@ -30,8 +30,8 @@ At strike 0 the gate simply holds open, so the bell becomes a pad. The
 wingbeat slowly moves the flux and the struck site, so the bands drift and
 the bright partials trade places.
 
-**Status: experimental.** Butterfly passes the SDK's tests. It has not yet
-been played on an OP-XY, and its CPU figures (below) are estimates, not
+**Status: experimental.** Butterfly passes the SDK's tests. It runs on an
+OP-XY, and its CPU figures (below) are estimates, not
 measurements on the device.
 
 ## Controls
@@ -52,10 +52,10 @@ wingbeat.
 | flux | α, 0 to 1/2 a flux quantum a plaquette | .382 | its fraction when it rests on one (`2/5`), otherwise three places (`.381`) | Reshapes the spectrum through Hofstadter's butterfly. The chain at 1 − α is the chain at α, so the knob spans the half that differs. A gentle snap (30% of each basin) holds it on the simple fractions (q up to 8), where the bands are exact; the golden flux reads `.381`, pulled a little toward 3/8. |
 | coupling | λ, 0 to 2, held at 1.00 over the middle 6% of its travel | 1.00 | `1.00` | The potential's strength. Below 1 the states spread and a strike sounds many partials; above 1 they localize and it sounds a few. At 0 the chain is free: one cosine band. |
 | spread | 3 to 48 semitones | 24 | `24st` | The span of the whole spectrum, 4 + 4λ wide in energy, in semitones above the key. |
-| strike | 0 to 100 | 63 | `pad`, the held hum's level under the strike (`-20dB`), `pluck` | How hard a note strikes the gate. A strike pulses it open, then it settles to a held hum, lower the harder the strike: 7 dB down at 25, 15 at 50, 26 at 75 (against a pad's level, three quarters open), and none at 100, a pluck. At 0 the note swells in and holds: a pad. The caption is the hum's level. |
-| glow | 40 ms to 8 s, exponentially | 3.5 s | `180ms`, `3.5s` | How long a struck gate takes to close from open to −60 dB. It closes three times faster while still bright, as a vactrol's cell does. A struck note's hum fades too, with a time constant of four glows over the strike squared: at short glows it dies with the ring, at long ones it sustains, and a pad never fades. An unstruck note swells in at a twentieth of glow. |
+| strike | 0 to 100 | 63 | `pad`, how far the held hum lies under a pad's level (`20dB`), `pluck` | How hard a note strikes the gate. A strike pulses it open, then it settles to a held hum, lower the harder the strike: 7 dB down at 25, 15 at 50, 26 at 75 (against a pad's level, three quarters open), and none at 100, a pluck. At 0 the note swells in and holds: a pad. The caption is how far the hum lies under a pad's level. |
+| glow | 40 ms to 8 s, exponentially | 3.5 s | `40ms` to `99ms`, `.10s` to `.99s`, `1.0s` to `8.0s` | How long a struck gate takes to close from open to −60 dB. It closes three times faster while still bright, as a vactrol's cell does. A struck note's hum fades too, with a time constant of four glows over the strike squared: at short glows it dies with the ring, at long ones it sustains, and a pad never fades. An unstruck note swells in at a twentieth of glow. |
 | site | from the chain's middle (`mid`) to its end (`end`) | 2 | `mid`, `1` to `7`, `end` | Where the chain is struck. The middle excites only the even states of the mirror-symmetric chain, as a bar struck at its centre sounds only its symmetric modes. Off the middle every state sounds, and above λ = 1 each site has its own few partials. |
-| tilt | 0 to 3 | 1.2 | the top partial's darkening (`-10dB`) | How dark the top of the spectrum is, and how much faster it follows the gate down. The upper three quarters of the span are darkened, to tilt × 8 dB at the top, and each partial takes the gate to the power 1 + tilt × place (its place being its height in the span), so the bell is darker from the strike and darkens further as it rings, as through a lowpass gate. |
+| tilt | 0 to 3 | 1.2 | how far the top partial is darkened (`10dB`) | How dark the top of the spectrum is, and how much faster it follows the gate down. The upper three quarters of the span are darkened, to tilt × 8 dB at the top, and each partial takes the gate to the power 1 + tilt × place (its place being its height in the span), so the bell is darker from the strike and darkens further as it rings, as through a lowpass gate. |
 | wingbeat | 0 to 100 | 15 | `off`, the beats a second (`.26Hz`) | A slow beat, 0.2 to 0.6 a second, of the flux (up to 1/48 either way) and of the struck site (up to 1.5 sites), from each note's own strike and starting at rest. The bands drift and breathe. |
 
 Measured on one note of 220 Hz at 0, 25, 50, 75 and 100, the other controls
@@ -224,6 +224,16 @@ white with the strike. The veins, eyespot rings, antennae and body are a
 step down. There are no fills on the wings, no line closer than about 3 px
 to its neighbour, and none of its own text under 9 px.
 
+Every outline is drawn as the OP-XY's renderer needs it, which the browser
+does not show: each has real area (a line is a closed ribbon at least
+0.5 px wide), none turns straight back at a point (the device draws such a
+join as a spike across the whole screen), no two neighbouring points lie
+within an eighth of a pixel, and each closes over at least a quarter of
+one. Each wing's margin and lit band close through two root points on the
+line between their ends, so they run straight on through the root, and
+under the tail's strap the margin holds one reach, so no notch between the
+lobes folds the strap's edge back.
+
 - **The breadth is the chain.** From the body out to the submarginal band
   (0.2 to 0.64 of the margin's reach) lies the chain, from its middle site
   to its end.
@@ -265,8 +275,8 @@ to its neighbour, and none of its own text under 9 px.
   along the forewings; at 100 they are long (1.05) and upright, 13 degrees
   in, their tips at least 10 px clear of the header. They turn and grow from
   their bases. A strike flicks them out and back within 0.2 s.
-- **Static parts:** each half wing's veins (three a half wing, 1 px tapering
-  to 0.6, stopping short of the body so they never merge there; one
+- **Static parts:** each half wing's veins (three a half wing, 1.2 px
+  tapering to 0.8, stopping short of the body so they never merge there; one
   comb-shaped outline each, a node so it scales with the wing and the
   forewing's turns with tilt), the body (head, thorax and abdomen), the pin
   through the thorax and the label, its name 9 px tall.
@@ -290,8 +300,8 @@ first frame reads the tables.
   its four eyespot rings, at most 10 nodes a frame with the antennae.
 - **The light is stepped,** in sixteen steps, on the lit band and the
   eyespots.
-- **Churn:** 3.0 nodes a frame on average over a scripted 24 s run at
-  60 fps and 3.9 at 30 fps, at most 10; 0.7 with reduced motion; 0 when
+- **Churn:** 2.9 nodes a frame on average over a scripted 24 s run at
+  60 fps and 3.8 at 30 fps, at most 10; 0.7 with reduced motion; 0 when
   idle. The GIF's tour of every control averages 3.9.
 
 Display state is 508 bytes, with 26 nodes, 4 outlines and all 16 text slots
@@ -318,15 +328,15 @@ an OP-XY.
   per voice block at the heaviest setting, on a heavily loaded host.
 - Both are within 15,000; Moth reads 10,300 by the same count. Nothing is
   solved at run time.
-- **Memory.** Butterfly takes 143.8 KiB of the 2040 KiB module region, most
+- **Memory.** Butterfly takes 144.5 KiB of the 2040 KiB module region, most
   of it the tables, and needs no runtime helpers. Eight voices are 352 bytes
   each, with no shared state.
 
 ## Tests
 
-`sdk.py test` runs three host tests, and `--firmware` compiles Butterfly for
-the Blackfin. The sound and screen tests are clean under UBSan, and the
-screen test under ASan too.
+`sdk.py test` runs five host tests, and `--firmware` compiles Butterfly for
+the Blackfin. The sound, screen and outline tests are clean under UBSan, and
+the screen and outline tests under ASan too.
 
 - **`tests/sound.cpp`:**
   - **The tables against a double-precision Jacobi solve.** On the grid,
@@ -354,6 +364,20 @@ screen test under ASan too.
   - The idle screen is still.
   - Churn stays within 20 a frame on average and 30 at most.
   - `./screen controls` prints the contact sheet's frames.
+- **`tests/outlines.cpp`:** every outline against what the OP-XY's renderer
+  does beyond the SDK's rules: area, no turn within 12 degrees of straight
+  back, neighbouring points at least an eighth of a pixel apart, and a
+  closing edge of at least a quarter. It runs every reshaping outline on
+  every frame of a note's animation, at each control alone in twentieths,
+  every control at 0, 1/2 and 1 together, each preset, and the settings of a
+  device photo that showed a root's spike. It also runs every static outline
+  of the artwork at the scale its node is drawn at: 6,738 settings.
+- **`tests/captions.cpp`:** every caption each control can show, over 2^16
+  steps of its travel, and every title, measured by advance widths in the
+  OP-XY's font (Univers Next Pro Light, at the header's 20 and 10 px): each
+  value within 53 px and each title within 56, so none runs into the next
+  column or off the screen's edge. The widest is wingbeat's `.20Hz`,
+  51.7 px.
 - **`tests/scenes.cpp`:** each preset's phrase and a flux sweep. Given a
   folder, it writes them there as WAVs; every scene's DC is under 1e−5.
 
@@ -366,7 +390,7 @@ screen test under ASan too.
 | `tables.h`, `tables_data.h` | The tables' declarations, and their one definition (from `tools/make_tables.py`) |
 | `display.h`, `display.cpp` | The screen |
 | `panel.svg.fragment`, `plate.h` | Artwork and the wing's geometry, from `tools/make_panel.py` |
-| `tests/sound.cpp`, `tests/screen.cpp`, `tests/scenes.cpp` | The checks above |
+| `tests/sound.cpp`, `tests/screen.cpp`, `tests/outlines.cpp`, `tests/captions.cpp`, `tests/scenes.cpp` | The checks above |
 | `tests/presets.h` | The presets for the tests, from `tools/make_presets.py` |
 | `tools/make_gif.py`, `tools/make_controls.py`, `tools/render.py`, `tools/frame2svg.py` | `docs/butterfly.gif`, `docs/controls-1x.png`, `docs/controls.png` and single frames, from the real display code |
 

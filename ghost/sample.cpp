@@ -116,7 +116,8 @@ void remove_fundamental(Section& s, const Coefficients& c, i32 depth, i32* buffe
 }
 
 // The bed into buffer (adding), at half rate: the sample at its own rate,
-// mono, looping in [begin, end), times gain (Q15).
+// mono, looping in [begin, end), times gain (Q15, up to 32: the product is
+// taken in two steps so it stays in 32 bits).
 template <bool Stereo>
 inline void read_bed(Voice& v, i32* buffer, i32 gain, u32 begin, u32 end) {
     const opxy::i16* data = v.sample.data;
@@ -125,7 +126,7 @@ inline void read_bed(Voice& v, i32* buffer, i32 gain, u32 begin, u32 end) {
     for (u32 i = 0; i < half_frames; ++i) {
         // The nearest frame: the bed is mostly whitened, so it needs no more.
         const i32 a = Stereo ? (i32(data[2 * frame]) + data[2 * frame + 1]) >> 1 : data[frame];
-        buffer[i] += (a * gain) >> 15;
+        buffer[i] += (a * (gain >> 6)) >> 9;
         fraction += step;
         frame += fraction >> 16;
         fraction &= 0xffff;
@@ -158,11 +159,12 @@ void breathe(Voice& v, const Exciter& x, u32 begin, u32 end, i32* common) {
     for (u32 i = 0; i < half_frames; ++i) {
         state ^= state << 13; state ^= state >> 17; state ^= state << 5;
         air += mul((i32(state) >> 16) - air, 20840 << 16);               // breath, softened above 3 kHz
-        // The bed, mostly whitened: its sign flipped at random, so it keeps its
-        // envelope and grain but rings every harmonic of the note, not its own.
+        // The bed, a little whitened: half its samples at random scaled to
+        // 0.4, which keeps the recording's own colour (0.7 of it dry) and adds
+        // grain enough that it rings every harmonic of the note.
         const i32 bed = common[i];
         if (Whisper) common[i] = (air * x.breath + (i32(state) >> 16) * x.whisper) >> 15;
-        else common[i] = (state & 1 ? bed : -((bed * 13107) >> 15)) + ((air * x.breath) >> 15);   // +1 or -0.4: 0.3 dry, 0.7 white
+        else common[i] = (state & 1 ? bed : (bed * 13107) >> 15) + ((air * x.breath) >> 15);   // +1 or +0.4: 0.7 dry, 0.3 white
     }
     v.noise = state;
     v.air = air;
@@ -423,13 +425,18 @@ void render_sample(Voice& voice, const opxy::SampleBlock& block) {
     const i32 pulse_in = i32(lost >> 1);
     Exciter ex;
     const i32 w = position > 65535 ? 32767 : i32(position >> 1);       // how sung, Q15: 0 at breath, 1 from oo on
-    const i32 own_share = bed ? cosine(bed << 14) : 32767;   // bed takes over from breath and hum
-    ex.breath = (((noise_in * (32767 - ((w * 22938) >> 15))) >> 15) * own_share) >> 16;   // 1 - 0.7 w, halved
-    ex.hum = (((pulse_in * ((w * 27852) >> 15)) >> 15) * own_share) >> 15;             // 0.85 w
     const u32 begin = block.region.begin;
     const u32 end = block.region.end < voice.sample.frames ? block.region.end : voice.sample.frames;
-    ex.bed = ex.whisper = 0;
     const bool sampled = voice.sample.data && end >= begin + 8;
+    const u32 share = bed_share(bed, sampled);                         // a loaded sample takes 40% at least
+    const i32 own_share = share ? cosine(share << 14) : 32767;         // bed takes over from breath and hum
+    // The hum, coherent at the note, builds in the resonators far more than
+    // anything broadband, so it gives way faster: as its share squared, and
+    // the sample, not the hum, sets them ringing.
+    const i32 hum_share = (own_share * own_share) >> 15;
+    ex.breath = (((noise_in * (32767 - ((w * 22938) >> 15))) >> 15) * own_share) >> 16;   // 1 - 0.7 w, halved
+    ex.hum = (((pulse_in * ((w * 27852) >> 15)) >> 15) * hum_share) >> 15;             // 0.85 w
+    ex.bed = ex.whisper = 0;
     if (bed && !sampled) {
         // No sample: a whisper of its own, white breath in gusts, a syllable
         // every 60 to 250 ms at its own strength, a quarter of them silent.
@@ -445,16 +452,18 @@ void render_sample(Voice& voice, const opxy::SampleBlock& block) {
     // them, made up so its average holds.
     const i32 gusting = bed && !sampled ? i32((bed * 22938u) >> 16) : 0;     // Q15
     const i32 gusts = 32768 - gusting + ((gusting * voice.gust) >> 15) + (gusting >> 1);   // Q15
-    if (bed && sampled) {
+    if (share && sampled) {
         const u32 volume = block.region.level >> 12;                   // Q15, unity 32768
-        ex.bed = i32(((u32((sine(bed << 14) * noise_in) >> 15) * (volume < 65536 ? volume : 65535)) >> 15)) << 4;   // recordings run quieter than breath
+        ex.bed = i32(((u32((sine(share << 14) * noise_in) >> 15) * (volume < 65536 ? volume : 65535)) >> 15)) << 4;   // recordings run quieter than breath
         if (voice.frame < begin || voice.frame >= end) voice.frame = begin + (voice.frame - begin) % (end - begin);
     }
     const u32 vowel_at = index ? index : 1, vowel_to = index ? upper : 1;
     const u32 blend = index ? part >> 1 : 0;
     for (u32 k = 0; k < 2; ++k)
         ex.f[k] = formant_table[2 * vowel_at + k] + i32(((formant_table[2 * vowel_to + k] - formant_table[2 * vowel_at + k]) * i32(blend)) >> 15);
-    ex.vowel = w;
+    // The vowel's formants thin as the sample's share grows (to a quarter at
+    // all of it), so the recording's own colour comes through them.
+    ex.vowel = sampled ? (w * i32(65536 - ((share * 49152u) >> 16))) >> 16 : w;
 
     // split and trade: +-split, swinging between the ears at trade's pace.
     const i32 divide = ((i32(split >> 1)) * cosine(voice.trade)) >> 15;   // Q15: + even to the left
@@ -529,7 +538,9 @@ void render_sample(Voice& voice, const opxy::SampleBlock& block) {
     if (!(voice.write & 255) || !voice.follow || power > voice.power) {
         // Breath peaks higher than song and sounds louder for its power: it
         // sits up to 2.6 dB lower (0.55 of the power at breath, all of it sung).
-        const u32 target = (target_power >> 6) * (36045 + u32(w) * 29491 / 32767) >> 10;
+        // A recording peaks higher too: its share takes up to 1.5 dB more off.
+        const u32 sung_target = (target_power >> 6) * (36045 + u32(w) * 29491 / 32767) >> 10;
+        const u32 target = sampled ? ((sung_target >> 4) * (65536 - ((share * 19661u) >> 16))) >> 12 : sung_target;
         const u32 follow = square_root(ratio(target, voice.power ? voice.power : 1) << 8);   // Q12
         voice.follow = follow < 1024 ? 1024 : follow > 32767 ? 32767 : follow;
     }

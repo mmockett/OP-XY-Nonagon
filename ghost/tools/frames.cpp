@@ -4,6 +4,7 @@
 //   clang++ -std=c++11 -O2 -I<sdk>/sdk/include tools/frames.cpp -o frames && ./frames <folder> [fps]
 //   ./frames clear: checks nothing drawn ever reaches the footlights or the hint
 #include "../display.cpp"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -26,6 +27,51 @@ i32 at(double v) { return i32(v * 2147483647.0); }
 void load() {
     overview.assigned = overview.loaded = 1; overview.frames = 264600; overview.rate = 44100; overview.end = 264600;
     for (u32 i = 0; i < 64; ++i) overview.peaks[i] = opxy::u8(60 + (i * 53 % 29) * 4 + ((i / 8) % 2) * 50);
+}
+
+// What the OP-XY does with a shown reshaping outline, beyond the SDK's rules
+// (as MNMD's tools/check_frame.cpp checks): it merges neighbouring points
+// within an eighth of a pixel on both axes, draws a closing edge under a
+// quarter of a pixel as a long sliver, and draws an outline with no area (a
+// line traced out and back, or a turn straight back at a point) as streaks.
+// A repeated last point only pads. Says what breaks, or nothing.
+const i32 apart = unit / 8;
+u32 outline_faults = 0;
+void check_outlines(const ghost::Frame& f, const char* when) {
+    for (u32 p = 0; p < ghost::Frame::path_count; ++p) {
+        if (f.nodes[p].x >= hidden_x * unit) continue;
+        Point q[64];
+        u32 m = 0;
+        for (u32 i = 0; i < 64; ++i) {
+            const Point& r = f.paths[p].points[i];
+            if (!m || r.x != q[m - 1].x || r.y != q[m - 1].y) q[m++] = r;
+        }
+        const char* fault = 0;
+        u32 at = 0;
+        for (u32 i = 0; i < m && !fault; ++i) {
+            const Point& a = q[i], &b = q[(i + 1) % m];
+            const i32 dx = b.x - a.x, dy = b.y - a.y;
+            if (i + 1 < m && dx > -apart && dx < apart && dy > -apart && dy < apart) { fault = "neighbouring points merge"; at = i; }
+        }
+        if (!fault && m > 2) {
+            const i32 dx = q[0].x - q[m - 1].x, dy = q[0].y - q[m - 1].y;
+            const i32 span = std::max(std::abs(dx), std::abs(dy));
+            if (span < 2 * apart) { fault = "closing edge under a quarter of a pixel"; at = m - 1; }
+        }
+        double area = 0;
+        for (u32 i = 0; i < m && !fault; ++i) {
+            const Point& a = q[(i + m - 1) % m], &b = q[i], &c = q[(i + 1) % m];
+            const double ux = b.x - a.x, uy = b.y - a.y, vx = c.x - b.x, vy = c.y - b.y;
+            const double cross = ux * vy - uy * vx, dot = ux * vx + uy * vy, lengths = std::hypot(ux, uy) * std::hypot(vx, vy);
+            if (dot < 0 && std::fabs(cross) < 0.02 * lengths) { fault = "turns straight back"; at = i; }
+            area += (double(b.x) * c.y - double(c.x) * b.y) / 2;
+        }
+        if (!fault && std::fabs(area) < double(unit) * unit) fault = "has no area";
+        if (fault) {
+            if (outline_faults < 12) std::printf("%s: path %u %s (point %u of %u)\n", when, p, fault, at, m);
+            ++outline_faults;
+        }
+    }
 }
 
 void dump(const ghost::Frame& f, const std::string& path) {
@@ -90,6 +136,7 @@ struct Session {
             for (u32 i = 0; i < 4; ++i) input.parameters[i] = input.slots[input.shown[i]];
             ghost::display(state, input, frame);
             if (!valid(frame)) ++invalid;
+            check_outlines(frame, folder.c_str());
             const u32 c = frames ? count_changes() : 0;
             if (frames) {
                 changed += c;
@@ -162,16 +209,19 @@ int gif(const std::string& dir) {
 
 // The footlights and the hint under the apron are never crossed: over a
 // sweep of every control that moves or sizes what is drawn, with three notes
-// held and let go, the lowest point any figure, halo, mouth or the chalk path
-// reaches over the apron (x 60..420) stays above the footlights' hoods
-// (y 193.8), and nothing reaches the pilasters (x 58 and 422). Fails
-// otherwise.
+// held and let go, with no sample and with one, the lowest point any figure,
+// halo, mouth or the chalk path reaches over the apron (x 60..420) stays
+// above the footlights' hoods (y 193.8), nothing reaches the pilasters (x 58
+// and 422), and every outline keeps the OP-XY's drawing rules
+// (check_outlines). Fails otherwise.
 int clear() {
     const double ring[4] = {0, 0.5, 0.8, 1}, two[2] = {0, 1};
     double lowest = 0, left = 480, right = 0;
     u32 sessions = 0;
+    for (u32 loaded = 0; loaded < 2; ++loaded)   // no sample, then one: bed frays by its peaks
     for (double rg : ring) for (u32 n = 0; n <= 10; ++n) for (u32 o = 0; o <= 10; ++o)
     for (double vo : two) for (double sp : two) for (double tr : two) for (double bt : two) for (double bd : two) {
+        if (loaded) load(); else overview.assigned = overview.loaded = 0;
         Session s(".", 30);
         const double v[8] = {rg, vo, sp, tr, bt, o / 10.0, n / 10.0, bd};
         for (u32 i = 0; i < 8; ++i) s.input.slots[i] = at(v[i]);
@@ -211,7 +261,8 @@ int clear() {
     }
     std::printf("footlights and hint: over %u settings, the lowest point drawn over the apron is at y %.1f (the footlights' hoods start at 193.8)\n", sessions, lowest);
     std::printf("  and between the pilasters, from x %.1f to %.1f (their inner faces at 58 and 422)\n", left, right);
-    return lowest < 193 && left > 59 && right < 421 ? 0 : 1;
+    std::printf("  outlines breaking the OP-XY's drawing rules: %u\n", outline_faults);
+    return lowest < 193 && left > 59 && right < 421 && !outline_faults ? 0 : 1;
 }
 
 int main(int argc, char** argv) {
@@ -249,6 +300,6 @@ int main(int argc, char** argv) {
     std::printf("  while notes are held: mean %.2f over %u frames; otherwise (including control turns): mean %.2f\n",
                 double(s.held_changed) / s.held_frames, s.held_frames, double(s.idle_changed) / s.idle_frames);
     std::printf("  idle, a second after the last fade: %u nodes changed\n", idle);
-    std::printf("DisplayState %u bytes\n", u32(sizeof(ghost::DisplayState)));
-    return s.invalid || idle ? 1 : 0;
+    std::printf("DisplayState %u bytes; outlines breaking the OP-XY's drawing rules: %u\n", u32(sizeof(ghost::DisplayState)), outline_faults);
+    return s.invalid || idle || outline_faults ? 1 : 0;
 }

@@ -1,5 +1,7 @@
 #pragma once
-// The header's captions, in real units, for display.cpp.
+// The header's captions, in real units, for display.cpp. Each fits its
+// column on the device: values 53 px or less at 20 px, titles 56 at 10
+// (tests/sound.cpp measures every one).
 #include <opxy/page_header.hpp>
 #include "ghost.h"
 
@@ -40,10 +42,13 @@ inline void percent(char (&value)[header_capacity], u32 level16) {
     append(value, "%");
 }
 
-inline void fill(const Input& input, char (&values)[8][header_capacity]) {
+inline void fill(const Input& input, bool has_sample, char (&values)[8][header_capacity]) {
     const u32 ring = ring_ms(level(input.slots[kRing]));
-    if (ring < 1000) { put(values[kRing], ring / 10 * 10); append(values[kRing], "ms"); }
-    else { decimal(values[kRing], (ring + 50) / 100, 1); append(values[kRing], "s"); }
+    // ring in seconds throughout: "150ms" runs into the next column on the
+    // device, "0.15s" fits.
+    if (ring < 995) decimal(values[kRing], (ring + 5) / 10, 2);
+    else decimal(values[kRing], (ring + 50) / 100, 1);
+    append(values[kRing], "s");
     const u32 position = vowel_position(level(input.slots[kVoice]));
     copy(values[kVoice], header_capacity, vowel_names[(position + 32768) >> 16]);
     percent(values[kSplit], level(input.slots[kSplit]));
@@ -62,8 +67,8 @@ inline void fill(const Input& input, char (&values)[8][header_capacity]) {
     const u32 cm = near_cm(level(input.slots[kNear]));
     if (cm >= 100) { decimal(values[kNear], (cm + 5) / 10, 1); append(values[kNear], "m"); }
     else { put(values[kNear], cm); append(values[kNear], "cm"); }
-    // bed: the sample's share, or without one the whisper's.
-    percent(values[kBed], level(input.slots[kBed]));
+    // bed: the sample's share (40% at least), or without one the whisper's.
+    percent(values[kBed], bed_share(level(input.slots[kBed]), has_sample));
 }
 }
 }

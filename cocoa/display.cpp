@@ -167,13 +167,42 @@ inline void caption_taps(char* out, i32 taps) {
     t[at++] = 'H'; t[at++] = 'z'; t[at] = 0;
     copy(out, header_capacity, t);
 }
-// fizz as the median bubble: "600um", "1.2mm".
-inline void caption_fizz(char* out, i32 fizz) {
-    const u32 um = drink::radius_um(fizz);
-    if (um < 995) { caption_unit(out, (um + 5) / 10 * 10, "um"); return; }
-    const u32 tenths_of = (um + 50) / 100;
-    const char t[6] = {static_cast<char>('0' + tenths_of / 10), '.', static_cast<char>('0' + tenths_of % 10), 'm', 'm', 0};
+// fizz as how long the drink takes to clear, the time its finest bubbles take
+// to rise through it (they set when the note is in tune): "15s", "3.7s",
+// "0.15s". It follows fill too.
+inline void caption_fizz(char* out, i32 fizz, i32 fill) {
+    i32 rate[drink::classes];
+    drink::rates(fill, fizz, rate);
+    const u32 blocks = static_cast<u32>(drink::clear) / static_cast<u32>(rate[0] > 0 ? rate[0] : 1);
+    const u32 ms = blocks * 64u * 10u / 441u;   // 64 samples at 44.1 kHz
+    char t[8];
+    u32 at = 0;
+    if (ms >= 9950) {
+        put_number(t, at, (ms + 500) / 1000);
+    } else if (ms >= 995) {
+        const u32 tenths_of = (ms + 50) / 100;
+        put_number(t, at, tenths_of / 10);
+        t[at++] = '.'; t[at++] = static_cast<char>('0' + tenths_of % 10);
+    } else {
+        const u32 hundredths = (ms + 5) / 10;
+        t[at++] = '0'; t[at++] = '.';
+        t[at++] = static_cast<char>('0' + hundredths / 10); t[at++] = static_cast<char>('0' + hundredths % 10);
+    }
+    t[at++] = 's'; t[at] = 0;
     copy(out, header_capacity, t);
+}
+// spoon as its contact time, 4 ms (soft) to 75 us (hard), in as few
+// characters as the header's column takes: "4ms", ".4ms", "80us".
+inline void caption_spoon(char* out, i32 spoon) {
+    const i32 log2_us = tables::log2_soft_us - static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * drink::q16(spoon) >> 12);
+    const u32 us = drink::exp2_int(log2_us);
+    if (us < 95) { caption_unit(out, (us + 5) / 10 * 10, "us"); return; }
+    if (us < 950) {
+        const char t[5] = {'.', static_cast<char>('0' + (us + 50) / 100), 'm', 's', 0};
+        copy(out, header_capacity, t);
+        return;
+    }
+    caption_unit(out, (us + 500) / 1000, "ms");
 }
 // pops as how often a fresh stir's foam pops: "15/s", "off".
 inline void caption_pops(char* out, i32 pops) {
@@ -181,14 +210,24 @@ inline void caption_pops(char* out, i32 pops) {
     if (!rate) { copy(out, header_capacity, "off"); return; }
     caption_unit(out, rate, "/s");
 }
-// spoon as its contact time: 4.0ms (soft) to 75us (hard).
-inline void caption_spoon(char* out, i32 spoon) {
-    const i32 log2_us = tables::log2_soft_us - static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * drink::q16(spoon) >> 12);
-    const u32 us = drink::exp2_int(log2_us);
-    if (us < 995) { caption_unit(out, (us + 5) / 10 * 10, "us"); return; }
-    const u32 tenths_of = (us + 50) / 100;
-    const char t[6] = {static_cast<char>('0' + tenths_of / 10), '.', static_cast<char>('0' + tenths_of % 10), 'm', 's', 0};
-    copy(out, header_capacity, t);
+}
+
+namespace screen {
+const char* const titles[8] = {"Powder", "Taps", "Fizz", "Cup", "Fill", "Spoon", "Pops", "Stir"};
+// Each control's caption, in its own units (tests/screen.cpp checks each one
+// fits its column in the OP-XY's font).
+inline void captions(const i32* slots, char (*values)[opxy::draw::header_capacity]) {
+    using opxy::draw::copy;
+    using opxy::draw::header_capacity;
+    const char* const cups[3] = {"china", "glass", "tin"};
+    caption_powder(values[POWDER], slots[POWDER]);
+    caption_taps(values[TAPS], slots[TAPS]);
+    caption_fizz(values[FIZZ], slots[FIZZ], slots[FILL]);
+    copy(values[CUP], header_capacity, cups[drink::choice(slots[CUP], 3)]);
+    caption_unit(values[FILL], (drink::fill_um(slots[FILL]) + 450) / 900, "%");   // of the mug's 90 mm
+    caption_spoon(values[SPOON], slots[SPOON]);
+    caption_pops(values[POPS], slots[POPS]);
+    caption_unit(values[STIR], (static_cast<u32>(drink::restir(slots[STIR])) * 100u + 16384u) >> 15, "%");
 }
 }
 
@@ -204,18 +243,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     const i32* slots = input.slots;
 
     // The header.
-    const char* const titles[8] = {"Powder", "Taps", "Fizz", "Cup", "Fill", "Spoon", "Pops", "Stir"};
-    const char* const cups[3] = {"china", "glass", "tin"};
     char values[8][header_capacity];
-    caption_powder(values[POWDER], slots[POWDER]);
-    caption_taps(values[TAPS], slots[TAPS]);
-    caption_fizz(values[FIZZ], slots[FIZZ]);
+    captions(slots, values);
     const u32 cup = drink::choice(slots[CUP], 3);
-    copy(values[CUP], header_capacity, cups[cup]);
-    caption_unit(values[FILL], (drink::fill_um(slots[FILL]) + 500) / 1000, "mm");
-    caption_spoon(values[SPOON], slots[SPOON]);
-    caption_pops(values[POPS], slots[POPS]);
-    caption_unit(values[STIR], (static_cast<u32>(drink::restir(slots[STIR])) * 100u + 16384u) >> 15, "%");
     const opxy::u8 pages[2][4] = {{0, 1, 2, 3}, {4, 5, 6, 7}};
     page_header(state.header, input, frame, titles, values, node::header, pages);
 
@@ -321,7 +351,10 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             }
         }
         const i32 meniscus[4] = {2560, 1280, 580, 230};   // Q10 px up, at the wall and inward
-        Point points[64];
+        // A thin closed ribbon, a quarter pixel thick (at its own scale), started
+        // in the middle of its top run: the device draws a short closing edge
+        // as a long sliver.
+        Point ring[64], points[64];
         for (u32 i = 0; i < 32; ++i) {
             const i32 u = -scene::inner * unit + 410 + static_cast<i32>(i) * (2 * scene::inner * unit - 820) / 31;
             const i32 w = u * 32 / scene::inner >> 10;                                        // -32..32
@@ -329,11 +362,12 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             const i32 v = 32 - (w < 0 ? -w : w);
             y += vortex * (v * v * 3 - 1024) / 3072;                                         // a funnel, D ((1 - |u|/a)^2 - 1/3)
             y += (ripple * sine(static_cast<i32>(i) * 3600 * 3 / 31)) >> 10;
-            points[i].x = u >> 1;
-            points[i].y = y >> 1;
-            points[63 - i].x = u >> 1;
-            points[63 - i].y = (y >> 1) + 184;   // the ribbon's width, at twice
+            ring[i].x = u >> 1;
+            ring[i].y = y >> 1;
+            ring[63 - i].x = u >> 1;
+            ring[63 - i].y = (y >> 1) + 256;   // the ribbon's width, at twice
         }
+        for (u32 i = 0; i < 64; ++i) points[i] = ring[(i + 16) & 63];
         outline(frame, node::surface, points, state.key, fresh);
         put(frame, node::surface, cx, level, 2 * unit, grey::spoon, stroke);
     }
@@ -399,12 +433,6 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         state.spoon = keep ? ease(state.spoon, target, keep) : target;
         if (magnitude(state.spoon - target) < 256) state.spoon = target;
         const i32 m = state.spoon >> 6;   // Q10
-        Point points[64];
-        morph(points, plate::bowl[0], plate::bowl[1], m);
-        outline(frame, node::bowl, points, state.key, fresh);
-        morph(points, plate::handle[0], plate::handle[1], m);
-        outline(frame, node::handle, points, state.key, fresh);
-
         const i32 rest = 240 - static_cast<i32>((220u * drink::q16(slots[TAPS])) >> 16);   // tenths of a degree
         const i32 swing = rest > 40 ? rest : 40;   // tapping, it always swings 4 degrees or more
         i32 lift = rest;
@@ -434,8 +462,20 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 tip_y = pivot_y + ((ox * rock.sin + oy * rock.cos) >> 6);
         const Turn t = rotation(lean + lift);
         const i32 mid_x = tip_x + scene::handle_mid * t.cos, mid_y = tip_y + scene::handle_mid * t.sin;
-        put_turned(frame, node::bowl, tip_x, tip_y, 2 * unit, t, grey::spoon);
-        put_turned(frame, node::handle, mid_x, mid_y, 2 * unit, t, grey::spoon);
+        // The spoon is one outline, its points turned here and drawn upright
+        // about its middle: the device turns a reshaping outline otherwise
+        // than the browser, and a bowl and handle turned apart came apart.
+        {
+            Point shape[64], points[64];
+            morph(shape, plate::spoon[0], plate::spoon[1], m);
+            for (u32 i = 0; i < 64; ++i) {
+                points[i].x = (shape[i].x * t.cos - shape[i].y * t.sin) >> 10;
+                points[i].y = (shape[i].x * t.sin + shape[i].y * t.cos) >> 10;
+            }
+            outline(frame, node::spoon, points, state.key, fresh);
+            const i32 half = plate::half_length[0] + (((plate::half_length[1] - plate::half_length[0]) >> 4) * m >> 6);   // Q10 px
+            put(frame, node::spoon, tip_x + ((half >> 4) * t.cos >> 6), tip_y + ((half >> 4) * t.sin >> 6), 2 * unit, grey::spoon, stroke);
+        }
         // Silver's bowl shines; wood is grained along its handle and in its bowl.
         const bool silver = m >= 512;
         if (silver) put_turned(frame, node::shine, tip_x, tip_y, unit, t, grey::detail);

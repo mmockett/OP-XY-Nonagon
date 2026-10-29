@@ -154,6 +154,61 @@ inline void figure(char* out, i32 log2_value, const char* unit_text) {
 }
 }
 
+// Each control's caption, in real units, each no wider than the header's
+// column in the OP-XY's font at 20 px (tests/captions.cpp measures them).
+inline void captions(const physics::Plate& p, const i32* slots, char values[8][opxy::draw::header_capacity]) {
+    using namespace screen;
+    const u32 liquid = physics::q16(slots[LIQUID]);
+    const u32 part = liquid >= 32768 ? 1 : 0, t = (liquid - part * 32768) * 2;
+    // Heat: the plate in degrees C; in kelvin for a liquid whose Leidenfrost
+    // point is under 100 C (liquid nitrogen's plate, 73 to 373 K), whose plate
+    // can be cold: a three-figure frost in degrees C would not fit.
+    if (p.heat - p.superheat < 1000) {
+        digits(values[HEAT], static_cast<u32>(p.heat + 2732 + 5) / 10, 0);
+        append(values[HEAT], "K");
+    } else {
+        digits(values[HEAT], static_cast<u32>(p.heat + 5) / 10, 0);
+        append(values[HEAT], "C");
+    }
+    // Size: the new drop's mass, its volume pi R^2 h times the liquid's
+    // density, h the lesser of 4/3 R (a bead's sphere) and twice the
+    // capillary length (a puddle's height): 45 mg to 4.3 g of water.
+    {
+        const i32 radius = p.size + p.lobe;                                       // log2 mm, Q16
+        const i32 bead = radius + 27198, puddle = p.lobe + 28345 + octave;        // log2 4/3 R, log2 2 l_c
+        const i32 densities[3] = {0, -22413, -20270};                             // log2 g/ml: water, ethanol, nitrogen
+        const i32 mass = 108236 + 2 * radius + (bead < puddle ? bead : puddle) +
+                         physics::lerp(densities[part], densities[part + 1], t);  // log2 mg
+        const u32 mg = (physics::exp2_q16(mass + 16 * octave) + 32768u) >> 16;
+        if (mg < 100) { digits(values[SIZE], mg ? mg : 1, 0); append(values[SIZE], "mg"); }
+        else if (mg < 995) { digits(values[SIZE], (mg + 5) / 10, 2); append(values[SIZE], "g"); }
+        else if (mg < 9950) { digits(values[SIZE], (mg + 50) / 100, 1); append(values[SIZE], "g"); }
+        else { digits(values[SIZE], (mg + 500) / 1000, 0); append(values[SIZE], "g"); }
+    }
+    copy(values[LIQUID], header_capacity, liquid < 16384 ? "water" : liquid < 49152 ? "ethnl" : "LN2");
+    // Beat: tenths of a hertz under 10.
+    {
+        const u32 tenths = (physics::exp2_q16(p.beat + 16 * octave) * 10u + 32768u) >> 16;
+        if (tenths < 100) digits(values[BEAT], tenths, 1);
+        else digits(values[BEAT], (tenths + 5) / 10, 0);
+        append(values[BEAT], "Hz");
+    }
+    // Groove: the pulses' swing, the longer of each pair's share (50% straight).
+    if (p.swing) {
+        digits(values[GROOVE], 50u + static_cast<u32>(p.swing * 100 + 32768) / 65536u, 0);
+        append(values[GROOVE], "%");
+    } else {
+        copy(values[GROOVE], header_capacity, "even");
+    }
+    // Vapour: the layer's thickness, 10 to 99 microns.
+    digits(values[VAPOUR], 10u + static_cast<u32>(p.vapour * 89 + 16384) / 32768u, 0);
+    append(values[VAPOUR], "um");
+    figure(values[LIFE], physics::lifetime(p, p.size), "s");
+    // Crackle: the floating drop's contacts a second, at this heat.
+    digits(values[CRACKLE], static_cast<u32>(physics::contacts(p)), 0);
+    append(values[CRACKLE], "/s");
+}
+
 inline void display_reset(DisplayState& state) {
     state.header.reset();
     state.notes.reset();
@@ -168,37 +223,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     // The header.
     const char* const titles[8] = {"Heat", "Size", "Liquid", "Beat", "Groove", "Vapour", "Life", "Crackle"};
     char values[8][header_capacity];
-    if (p.heat < 0) {   // liquid nitrogen's plate can be cold
-        copy(values[HEAT], header_capacity, "-");
-        char t[header_capacity];
-        digits(t, static_cast<u32>(-p.heat + 5) / 10, 0);
-        append(values[HEAT], t);
-    } else {
-        digits(values[HEAT], static_cast<u32>(p.heat + 5) / 10, 0);
-    }
-    append(values[HEAT], "C");
-    figure(values[SIZE], p.size + p.lobe, "mm");
-    const u32 liquid = physics::q16(input.slots[LIQUID]);
-    copy(values[LIQUID], header_capacity, liquid < 16384 ? "water" : liquid < 49152 ? "ethnl" : "LN2");
-    // Crackle: the floating drop's contacts a second, at this heat.
-    digits(values[CRACKLE], static_cast<u32>(physics::contacts(p)), 0);
-    append(values[CRACKLE], "/s");
-    // Groove: the pulses' swing, the longer of each pair's share (50% straight).
-    if (p.swing) {
-        digits(values[GROOVE], 50u + static_cast<u32>(p.swing * 100 + 32768) / 65536u, 0);
-        append(values[GROOVE], "%");
-    } else {
-        copy(values[GROOVE], header_capacity, "even");
-    }
-    digits(values[VAPOUR], 20u + static_cast<u32>(p.vapour * 180 + 16384) / 32768u, 0);
-    append(values[VAPOUR], "um");
-    figure(values[LIFE], physics::lifetime(p, p.size), "s");
-    {
-        const u32 tenths = (physics::exp2_q16(p.beat + 16 * octave) * 10u + 32768u) >> 16;   // the beat, tenths of a Hz
-        if (tenths < 100) digits(values[BEAT], tenths, 1);
-        else digits(values[BEAT], (tenths + 5) / 10, 0);
-        append(values[BEAT], "Hz");
-    }
+    captions(p, input.slots, values);
     const opxy::u8 pages[2][4] = {{0, 1, 2, 3}, {4, 5, 6, 7}};
     page_header(state.header, input, frame, titles, values, node::header, pages);
 
@@ -286,7 +311,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     for (u32 k = 0; k < scene::most; ++k) {
         ScreenDrop& d = state.drops[k];
         const u32 rim = node::rim + k, under = node::underside + k;
-        if (!d.used) {
+        // A drop under 3 px across its radius is gone from the screen: its
+        // outline's points would merge, which the OP-XY draws as streaks.
+        if (!d.used || drop_px(physics::radius(d.drop, p)) < 3 * unit) {
             rest(points);
             outline(frame, rim, points, d.key, fresh);
             conceal(frame, rim);
@@ -336,7 +363,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             const i32 rise = ((height * 3 >> 2) * (unit - bead) >> 10) + (radius_mm * bead >> 10);
             const i32 top = mm_px(rise + vapour + lift);                              // the outline's middle, px Q10
             for (u32 i = 0; i < 64; ++i) {
-                const i32 t = static_cast<i32>(i * 225 / 4);
+                // From a lobe's tip, where its edges are longest: its closing edge is no sliver.
+                const i32 t = static_cast<i32>(i * 225 / 4) + seed_turn;
                 const i32 r = radius + (radius * (amount * sine(static_cast<i32>(n) * (t - seed_turn) + 900) >> 10) >> 10);
                 const i32 px = r * sine(t + 900) >> 10, py = r * sine(t) >> 10;
                 points[i].x = px;
@@ -346,7 +374,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             put(frame, rim, x, y, unit, 15, stroke);
             const i32 gap = mm_px(vapour + lift) * scene::cos_e >> 10;
             const i32 size = clamp(radius / scene::ring, 16, 2 * unit);
-            nudge(frame, under, x, y - gap, size, d.flash ? 15 : 10);   // it flashes as the vapour vents
+            if (size >= 430) nudge(frame, under, x, y - gap, size, d.flash ? 15 : 10);   // it flashes as the vapour vents
+            else conceal(frame, under);   // too small to draw cleanly
             // Its shadow stays on the iron, a dark footprint the vapour lifts it off.
             nudge(frame, node::shadow + k, x, y, size, 2, fill_and_stroke);
             // Its steam, from its top, swaying as it billows.

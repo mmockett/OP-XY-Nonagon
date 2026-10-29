@@ -91,14 +91,17 @@ void place_header(DisplayState& state, const Input& input, Frame& frame, const S
     const char* const titles[8] = {"pos", "grid", "slice", "map", "step", "rate", "depth", "chrd"};
     char values[8][header_capacity] = {};
     if (sample.shown) {
-        // Seconds into the sample, to 5 characters: 0.62s, 12.4s, 123s.
+        // Seconds into the sample, within the 53 px a value has in the
+        // device's face: 0.62s, 12.4s, 123s, and from 1000 s on whole
+        // minutes, 17m ("1000s" is too wide).
         const u32 per_ms = sample.rate / 1000 ? sample.rate / 1000 : 1;
         const u32 hundredths = from / (per_ms * 10);
         char* at = values[kPos];
         if (hundredths < 1000) { at = put(at, hundredths / 100); *at++ = '.'; at = put(at, hundredths / 10 % 10); at = put(at, hundredths % 10); }
         else if (hundredths < 10000) { at = put(at, hundredths / 100); *at++ = '.'; at = put(at, hundredths / 10 % 10); }
-        else at = put(at, hundredths / 100);
-        *at++ = 's'; *at = 0;
+        else if (hundredths < 100000) at = put(at, hundredths / 100);
+        else { at = put(at, hundredths / 6000); *at++ = 'm'; *at = 0; }
+        if (hundredths < 100000) { *at++ = 's'; *at = 0; }
     } else header_amount(values[kPos], header_capacity, input.slots[kPos]);
     copy(values[kGrid], header_capacity, grid_names[choice(input.slots[kGrid], grid_count)]);
     copy(values[kSlice], header_capacity, slice_names[choice(input.slots[kSlice], slice_count)]);

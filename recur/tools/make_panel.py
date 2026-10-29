@@ -216,11 +216,10 @@ def honeycomb():
     # Centred on a cell, so each corner and its wall's stub fall inside one cell.
     def at(r, i):
         return (576 + r * math.cos(math.radians(60 * i)), 576 + r * math.sin(math.radians(60 * i)))
-    # One loop: round the hexagon, out along each wall and back.
-    cell_ = []
-    for i in range(6):
-        cell_ += [at(256, i), at(316, i), at(256, i + 0.03)]
-    return [cell_], []
+    # The stubs are strokes of their own: traced out and back inside the
+    # hexagon's outline they would turn straight back, which the OP-XY draws
+    # as a streak.
+    return [[at(256, i) for i in range(6)]], [[at(256, i), at(316, i)] for i in range(6)]
 
 
 CAT_SIZE = 0.72
@@ -287,14 +286,16 @@ def length(pts):
     return sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(pts, pts[1:]))
 
 
-def distinct(points, places=1):
-    """Drops points that repeat the one before, as written."""
+def distinct(points, places=1, apart=0.3):
+    """Drops points within apart px of the one before, as written, and at the end
+    of the one it closes on. The OP-XY merges points within an eighth of a pixel
+    as it draws, and a piece is drawn at 0.72 of its size at the least."""
     out = []
     for p in points:
         q = (round(p[0], places), round(p[1], places))
-        if not out or q != out[-1]:
+        if not out or math.hypot(q[0] - out[-1][0], q[1] - out[-1][1]) >= apart:
             out.append(q)
-    if len(out) > 1 and out[0] == out[-1]:
+    while len(out) > 2 and math.hypot(out[0][0] - out[-1][0], out[0][1] - out[-1][1]) < apart:
         out.pop()
     return out
 

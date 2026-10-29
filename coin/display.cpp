@@ -53,6 +53,8 @@ static opxy::draw::Turn rotation(i32 tenths) {
 namespace screen {
 using namespace opxy::draw;
 const u32 budget = 4;           // the base's marks swapped a frame, at most
+const i32 lean_away = 110;      // the most the disk leans away from the camera, tenths of a degree
+const i32 face_open = 213;      // the least the face is drawn open to the camera: sin 12 degrees, Q10
 const i32 fade_step = 5190000;  // spin at hold with no note held: the disks settle in 0.3 s
 // Each size's radius (px) and half its thickness (Q10 of the radius): a thin
 // coin to the toy's own heavy disk, a third of its radius thick, and heavier.
@@ -126,20 +128,87 @@ inline Point lay(const Pose& p, i32 phi, i32 s, i32 r, bool mirrored) {
     const i32 z = p.middle + (s * p.ca >> 10) - (rc * p.sa >> 10);
     return project(x, y, mirrored ? -(z * scene::mirrored >> 10) : z);
 }
+// The OP-XY draws an outline with streaks or slivers where neighbouring
+// points lie within an eighth of a pixel on both axes (its loader merges
+// them), where it turns straight back at a point, or where its closing edge
+// is under a quarter of a pixel (tests/frames.cpp checks every frame).
+const i32 apart = unit / 8;
+inline bool near(const Point& a, const Point& b) {
+    return magnitude(a.x - b.x) < apart && magnitude(a.y - b.y) < apart;
+}
+// An edge's length on its longer axis.
+inline i32 span(const Point& a, const Point& b) {
+    const i32 dx = magnitude(b.x - a.x), dy = magnitude(b.y - a.y);
+    return dx > dy ? dx : dy;
+}
+// Whether the way a-b-c turns back within 6 degrees of straight back (in
+// 1/128 px: points lie within 64 px, so the products stay in 32 bits).
+inline bool reverses(const Point& a, const Point& b, const Point& c) {
+    const i32 ux = (b.x - a.x) >> 3, uy = (b.y - a.y) >> 3, vx = (c.x - b.x) >> 3, vy = (c.y - b.y) >> 3;
+    const i32 dot = ux * vx + uy * vy, cross = ux * vy - uy * vx;
+    return dot < 0 && magnitude(cross) < -dot / 10;
+}
 // Sets outline p (drawn at twice its points about the mirror's centre) when a
-// point has moved half a pixel, or `force`.
+// point has moved half a pixel, or `force`. Points that merge or turn back go;
+// the longest edges are halved back to 64 points; and the outline starts
+// where both its edges are longest, so it closes on a long edge.
 inline void outline(Frame& frame, u32 p, Point* points, u32& key, bool force) {
+    const u32 count = Frame::point_count;
+    Point q[Frame::point_count];
+    u32 m = 0;
+    for (u32 i = 0; i < count; ++i) {
+        Point v = {points[i].x >> 1, points[i].y >> 1};
+        if (m && near(v, q[m - 1])) continue;
+        q[m++] = v;
+    }
+    while (m > 1 && near(q[m - 1], q[0])) --m;
+    for (u32 pass = 0; pass < 8 && m > 3; ++pass) {
+        bool dropped = false;
+        for (u32 j = 0; j < m && m > 3;) {
+            const Point& a = q[j ? j - 1 : m - 1];
+            const Point& c = q[j + 1 < m ? j + 1 : 0];
+            if (reverses(a, q[j], c) || near(q[j], c)) {
+                for (u32 k = j; k + 1 < m; ++k) q[k] = q[k + 1];
+                --m;
+                dropped = true;
+            } else {
+                ++j;
+            }
+        }
+        if (!dropped) break;
+    }
+    while (m < count && m > 1) {
+        u32 at = 0;
+        i32 longest = 0;
+        for (u32 i = 0; i < m; ++i) {
+            const i32 e = span(q[i], q[i + 1 < m ? i + 1 : 0]);
+            if (e > longest) { longest = e; at = i; }
+        }
+        if (longest < 2 * apart) break;
+        const Point& a = q[at];
+        const Point& b = q[at + 1 < m ? at + 1 : 0];
+        const Point mid = {a.x + (b.x - a.x) / 2, a.y + (b.y - a.y) / 2};
+        for (u32 i = m; i > at + 1; --i) q[i] = q[i - 1];
+        q[at + 1] = mid;
+        ++m;
+    }
+    for (; m < count; ++m) q[m] = q[m - 1];   // too small to draw: it collapses
+    u32 start = 0;
+    i32 best = -1;
+    for (u32 i = 0; i < count; ++i) {
+        const i32 in = span(q[i ? i - 1 : count - 1], q[i]), out = span(q[i], q[i + 1 < count ? i + 1 : 0]);
+        const i32 shorter = in < out ? in : out;
+        if (shorter > best) { best = shorter; start = i; }
+    }
     Frame::path_type& path = frame.paths[p];
     bool moved = force || !path.key;
-    for (u32 i = 0; i < Frame::point_count; ++i) {
-        points[i].x >>= 1;
-        points[i].y >>= 1;
-        if (i && points[i].x == points[i - 1].x && points[i].y == points[i - 1].y) ++points[i].y;   // distinct
+    for (u32 i = 0; i < count; ++i) {
+        points[i] = q[(start + i) % count];
         if (magnitude(points[i].x - path.points[i].x) >= 256 || magnitude(points[i].y - path.points[i].y) >= 256)
             moved = true;
     }
     if (!moved) return;
-    for (u32 i = 0; i < Frame::point_count; ++i) path.points[i] = points[i];
+    for (u32 i = 0; i < count; ++i) path.points[i] = points[i];
     key = key + 1 ? key + 1 : 1;
     path.key = key;
 }
@@ -170,7 +239,7 @@ inline void caption_seconds(char* out, u32 h) {
     if (h < 100) {
         t[at++] = '0'; t[at++] = '.';
         t[at++] = static_cast<char>('0' + h / 10); t[at++] = static_cast<char>('0' + h % 10);
-    } else if (h < 1000) {
+    } else if (h < 995) {   // 9.95 s and over round to 10s
         const u32 tenths_of = (h + 5) / 10;
         t[at++] = static_cast<char>('0' + tenths_of / 10 % 10); t[at++] = '.';
         t[at++] = static_cast<char>('0' + tenths_of % 10);
@@ -389,11 +458,15 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     Pose pose;
     pose.radius = state.radius;
     pose.half = state.radius * half_of[size] >> 10;
-    pose.sa = sine(lead.tilt);
-    pose.ca = sine(lead.tilt + 900);
     const i32 way = tenths(lead.precession);
     pose.st = sine(way);
     pose.ct = sine(way + 900);
+    // Leaning away from the camera (16 degrees up), the disk leans at most 11
+    // degrees, so its face stays open to the camera by 5 and its rim never
+    // collapses to a line (which the device draws as a streak).
+    const i32 drawn = pose.st > 0 && lead.tilt * pose.st > lean_away * unit ? lean_away * unit / pose.st : lead.tilt;
+    pose.sa = sine(drawn);
+    pose.ca = sine(drawn + 900);
     pose.middle = (pose.half * pose.ca >> 10) + (pose.radius * pose.sa >> 10) + jitter;
     const i32 face = tenths(state.turn);
 
@@ -407,6 +480,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     const i32 a = -(((pose.ca * pose.st >> 10) * scene::cos_e + pose.sa * scene::sin_e) >> 14);
     const i32 b = -((pose.ct * scene::cos_e) >> 14);
     const i32 front = angle_of(a, b);
+    // Where the side meets the upper rim it turns straight back; outline()
+    // drops that corner.
     for (u32 i = 0; i < 32; ++i) {
         const i32 phi = front - 900 + static_cast<i32>(i * 1800 / 31);
         points[i] = lay(pose, phi, -pose.half, pose.radius, false);
@@ -424,7 +499,10 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     outline(frame, node::face, points, state.key, fresh);
     put(frame, node::disk, cx, cy, 2 * unit, brightest, stroke);
     put(frame, node::edge, cx, cy, 2 * unit, second, stroke);
-    put(frame, node::face, cx, cy, 2 * unit, second, stroke);
+    // The face, seen at under 12 degrees, is too thin to draw.
+    const i32 open = (pose.ca * scene::sin_e - (pose.sa * pose.st >> 10) * scene::cos_e) >> 14;   // sin, Q10
+    if (open >= face_open) put(frame, node::face, cx, cy, 2 * unit, second, stroke);
+    else conceal(frame, node::face);
     if (ground == 0) put(frame, node::reflection, cx, cy, 2 * unit, faint, stroke);
     else conceal(frame, node::reflection);
 
@@ -451,7 +529,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     // Wobble's rattle: a dashed ghost of the face's rim, where the eccentric
     // weight throws it, hopped up and rocked further over: none at 0, 6 px
     // and 5 degrees at 50, 12 px and 10 degrees at 100. It rattles with the
-    // disk, a third of its dashes a frame; gone when the disk lies flat.
+    // disk, two of its eight dashes a frame; gone when the disk lies flat.
     const bool rocking = wobble > 1300 && (lead.rolling || state.poised);
     if (rocking) {
         Pose ghost = pose;
@@ -460,10 +538,10 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         ghost.ca = sine(lead.tilt + swing + 900);
         ghost.middle = (ghost.half * ghost.ca >> 10) + (ghost.radius * ghost.sa >> 10) + hop + jitter;
         for (u32 j = 0; j < node::ghosts; ++j) {
-            if (!fresh && (j + state.frames) % 3) continue;
-            const i32 phi = static_cast<i32>(j) * 300;
+            if (!fresh && (j + state.frames) % 4) continue;
+            const i32 phi = static_cast<i32>(j) * 450;
             const Point p0 = lay(ghost, phi, ghost.half, ghost.radius, false),
-                        p1 = lay(ghost, phi + 180, ghost.half, ghost.radius, false);
+                        p1 = lay(ghost, phi + 270, ghost.half, ghost.radius, false);
             const i32 dx = (p1.x - p0.x) >> 2, dy = (p1.y - p0.y) >> 2;
             const i32 length = static_cast<i32>(root(static_cast<u32>(dx * dx + dy * dy))) + 1;
             const Turn along = {dx * unit / length, dy * unit / length};
@@ -472,7 +550,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         }
     } else {
         for (u32 j = 0; j < node::ghosts; ++j)
-            if (fresh || (j + state.frames) % 3 == 0) conceal(frame, node::ghost + j);
+            if (fresh || (j + state.frames) % 4 == 0) conceal(frame, node::ghost + j);
     }
 
     // The contact path, as motion lines 7 px outside the rim, its back hidden

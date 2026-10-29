@@ -240,7 +240,8 @@ inline u32 ghost(DisplayState& st, Frame& frame, i32 spacing, bool shown) {
         Point pts[64];
         for (u32 i = 0; i < 32; ++i) {
             const i32 off = -44 * unit + static_cast<i32>(i) * 2907;
-            const u32 rel = static_cast<u32>(centre + off - plate::hook_left * unit);
+            const i32 from_hook = centre + off - plate::hook_left * unit;   // the first sample sits just left of the hook
+            const u32 rel = static_cast<u32>(from_hook < 0 ? 0 : from_hook);
             const u32 p = ((rel >> 4) * inverse) >> 16;   // Q10 masses along the chain
             const u32 at = p >> 10, frac = p & 1023;
             const i32 h0 = at == 0 || at > n ? 0 : st.high[at - 1], h1 = at + 1 > n ? 0 : st.high[at];
@@ -420,8 +421,12 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
     // last frame stopped; the coils always span the bobs as they stand.
     // A bob's radius is a share of the spacing that grows with dispersion,
     // from 0.085 (beads) to 0.3 (heavy bobs), in steps of 1/64.
+    // A bob never leaves its coils under 6.4 px, the shortest the device
+    // draws cleanly (tools/make_panel.py), and is never under 0.6 px across.
     i32 scale = (spacing * (497 + ((1260 * st.lump) >> 15))) >> 15;   // radius / 5.6 px, Q10
-    scale = scale > 2 * unit ? 2 * unit : scale < 16 ? 16 : (scale + 8) & ~15;
+    const i32 roomiest = ((spacing - 6554) * 183) >> 11;
+    scale = scale > roomiest ? roomiest : scale;
+    scale = scale > 2 * unit ? 2 * unit : scale < 112 ? 112 : (scale + 8) & ~15;
     const i32 groove = (plate::groove * scale) >> 10;
     const bool cubic = s.springs >= 16384;
     auto weight_x = [&](u32 j) { return plate::hook_left * unit + static_cast<i32>(j + 1) * spacing; };

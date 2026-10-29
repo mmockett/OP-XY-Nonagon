@@ -14,10 +14,13 @@ and they clear from the floor up as the bubbles rise out; the drink is in
 tune when every line is clear. The lines' density is the drink's darkness
 (powder); powder heaps on the floor where it has not been stirred in.
 
-The four reshaping outlines are the vessel (by cup), the drink's surface
-(meniscus, the stir's dip and the tap's ripples), and the spoon's bowl and
-handle (by spoon: a wooden spoon to a silver teaspoon). Lines are closed
-ribbons or rings; nothing large is filled."""
+The three reshaping outlines are the vessel (by cup), the drink's surface
+(meniscus, the stir's dip and the tap's ripples), and the spoon, bowl and
+handle in one (by spoon: a wooden spoon to a silver teaspoon). They are
+always drawn upright: the device places a turned reshaping outline otherwise
+than the browser, so display.cpp turns the spoon's points itself. Lines are
+closed ribbons or rings; nothing large is filled. Every outline written here
+is checked against what the device draws badly (device_rules)."""
 import math
 import pathlib
 import random
@@ -44,22 +47,22 @@ WATER_STEP = 6.0
 HANDLE_MID = 115.0       # the spoon's handle node, this far along it from the tip
 
 # Nodes (display.h).
-VESSEL, SURFACE, BOWL, HANDLE = 0, 1, 2, 3
-HEADER = 4
-BUBBLE, BUBBLES = 12, 40
-FOAM, FOAMS = 52, 20
-POP, POPS = 72, 4
-HANDLE_CHINA, HANDLE_TIN = 76, 77
-WATER = 78                # clear lines, then the same lines frothy
-FROTH = 98
-HEAP = 118                # undissolved powder on the floor
-CLUMP, CLUMPS = 119, 3    # and hanging in the drink
-SHINE = 122
-GRAIN, GRAINS = 123, 2    # the wooden spoon's grain: along the handle, a ring in the bowl
-SHAKE, SHAKES = 125, 3    # strokes beside the bowl while it taps fast
-RING, RINGS = 128, 3      # ripples on the floor where the bowl taps
-SWIRL, SWIRLS = 131, 4    # the stirred drink turning
-NODES = 135
+VESSEL, SURFACE, SPOON_NODE = 0, 1, 2   # the reshaping outlines, never turned (display.cpp turns their points)
+HEADER = 3
+BUBBLE, BUBBLES = 11, 40
+FOAM, FOAMS = 51, 20
+POP, POPS = 71, 4
+HANDLE_CHINA, HANDLE_TIN = 75, 76
+WATER = 77                # clear lines, then the same lines frothy
+FROTH = 97
+HEAP = 117                # undissolved powder on the floor
+CLUMP, CLUMPS = 118, 3    # and hanging in the drink
+SHINE = 121
+GRAIN, GRAINS = 122, 2    # the wooden spoon's grain: along the handle, a ring in the bowl
+SHAKE, SHAKES = 124, 3    # strokes beside the bowl while it taps fast
+RING, RINGS = 127, 3      # ripples on the floor where the bowl taps
+SWIRL, SWIRLS = 130, 4    # the stirred drink turning
+NODES = 134
 # Three weights: the mug brightest and boldest, the spoon and the drink's
 # surface a step down, the drink's detail finer. A palette entry's stroke is
 # its weight (px).
@@ -74,10 +77,38 @@ def num(v, places=4):
 
 
 def outline(points, places=2):
+    """A closed path, started so that its closing edge is its longest: the
+    device draws a short closing edge as a long sliver."""
+    n = len(points)
+    j = max(range(n), key=lambda i: math.dist(points[i], points[(i + 1) % n]))
+    points = points[j + 1:] + points[:j + 1]
     return "M" + " L".join(f"{num(x, places)},{num(y, places)}" for x, y in points) + " Z"
 
 
+# ---- What the OP-XY draws badly, beyond the SDK's rules (learned on the
+# device, MNMD's docs/SCREEN.md): neighbouring points within an eighth of a
+# pixel merge; a closing edge under a quarter of a pixel draws as a long
+# sliver; an outline with no area, or turning straight back on itself, draws
+# streaks. Every outline written here is checked.
+def device_rules(points, what, scale=1.0):
+    pts = [(x * scale, y * scale) for x, y in points]
+    n = len(pts)
+    for i in range(n):
+        a, b = pts[i], pts[(i + 1) % n]
+        assert math.dist(a, b) >= 0.125 + 1e-9 or (i == n - 1 and math.dist(a, b) >= 0.25), (what, "points merge", i, a, b)
+    assert math.dist(pts[-1], pts[0]) >= 0.25, (what, "closing edge under a quarter pixel")
+    area = abs(sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1] for i in range(n))) / 2
+    assert area > 0.2, (what, "no area", area)
+    for i in range(n):
+        a, b, c = pts[i - 1], pts[i], pts[(i + 1) % n]
+        u, v = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
+        lu, lv = math.hypot(*u), math.hypot(*v)
+        assert (u[0] * v[0] + u[1] * v[1]) / (lu * lv) > -0.995, (what, "turns straight back at point", i)
+
+
 def path(d, stroke, width=STROKE, node=None, at=None, fill="none"):
+    pts = [tuple(map(float, q.split(","))) for q in re.findall(r"-?[\d.]+,-?[\d.]+", d)]
+    device_rules(pts, f"node {node}")
     ident = f' id="{ID}_node_{node}"' if node is not None else ""
     move = f' transform="matrix(1 0 0 1 {num(at[0])} {num(at[1])})"' if at else ""
     w = f' stroke-width="{num(width)}"' if (fill == "none" or node is None) else ""
@@ -92,7 +123,9 @@ def circle(cx, cy, r, stroke, width=STROKE, node=None, at=None, fill="none"):
 
 
 def ribbon(points, h):
-    """A thin line: out along the points, back offset along each point's normal by h."""
+    """A thin line: out along the points, back offset along each point's normal
+    by h, at least 0.4 px so that it has area on the device."""
+    h = h if abs(h) >= 0.4 else math.copysign(0.4, h)
     back = []
     n = len(points)
     for i in range(n - 1, -1, -1):
@@ -184,35 +217,49 @@ SPOON = {"wood": dict(length=74, bowl=42, width=38, neck=13, end=15, drop=4.0),
 TIP_X = CX - 5
 
 
-def bowl(kind):
+def resample(points, n, ends=False):
+    """n points along a polyline, evenly by length; without its first point
+    unless `ends` (the polyline's own points kept as the curve)."""
+    cum = [0.0]
+    for a, b in zip(points, points[1:]):
+        cum.append(cum[-1] + math.dist(a, b))
+    out = []
+    for k in range(n):
+        d = cum[-1] * (k / (n - 1) if ends else (k + 1) / n)
+        i = max(0, min(len(cum) - 2, next((q for q in range(len(cum) - 1) if cum[q + 1] >= d), len(cum) - 2)))
+        f = (d - cum[i]) / ((cum[i + 1] - cum[i]) or 1)
+        out.append((points[i][0] + (points[i + 1][0] - points[i][0]) * f, points[i][1] + (points[i + 1][1] - points[i][1]) * f))
+    return out
+
+
+def spoon(kind):
+    """The spoon's whole silhouette, one closed outline of 64 points along +x
+    from the bowl's tip (px): the bowl, an egg widest toward the tip, running
+    into the handle, round at its end. Point for point alike for wood and
+    silver, to morph: the tip, 16 points up the bowl, 11 along the handle, 9
+    round its end, 11 back and 16 down the bowl."""
     p = SPOON[kind]
-    bl, w = p["bowl"] * MM, p["width"] * MM
-    pts = []
-    for i in range(POINTS):
-        t = 2 * math.pi * i / POINTS
+    bl, w, length, cap = p["bowl"] * MM, p["width"] * MM, p["length"] * MM, p["end"] / 2 * MM
+    neck = p["neck"] / 2 * MM
+    egg = []
+    for k in range(200):
+        t = math.pi * k / 199
         x = bl / 2 * (1 - math.cos(t))
-        y = w / 2 * math.sin(t) * (1 - 0.22 * x / bl)     # an egg, widest toward the tip
-        neck = p["neck"] / 2 * MM * (x / bl) ** 8         # narrowing into the neck, not to a point
-        pts.append((x, math.copysign(max(abs(y), neck), y if abs(y) > 1e-9 else (1 if i < POINTS // 2 else -1))))
+        egg.append((x, -max(w / 2 * math.sin(t) * (1 - 0.22 * x / bl), neck * (x / bl) ** 8)))
+    stem = []
+    for k in range(60):
+        t = k / 59
+        x = bl + (length - cap - bl) * t
+        widen = neck + (cap - neck) * (t ** 2.2 if kind == "silver" else t ** 0.4)
+        if kind == "silver" and 0.55 < t < 0.85:   # the fiddle's waist
+            widen *= 1 - 0.18 * math.sin(math.pi * (t - 0.55) / 0.3)
+        stem.append((x, -widen))
+    up = resample(egg, 16) + resample([egg[-1]] + stem, 11)
+    round_end = [(length - cap + cap * math.cos(-math.pi / 2 + math.pi * k / 10), cap * math.sin(-math.pi / 2 + math.pi * k / 10))
+                 for k in range(1, 10)]
+    pts = [(0.0, 0.0)] + up + round_end + [(x, -y) for x, y in up[::-1]]
+    assert len(pts) == POINTS, (kind, len(pts))
     return pts
-
-
-def handle(kind):
-    p = SPOON[kind]
-    x0, x1 = (p["bowl"] - 0.4) * MM, p["length"] * MM
-    cap = p["end"] / 2 * MM
-    upper = []
-    for i in range(29):
-        t = i / 28
-        x = x0 + (x1 - cap - x0) * t
-        widen = p["neck"] / 2 + (p["end"] / 2 - p["neck"] / 2) * (t ** 2.2 if kind == "silver" else t ** 0.4)
-        if kind == "silver" and t > 0.55:   # the fiddle's waist and shoulder
-            widen *= 1 - 0.18 * math.sin(math.pi * (t - 0.55) / 0.3) if t < 0.85 else 1
-        upper.append((x, -widen * MM))
-    end = arc(x1 - cap, 0, cap, -math.pi / 2 + 0.3, math.pi / 2 - 0.3, 6)
-    pts = upper + end + [(x, -y) for x, y in upper[::-1]]
-    pts = [(x - HANDLE_MID, y) for x, y in distinct(pts)]
-    return fill_to(pts, POINTS)
 
 
 # ---- Where the spoon rests, solved against each cup's own outline. The tip
@@ -230,17 +277,13 @@ HEADER_BOTTOM = 46.0 # px: nothing of the spoon above this, a clear margin under
 
 def morphed(m):
     """The spoon's outline in its own frame (tip at 0, +x along it), m from wood 0 to silver 1, densified."""
-    shapes = []
-    for part in ((bowl("wood"), bowl("silver"), 0.0), (handle("wood"), handle("silver"), HANDLE_MID)):
-        a, b, shift = part
-        pts = [(ax + (bx - ax) * m + shift, ay + (by - ay) * m) for (ax, ay), (bx, by) in zip(a, b)]
-        dense = []
-        for i in range(len(pts)):
-            (x0, y0), (x1, y1) = pts[i], pts[(i + 1) % len(pts)]
-            n = max(1, math.ceil(math.dist((x0, y0), (x1, y1)) / 1.5))
-            dense += [(x0 + (x1 - x0) * j / n, y0 + (y1 - y0) * j / n) for j in range(n)]
-        shapes += dense
-    return shapes
+    pts = [(ax + (bx - ax) * m, ay + (by - ay) * m) for (ax, ay), (bx, by) in zip(spoon("wood"), spoon("silver"))]
+    dense = []
+    for i in range(len(pts)):
+        (x0, y0), (x1, y1) = pts[i], pts[(i + 1) % len(pts)]
+        n = max(1, math.ceil(math.dist((x0, y0), (x1, y1)) / 1.5))
+        dense += [(x0 + (x1 - x0) * j / n, y0 + (y1 - y0) * j / n) for j in range(n)]
+    return dense
 
 
 def segments(points):
@@ -402,8 +445,6 @@ for _ in range(5 * 16 + 18):
 # The drink's surface (outline 1), at 59 mm, flat.
 surface = ribbon([(-INNER / 2 + 0.2 + i * (INNER - 0.4) / 31, 0.0) for i in range(32)], 0.18)
 out.append(path(outline([(x, y) for x, y in surface]), G(13), STROKE, SURFACE, (CX, BOTTOM - 59 * MM)))
-# The spoon: its bowl (outline 2) and handle (outline 3), silver, at rest
-# in the drink.
 POSES = {k: [lean_on(k, i / (MORPHS - 1)) for i in range(MORPHS)] for k in ("china", "glass", "tin")}
 TIP = POSES["china"][-1][2]
 angle = POSES["china"][-1][1]
@@ -419,9 +460,11 @@ for k in range(SHAKES):
 for k in range(RINGS):
     ring = arc(0, 0, 8, 0, 2 * math.pi * 31 / 32, 32, 2.2)
     out.append(path(outline(ring), G(11), 0.3, RING + k, HIDDEN))
-out.append(path(outline(turned(bowl("silver"), TIP)), G(15), STROKE, BOWL, TIP))
-out.append(path(outline(turned(handle("silver"), TIP)), G(15), STROKE, HANDLE, at=
-                (TIP[0] + HANDLE_MID * c, TIP[1] + HANDLE_MID * sn)))
+# The spoon (outline 2), silver, at rest: its points turned here, about its
+# middle, and halved, as display.cpp draws it.
+half_length = SPOON["silver"]["length"] * MM / 2
+out.append(path(outline(turned([(x - half_length, y) for x, y in spoon("silver")], TIP)), G(13), STROKE, SPOON_NODE,
+                (TIP[0] + half_length * c, TIP[1] + half_length * sn)))
 # The silver bowl's shine, about the tip, drawn at its own size. (No line
 # along silver's handle: at 5 px wide it would merge with the outline at 1:1,
 # and a mutable outline cannot be filled.)
@@ -475,10 +518,17 @@ lines = ["#pragma once",
          "namespace plate {"]
 emit("vessel", "// Each cup in section (china, glass, tin), about the vessel's node, drawn at twice.",
      [[((x - VESSEL_AT[0]) / 2, (y - VESSEL_AT[1]) / 2) for x, y in VESSELS[k]] for k in ("china", "glass", "tin")])
-emit("bowl", "// The spoon's bowl about its tip (wood, silver), drawn at twice.",
-     [[(x / 2, y / 2) for x, y in bowl(k)] for k in ("wood", "silver")])
-emit("handle", f"// The spoon's handle about a point {HANDLE_MID:g} px from the tip (wood, silver), drawn at twice.",
-     [[(x / 2, y / 2) for x, y in handle(k)] for k in ("wood", "silver")])
+emit("spoon", "// The spoon's whole outline (wood, silver), along +x about its middle, halved:\n"
+     "// display.cpp turns its points and draws it upright at twice.",
+     [[((x - SPOON[k]["length"] * MM / 2) / 2, y / 2) for x, y in spoon(k)] for k in ("wood", "silver")])
+for k in ("china", "glass", "tin"):
+    device_rules([((x - VESSEL_AT[0]) / 2, (y - VESSEL_AT[1]) / 2) for x, y in VESSELS[k]], f"the {k} vessel's outline")
+for i in range(MORPHS):
+    m = i / (MORPHS - 1)
+    device_rules([((ax + (bx - ax) * m - (SPOON["wood"]["length"] + (SPOON["silver"]["length"] - SPOON["wood"]["length"]) * m) * MM / 2) / 2,
+                   (ay + (by - ay) * m) / 2) for (ax, ay), (bx, by) in zip(spoon("wood"), spoon("silver"))], f"the spoon's outline at {m:.2f}")
+lines.append("// Each spoon's half length, from its tip to its middle (Q10 px).")
+lines.append("const opxy::i32 half_length[2] = {" + ", ".join(str(round(SPOON[k]["length"] * MM / 2 * 1024)) for k in ("wood", "silver")) + "};")
 lines.append("// The spoon at rest, for each cup (china, glass, tin) and each of 33 shapes")
 lines.append("// from wood to silver: its tip's height on the floor and the point it rocks")
 lines.append("// about (Q10 px), and its angle (tenths of a degree, clockwise), leaning on")
