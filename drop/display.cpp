@@ -25,6 +25,21 @@
 // stars' turns, the puddles' shapes and the hops. Integer
 // arithmetic only.
 namespace drop {
+// The SDK's draw::sine, kept local to this machine: the
+// Blackfin compiler emits an inline function it doesn't inline as a strong
+// global symbol, so two machines using the SDK's copy can't link into one
+// firmware. Same arithmetic, internal linkage.
+static i32 sine(i32 tenths) {
+    tenths %= 3600;
+    if (tenths < 0) tenths += 3600;
+    const i32 sign = tenths >= 1800 ? -1 : 1;
+    tenths %= 1800;
+    if (tenths > 900) tenths = 1800 - tenths;
+    const i32 degree = tenths / 10, fraction = tenths % 10;
+    const i32 low = opxy::draw::sine_q10[degree], high = opxy::draw::sine_q10[degree < 90 ? degree + 1 : 90];
+    return sign * (low + (high - low) * fraction / 10);
+}
+
 namespace screen {
 using namespace opxy::draw;
 using physics::octave;

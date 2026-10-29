@@ -31,6 +31,25 @@
 // with the voices' own code (spin.h), for each 64 samples of time since the
 // note. Integer arithmetic only.
 namespace coin {
+// The SDK's draw::sine and draw::rotation, kept local to this machine: the
+// Blackfin compiler emits an inline function it doesn't inline as a strong
+// global symbol, so two machines using the SDK's copy can't link into one
+// firmware. Same arithmetic, internal linkage.
+static i32 sine(i32 tenths) {
+    tenths %= 3600;
+    if (tenths < 0) tenths += 3600;
+    const i32 sign = tenths >= 1800 ? -1 : 1;
+    tenths %= 1800;
+    if (tenths > 900) tenths = 1800 - tenths;
+    const i32 degree = tenths / 10, fraction = tenths % 10;
+    const i32 low = opxy::draw::sine_q10[degree], high = opxy::draw::sine_q10[degree < 90 ? degree + 1 : 90];
+    return sign * (low + (high - low) * fraction / 10);
+}
+static opxy::draw::Turn rotation(i32 tenths) {
+    const opxy::draw::Turn turn = {sine(tenths + 900), sine(tenths)};
+    return turn;
+}
+
 namespace screen {
 using namespace opxy::draw;
 const u32 budget = 4;           // the base's marks swapped a frame, at most
