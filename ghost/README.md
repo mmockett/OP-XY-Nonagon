@@ -185,15 +185,23 @@ of full scale.
 
 ![Ghost's screen: Pepper's ghost, a held note](docs/ghost.gif)
 
-Pepper's ghost: a theatre stage in front elevation, drawn in as few lines
-as it takes. A proscenium arch, outlined twice; a curtain tied back each
-side; the apron's edge; and the great pane of glass leaning over the stage,
-with two glints on it. The apparition leads: it is drawn brightest and
-boldest, the frame and apron a step down, the curtains and glass a step
-below that, and the halos and chalk path in between. Three greys and three
-weights, nothing finer than about 4 px apart, and no text but the header's.
-The contact sheets are at 1:1 (`docs/controls-1x.png`) and twice that
-(`docs/controls.png`).
+Pepper's ghost: a Victorian theatre's stage in front elevation, in a few
+bold lines, deep from front to back and grey by depth, nearest brightest:
+- in front, two pilasters with capitals and bases, the arch they carry with
+  a cartouche at its head, the apron, and seven footlights along it;
+- a step behind, heavy swagged curtains meeting under the cartouche with a
+  tassel there, and a drape each side tied back with a tasselled cord;
+- in the middle, the great pane of glass, its top edge and two glints;
+- at the back, the floor receding to the back wall, and the wall's corners.
+
+No two of these lines cross (`tools/make_panel.py` checks). The apparition
+leads, brighter and bolder than all of it, and like each figure on the stage
+it stands over a black silhouette, so it hides what is behind it: the
+curtains, the glass, its twin, the chalk path at its feet. Each nimbus ring
+is black inside too, so the stage behind a head never shows through it. Nothing drawn ever reaches the
+footlights or the pilasters (`tools/frames.cpp clear` checks this over
+15,488 settings). Nothing is finer than about 4 px apart. The contact sheets
+are at 1:1 (`docs/controls-1x.png`) and twice that (`docs/controls.png`).
 
 The note's apparition stands in the glass where the sound is in your head:
 across the stage for left and right, upstage and dimmer behind you,
@@ -201,26 +209,31 @@ downstage and larger when near. It is faint at rest, as a preview of where
 the next note will sound. It brightens on a note in 0.15 s and fades on
 release over ring's time (at most 2.5 s).
 
-![Each control at 0, 50 and 100, the others at the default; bed with a sample and without](docs/controls.png)
+![Each control at 0, 50 and 100, the others at the default, a sample loaded; then no sample](docs/controls.png)
 
 Every control acts on the apparition or the stage:
 
 | Control | On the screen |
 | --- | --- |
-| ring | Halos round the apparition, and round its twin: none at 0, four at 100. While notes are held they breathe at the beat's rate. |
+| ring | A nimbus round each head: none at 0, up to three rings at 100. The figure hides the rings behind it. While notes are held they breathe at the beat's rate. |
 | voice | Its pose, from a bowed, hooded figure (breath) to one singing with arms raised (ee), and its mouth, shaped to the vowel. |
-| split | The glass's two faces give two apparitions, each with its own mouth and halos: one at 0, overlapping at 50, standing apart at 100 (72 px between them at full size). |
-| trade | The twins lean toward each other, up to 20°. While held they swing through each other at trade's pace. |
+| split | The glass's two faces give two apparitions, each with its own mouth and nimbus: one at 0, the nearer hiding part of the other at 50, standing apart at 100 (72 px between them at full size). |
+| trade | The twins lean toward each other, up to 20°, lifted so their hems stay clear of the footlights. While held they swing through each other at trade's pace. |
 | beat | The apparition's outline trembles, up to 6 px, the tremble running at the beat's rate while held. |
 | orbit | The chalk path on the floor where it can walk: a mark at the front at 0, an arc as the notes spread, the whole circle once they circle. The apparition walks it while held. |
-| near | Its size and depth, from small at the back to large at the apron's edge. The chalk path follows it. |
+| near | Its size and depth, from small at the back wall to large behind the footlights. The chalk path follows it. |
 | bed | Its robe frays, up to 8 px: into the sample's own waveform (the 64 peaks of its overview), or with no sample into the whisper's ragged gusts. The fray scrolls while held. |
 
 A second and third held note bring two more apparitions, each where its
 own note began.
 
-Ghost has no empty state: it plays without a sample, and bed then whispers,
-so the stage is always the same and every control acts on it.
+Ghost is a sample engine, and with no sample loaded it says so as Grains
+does: "load a sample", then "shift +" and the Sample key's icon, in Grains'
+words, face and greys. It doesn't cover the stage, because Ghost plays on
+without a sample (breath and hum, and bed's own whisper), so the hint sits on
+one line under the apron, in front of the footlights, where nothing on the
+stage ever reaches. The hint goes as soon as a sample is loaded. The
+contact sheets' last row shows it.
 
 The display cannot read the audio, so it draws everything from the
 controls, note activity and time, through the same `place()` (`ghost.h`) the
@@ -228,8 +241,9 @@ engine uses. Each apparition's place is seeded from the note's serial, so it
 matches the sound in kind, not note for note.
 
 The screen uses 4 reshaping outlines of 64 points (the apparition, its twin,
-its mouth and the chalk path), 23 nodes (8 of them the header bar), all 16
-text slots, 8 static outlines and 84 bytes of state. Churn over a scripted
+its mouth and the chalk path), 24 nodes (8 of them the header bar), all 16
+text slots, 46 static outlines (37 of the stage, 9 of the hint's icon) and
+84 bytes of state. Churn over a scripted
 run (`tools/frames.cpp`: every control, a page switch, three notes circling,
 the bed, reduced motion) is below. The idle screen is still: nothing changes
 a second after the last fade. Reduced motion snaps the apparition and stills
@@ -237,8 +251,8 @@ its tremble, hem and circling.
 
 | | Mean nodes changed a frame | While notes are held | Peak |
 | --- | --- | --- | --- |
-| 60 fps | 3.9 | 7.5 | 16 (a page switch) |
-| 30 fps | 4.2 | 7.5 | 16 |
+| 60 fps | 4.9 | 9.2 | 16 (a page switch) |
+| 30 fps | 5.2 | 9.3 | 16 |
 
 Sample engines have no browser preview, so the screen's frames, churn, GIF
 and contact sheets come from `tools/frames.cpp` on the host.
@@ -334,7 +348,8 @@ the top of its file.
   give it.
 - `tools/bench.cpp` gives the host CPU estimate.
 - `tools/frames.cpp` checks the screen frame by frame, counts its churn and
-  writes frames as JSON. `tools/frame2svg.py` draws a frame as SVG; it needs
+  writes frames as JSON; `frames clear` checks that nothing drawn reaches
+  the footlights, the hint or the pilasters. `tools/frame2svg.py` draws a frame as SVG; it needs
   `XY_FONT` set to the path of the OP-XY's face, UniversNextPro-Light.ttf,
   which is not in this repository. `tools/make_gif.py` makes `docs/ghost.gif`
   and `tools/make_sheet.py` makes `docs/controls.png` and `docs/controls-1x.png`

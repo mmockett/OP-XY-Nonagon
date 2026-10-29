@@ -282,10 +282,10 @@ course after the key is released, under the OP-XY's amp envelope.
 Ghost is made for headphones: its pitches exist only between the ears. As a
 sample engine it plays in stereo, which the SDK's synth voices can't.
 
-Ghost and Recur sit on the sampler page. Recur needs a sample: with none
-loaded, its screen asks for one ("load a sample · shift + sample"). Ghost
-plays without one; its bed is then a gusty breath of its own, and a loaded
-sample takes its place.
+Ghost and Recur are sample engines, on the sampler page. With no sample
+loaded, both screens say so ("load a sample · shift + sample"). Recur needs
+one to play. Ghost plays without: its bed is then a gusty breath of its own,
+and a loaded sample takes its place.
 
 ## CPU
 

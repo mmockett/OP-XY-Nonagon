@@ -17,11 +17,9 @@ ID = sys.argv[1] if len(sys.argv) > 1 else "ghost"
 FONT = 'font-family="UniversNextPro-Light"'
 
 # Geometry shared with display.h (keep in step).
-FRONT_Y, BACK_Y = 198.0, 150.0          # the stage floor: footlights' edge, back wall
-FRONT_HALF, BACK_HALF = 170.0, 108.0    # its half widths there
+FRONT_Y = 198.0                         # the apron's edge; the figures' feet stay above the footlights on it
 
-# Greys that hold at 1:1 on the device: nothing dimmer than FAINT.
-LINE, FAINT, BRIGHT, DIM = "#9a9a9a", "#5e5e5e", "#c8c8c8", "#787878"
+LINE = "#9a9a9a"   # the default stroke
 
 
 def num(v):
@@ -106,31 +104,119 @@ for i, (x, y, ink, size) in enumerate(texts):
     out.append(f'<text id="{ID}_text_{i}" transform="matrix(1 0 0 1 {num(x)} {num(y)})" fill="{ink}" {FONT} font-size="{size}px">-</text>')
 
 art = []
-# Three weights, used throughout: the apparition (drawn by display.cpp) the
-# brightest and boldest; the stage's frame and apron a step down (FRAME);
-# everything else on the stage another step down (SET).
-def frame_line(points):
-    return line(points, 0.8, LINE, w=0.5)
+# Depth in grey: the proscenium, apron and footlights nearest and brightest
+# (FRONT), the curtains a step behind (DRAPE), the glass in the middle
+# (GLASS), the floor and back wall farthest and dimmest (BACK). The
+# apparition (display.cpp) is brighter and bolder than all of them. No two
+# outlines here cross (checked below); the figures, filled black, hide what
+# stands behind them.
+FRONT, DRAPE, GLASS, BACK = "#a8a8a8", "#8c8c8c", "#6e6e6e", "#5a5a5a"
+outlines = []   # (name, points) of every line drawn, for the crossing check
 
 
-def set_line(points, taper=False):
-    return line(points, 0.6, FAINT, taper, w=0.5)
+def ink(points, colour, width, w=0.5, taper=False, name=""):
+    outlines.append((name, points))
+    return line(points, width, colour, taper, w)
 
 
-# --- The proscenium: one arch on two plain piers, outlined twice.
-art.append(frame_line([(44, 206), (44, 72)] + bezier((44, 72), (44, 50), (436, 50), (436, 72), 32)[1:] + [(436, 206)]))
-art.append(set_line([(58, 198), (58, 76)] + bezier((58, 76), (58, 62), (422, 62), (422, 76), 32)[1:] + [(422, 198)]))
-# --- The curtains: a drape each side, tied back.
+def shape(points, colour, width=0.5, name=""):
+    outlines.append((name, points + points[:1]))
+    return path(points, colour, width)
+
+
+# --- Background: the floor receding to the back wall, and the wall's corners.
+BACK_Y, BACK_L, BACK_R = 145.0, 128.0, 352.0
+art.append(ink([(BACK_L, BACK_Y), (BACK_R, BACK_Y)], BACK, 0.6, name="floor back"))
 for side in (False, True):
-    drape = bezier((60, 78), (100, 104), (64, 146), (86, 172), 16) + bezier((86, 172), (76, 182), (66, 190), (62, 197), 6)[1:]
-    art.append(set_line(mirror(drape) if side else drape))
-# --- The stage: the apron's edge (the chalk path marks the floor).
-art.append(frame_line([(58, FRONT_Y), (422, FRONT_Y)]))
-# --- The glass: the great pane leaning over the stage, and two glints on it.
-glass_top, glass_bottom = 88.0, FRONT_Y - 2
-art.append(set_line([(240 - 156, glass_bottom), (240 - 112, glass_top), (240 + 112, glass_top), (240 + 156, glass_bottom)]))
-for x0, y0, x1, y1 in ((142, 100, 130, 124), (344, 104, 334, 124)):
-    art.append(set_line([(x0, y0), (x1, y1)], taper=True))
+    edge = [(70, FRONT_Y), (BACK_L, BACK_Y)]
+    art.append(ink(mirror(edge) if side else edge, BACK, 0.6, name="floor side"))
+    corner = [(BACK_L, BACK_Y), (BACK_L, 112)]
+    art.append(ink(mirror(corner) if side else corner, BACK, 0.6, name="wall corner"))
+# --- Middle ground: the glass's top edge, and two glints on the pane.
+art.append(ink([(118, 104), (362, 104)], GLASS, 0.6, name="glass"))
+for x0, y0, x1, y1 in ((152, 112, 143, 130), (337, 112, 328, 130)):
+    art.append(ink([(x0, y0), (x1, y1)], GLASS, 0.8, taper=True, name="glint"))
+# --- The curtains: two heavy swags meeting under the crest, with a tassel
+# there; a drape each side, tied back with a tasselled cord.
+for side in (False, True):
+    top = bezier((60, 78), (120, 84), (180, 84), (238, 80), 14)
+    low = bezier((238, 80), (190, 104), (110, 104), (60, 78), 14)[1:-1]
+    swag = top + low
+    art.append(shape(mirror(swag) if side else swag, DRAPE, 0.8, name="swag"))
+    under = bezier((60, 78), (110, 104), (190, 104), (238, 80), 14)
+    fold = [((p[0] + q[0]) / 2, (p[1] + q[1]) / 2) for p, q in zip(top, under)][3:-3]   # midway down the swag
+    art.append(ink(mirror(fold) if side else fold, DRAPE, 0.6, taper=True, name="swag fold"))
+    drape = bezier((60, 82), (104, 100), (98, 132), (96, 150), 12) + bezier((96, 150), (78, 166), (66, 184), (62, 197), 10)[1:]
+    art.append(ink(mirror(drape) if side else drape, DRAPE, 0.8, name="drape"))
+    cord = [(96, 150), (99, 157)]
+    art.append(ink(mirror(cord) if side else cord, DRAPE, 0.6, name="cord"))
+    tassel = [(99, 157), (102.5, 163), (101.5, 167), (96.5, 167), (95.5, 163)]
+    art.append(shape(mirror(tassel) if side else tassel, DRAPE, 0.6, name="tassel"))
+art.append(ink([(240, 82), (240, 88)], DRAPE, 0.6, name="centre cord"))
+art.append(shape([(240, 88), (243.5, 94), (242.5, 98), (237.5, 98), (236.5, 94)], DRAPE, 0.6, name="centre tassel"))
+# --- Foreground: two pilasters with capitals and bases, an arch springing
+# from them with a cartouche at its head, the apron and its footlights.
+for side in (False, True):
+    pil = [(32, 210), (58, 210), (58, 204), (54, 204), (54, 78), (58, 78), (58, 72), (32, 72), (32, 78), (36, 78), (36, 204), (32, 204)]
+    art.append(shape(mirror(pil) if side else pil, FRONT, 0.6, name="pilaster"))
+    flute = [(45, 86), (45, 196)]
+    art.append(ink(mirror(flute) if side else flute, DRAPE, 0.6, name="flute"))
+CART = (240.0, 49.0, 15.0, 8.0)   # the cartouche: centre, half width, half height
+cx, cy, rx, ry = CART
+outer = [p for p in bezier((32, 70), (40, 40), (440, 40), (448, 70), 64) if ((p[0] - cx) / (rx + 3)) ** 2 + ((p[1] - cy) / (ry + 3)) ** 2 > 1]
+half = len(outer) // 2
+art.append(ink(outer[:half], FRONT, 0.9, name="arch outer"))
+art.append(ink(outer[half:], FRONT, 0.9, name="arch outer"))
+art.append(ink(bezier((58, 74), (66, 56), (414, 56), (422, 74), 48), FRONT, 0.9, name="arch inner"))
+art.append(shape(ellipse(cx, cy, rx, ry, 28), FRONT, 0.7, name="cartouche"))
+art.append(shape([(cx, cy - 5), (cx + 3.5, cy), (cx, cy + 5), (cx - 3.5, cy)], FRONT, 0.6, name="lozenge"))
+art.append(ink([(58, FRONT_Y), (422, FRONT_Y)], FRONT, 1.0, name="apron"))
+for k in range(7):
+    x = 96 + 48 * k
+    hood = ellipse(x, FRONT_Y - 0.6, 5, 3.6, 12, 180, 360, False)
+    art.append(shape(hood, FRONT, 0.6, name="footlight"))
+
+
+def crossings(items):
+    """Pairs of outlines whose segments cross (touching ends allowed)."""
+    def segs(points):
+        return list(zip(points, points[1:]))
+    def cross(a, b, c, d):
+        def side(p, q, r):
+            return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+        d1, d2, d3, d4 = side(c, d, a), side(c, d, b), side(a, b, c), side(a, b, d)
+        return d1 * d2 < -1e-6 and d3 * d4 < -1e-6
+    found = []
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            if any(cross(a, b, c, d) for a, b in segs(items[i][1]) for c, d in segs(items[j][1])):
+                found.append((items[i][0], items[j][0]))
+    return found
+
+
+bad = crossings(outlines)
+if bad:
+    sys.exit("make_panel.py: outlines cross: " + ", ".join(f"{a} / {b}" for a, b in bad))
+
+# --- With no sample, Grains' hint, on one line under the apron, where nothing
+# on the stage ever reaches:
+# "load a sample", "shift +" and the Sample key's icon, in Grains' face and
+# greys. Node 21, a black cover, hides it once a sample is loaded.
+HINT = (154.0, 326.0, 200.0, 220.0)       # the cover: x0, x1, y0, y1
+BASE, ICON = 215.0, 15.0
+hint = [f'<text transform="matrix(1 0 0 1 158.6 {num(BASE)})" fill="#CBCBCB" {FONT} font-size="15px">load a sample</text>',
+        f'<text transform="matrix(1 0 0 1 264.8 {num(BASE)})" fill="#7D7D7D" {FONT} font-size="13px">shift +</text>']
+# Grains' icon (a 28 px key at 256, 129), scaled to ICON.
+k, KX, KY = ICON / 28, 306.3, BASE - 12.5
+icon = lambda x, y: (KX + (x - 256) * k, KY + (y - 129) * k)
+hint.append(path([icon(x, y) for x, y in ((257.4237, 129), (282.5763, 129), (284, 130.4237), (284, 155.5763), (282.5763, 157),
+                                         (257.4237, 157), (256, 155.5763), (256, 130.4237))], "#7D7D7D", 0.8))
+hint.append(path([icon(x, y) for x, y in ellipse(270, 142.8814, 9.0763, 9.0763, 20)], "#7D7D7D", 0.6))
+for x, top, bottom in ((265.6254, 142.2881, 143.5932), (267.0492, 142.2881, 143.5932), (268.5322, 139.2627, 146.5593), (269.9559, 140.8644, 145.0763),
+                       (271.439, 142.2881, 143.5932), (272.922, 142.2881, 143.5932), (274.3458, 142.2881, 143.5932)):
+    hint.append(path([icon(x, top), icon(x + 0.8, top), icon(x + 0.8, bottom), icon(x, bottom)], "#7D7D7D", 0.5, "#7D7D7D"))
+x0, x1, y0, y1 = HINT
+cover = f'<path id="{ID}_node_21" d="{outline([(x0, y0), (x1, y0), (x1, y1), (x0, y1)])}" fill="#000000" stroke="#000000" stroke-width="0.5"/>'
 
 # --- The apparition's poses: a robed figure, feet at the origin, 64 points.
 # Each pose lists the same keypoints; the outline runs from the hem's left
@@ -186,21 +272,29 @@ dynamic = [
     # The chalk path on the floor (path 3), under everything: where the apparition walks.
     f'<path id="{ID}_node_3" transform="matrix(1 0 0 1 240 174)" d="{outline(ring)}" fill="none" stroke="#555555" stroke-width="0.6"/>',
 ]
-# Halos (12..15 the apparition's, 18..21 its twin's): ellipses round the upper
-# body, drawn at their origin.
-halo = ellipse(0, 0, 36, 46, 40)
-dynamic += [f'<path id="{ID}_node_{n}" d="{outline(halo)}" fill="none" stroke="#444444" stroke-width="0.5"/>' for n in (12, 13, 14, 15, 18, 19, 20, 21)]
+# Halos (12..14 the apparition's, 17..19 its twin's): a nimbus round each
+# head, rings drawn at their origin, filled black and drawn largest first, so
+# each ring shows whole and hides the stage behind it; the figure, drawn
+# after, hides the rings behind it.
+halo = ellipse(0, 0, 15, 15, 40)   # a radius of 10 to 19 px by display.cpp's scale
+dynamic += [f'<path id="{ID}_node_{n}" d="{outline(halo)}" fill="#000000" stroke="#444444" stroke-width="0.5"/>' for n in (14, 13, 12, 19, 18, 17)]
+# Under each figure a black silhouette (nodes 22 and 23, the bowed figure a
+# little narrower, so it sits inside every pose) hides the stage, the chalk
+# path, the halos and the twin behind it.
+mask = outline([(x * 0.95, y) for x, y in bowed])
 dynamic += [
     # The ghost's twin first, behind it, and its mouth; the ghost; its mouth (paths 1, 0, 2).
+    f'<path id="{ID}_node_23" transform="matrix(1 0 0 1 240 190)" d="{mask}" fill="#000000" stroke="#000000" stroke-width="0.5"/>',
     f'<path id="{ID}_node_1" transform="matrix(1 0 0 1 240 190)" d="{outline(bowed)}" fill="none" stroke="#555555" stroke-width="0.6"/>',
-    # The twin's mouth (node 22): an oval at its origin, sized to the vowel.
-    f'<path id="{ID}_node_22" d="{outline(ellipse(0, 0, 3, 3.5, 24))}" fill="none" stroke="#555555" stroke-width="0.5"/>',
+    # The twin's mouth (node 20): an oval at its origin, sized to the vowel.
+    f'<path id="{ID}_node_20" d="{outline(ellipse(0, 0, 3, 3.5, 24))}" fill="none" stroke="#555555" stroke-width="0.5"/>',
+    f'<path id="{ID}_node_22" transform="matrix(1 0 0 1 240 190)" d="{mask}" fill="#000000" stroke="#000000" stroke-width="0.5"/>',
     f'<path id="{ID}_node_0" transform="matrix(1 0 0 1 240 190)" d="{outline(bowed)}" fill="none" stroke="#999999" stroke-width="0.6"/>',
     f'<path id="{ID}_node_2" transform="matrix(1 0 0 1 240 136)" d="{outline(ring)}" fill="none" stroke="#999999" stroke-width="0.5"/>',
 ]
 # Two more apparitions for a second and third held note: the bowed figure, smaller.
 small = outline([(x * 0.8, y * 0.8) for x, y in bowed])
-dynamic += [f'<path id="{ID}_node_{n}" d="{small}" fill="none" stroke="#555555" stroke-width="0.5"/>' for n in (16, 17)]
+dynamic += [f'<path id="{ID}_node_{n}" d="{small}" fill="#000000" stroke="#555555" stroke-width="0.5"/>' for n in (15, 16)]
 
 palette = []
 for i in range(16):
@@ -210,6 +304,6 @@ for i in range(16):
     width = 1.1 if i >= 12 else 0.8 if i >= 9 else 0.6
     palette.append(f'<circle id="{ID}_palette_{i}" cx="640" cy="0" r="1" fill="{grey}" stroke="{grey}" stroke-width="{width}"/>')
 
-out += art + dynamic + palette + ["</g>", ""]
+out += art + hint + [cover] + dynamic + palette + ["</g>", ""]
 (ROOT / "panel.svg.fragment").write_text("\n".join(out))
 print(len("\n".join(out)), "bytes,", count[0], "static outlines")

@@ -2,7 +2,9 @@
 // frame, counts the nodes that change each frame (a path whose key changes
 // counts as its node), and writes chosen frames as JSON for tools/frame2svg.py.
 //   clang++ -std=c++11 -O2 -I<sdk>/sdk/include tools/frames.cpp -o frames && ./frames <folder> [fps]
+//   ./frames clear: checks nothing drawn ever reaches the footlights or the hint
 #include "../display.cpp"
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -19,6 +21,12 @@ using opxy::u32;
 using namespace opxy::draw;
 
 i32 at(double v) { return i32(v * 2147483647.0); }
+
+// A sample loaded, its overview's peaks a breathy phrase.
+void load() {
+    overview.assigned = overview.loaded = 1; overview.frames = 264600; overview.rate = 44100; overview.end = 264600;
+    for (u32 i = 0; i < 64; ++i) overview.peaks[i] = opxy::u8(60 + (i * 53 % 29) * 4 + ((i / 8) % 2) * 50);
+}
 
 void dump(const ghost::Frame& f, const std::string& path) {
     FILE* out = std::fopen(path.c_str(), "w");
@@ -107,18 +115,15 @@ struct Session {
 }
 
 // The contact sheets (docs/controls.png, controls-1x.png): each control at 0,
-// 50 and 100, the others at their defaults, a note held 0.7 s; bed with a
-// sample, then without one.
+// 50 and 100, the others at their defaults, a sample loaded and a note held
+// 0.7 s; then no sample, bed at 0, 50 and 100: the hint, and bed's whisper.
 int sheet(const std::string& dir) {
     const char* const names[8] = {"ring", "voice", "split", "trade", "beat", "orbit", "near", "bed"};
     const double values[3] = {0, 0.5, 1};
     for (u32 c = 0; c < 8; ++c)
         for (u32 v = 0; v < 3; ++v) {
             Session s(dir, 60);
-            if (c == ghost::kBed) {   // a sample loaded, its peaks a breathy phrase
-                overview.assigned = overview.loaded = 1; overview.frames = 264600; overview.rate = 44100; overview.end = 264600;
-                for (u32 i = 0; i < 64; ++i) overview.peaks[i] = opxy::u8(60 + (i * 53 % 29) * 4 + ((i / 8) % 2) * 50);
-            } else overview.assigned = overview.loaded = 0;
+            load();   // a sample loaded, so the hint is away
             s.input.slots[c] = at(values[v]);
             s.press();
             char name[48];
@@ -126,7 +131,7 @@ int sheet(const std::string& dir) {
             s.run(0.7, name);
         }
     overview.assigned = overview.loaded = 0;
-    for (u32 v = 0; v < 3; ++v) {   // no sample: bed is Ghost's own whisper
+    for (u32 v = 0; v < 3; ++v) {   // no sample: the hint, and bed is Ghost's own whisper
         Session s(dir, 60);
         s.input.slots[ghost::kBed] = at(values[v]);
         s.press();
@@ -141,8 +146,10 @@ int sheet(const std::string& dir) {
 int gif(const std::string& dir) {
     Session s(dir, 60);
     s.every = 5;
+    overview.assigned = overview.loaded = 0;   // no sample: the hint shows, and Ghost plays on
     s.run(0.6);
     s.press(); s.run(1.6); s.release(); s.run(0.8);
+    load();                                    // a sample loaded: the hint goes
     s.turn(ghost::kVoice, 0.0, 0.6); s.turn(ghost::kVoice, 1.0, 0.8); s.turn(ghost::kVoice, 0.6, 0.4);
     s.turn(ghost::kSplit, 1.0, 0.3); s.turn(ghost::kTrade, 1.0, 0.2);
     s.press(); s.run(2.0); s.release(); s.run(0.4);
@@ -153,7 +160,62 @@ int gif(const std::string& dir) {
     return 0;
 }
 
+// The footlights and the hint under the apron are never crossed: over a
+// sweep of every control that moves or sizes what is drawn, with three notes
+// held and let go, the lowest point any figure, halo, mouth or the chalk path
+// reaches over the apron (x 60..420) stays above the footlights' hoods
+// (y 193.8), and nothing reaches the pilasters (x 58 and 422). Fails
+// otherwise.
+int clear() {
+    const double ring[4] = {0, 0.5, 0.8, 1}, two[2] = {0, 1};
+    double lowest = 0, left = 480, right = 0;
+    u32 sessions = 0;
+    for (double rg : ring) for (u32 n = 0; n <= 10; ++n) for (u32 o = 0; o <= 10; ++o)
+    for (double vo : two) for (double sp : two) for (double tr : two) for (double bt : two) for (double bd : two) {
+        Session s(".", 30);
+        const double v[8] = {rg, vo, sp, tr, bt, o / 10.0, n / 10.0, bd};
+        for (u32 i = 0; i < 8; ++i) s.input.slots[i] = at(v[i]);
+        s.input.note_serial = sessions * 7;
+        s.press(3);
+        for (u32 f = 0; f < 120; ++f) {
+            if (f == 90) s.release();
+            s.run(1.0 / 30);
+            for (u32 i = 0; i < ghost::Frame::node_count; ++i) {
+                if ((i >= ghost::header_first && i < ghost::header_first + 8) || i == ghost::hint_cover || i == ghost::mask || i == ghost::twin_mask) continue;   // the silhouettes lie inside the figures
+                const Node& d = s.frame.nodes[i];
+                if (d.x == hidden_x * unit && d.y == hidden_y * unit) continue;
+                // The node's outline: its path, or the shape make_panel.py draws it with.
+                double px[64], py[64]; u32 count = 0;
+                if (i < ghost::Frame::path_count) {
+                    for (u32 k = 0; k < 64; ++k) { px[k] = s.frame.paths[i].points[k].x / 1024.0; py[k] = s.frame.paths[i].points[k].y / 1024.0; }
+                    count = 64;
+                } else if (i == ghost::twin_mouth) {
+                    for (u32 k = 0; k < 24; ++k) { px[k] = 3 * std::cos(k * M_PI / 12); py[k] = 3.5 * std::sin(k * M_PI / 12); }
+                    count = 24;
+                } else if (i >= ghost::extra_first && i < ghost::extra_first + 2) {
+                    for (u32 k = 0; k < 64; ++k) { px[k] = ghost::figure_bowed[2 * k] * 0.2; py[k] = ghost::figure_bowed[2 * k + 1] * 0.2; }
+                    count = 64;
+                } else {   // a halo
+                    for (u32 k = 0; k < 40; ++k) { px[k] = 15 * std::cos(k * M_PI / 20); py[k] = 15 * std::sin(k * M_PI / 20); }
+                    count = 40;
+                }
+                const double k = d.scale / 1024.0, c = d.cos / 1024.0, sn = d.sin / 1024.0;
+                for (u32 j = 0; j < count; ++j) {
+                    const double x = k * (c * px[j] - sn * py[j]) + d.x / 1024.0, y = k * (sn * px[j] + c * py[j]) + d.y / 1024.0;
+                    if (x > 60 && x < 420 && y > lowest) lowest = y;
+                    if (i != ghost::floor_path && y > 72) { left = std::fmin(left, x); right = std::fmax(right, x); }
+                }
+            }
+        }
+        ++sessions;
+    }
+    std::printf("footlights and hint: over %u settings, the lowest point drawn over the apron is at y %.1f (the footlights' hoods start at 193.8)\n", sessions, lowest);
+    std::printf("  and between the pilasters, from x %.1f to %.1f (their inner faces at 58 and 422)\n", left, right);
+    return lowest < 193 && left > 59 && right < 421 ? 0 : 1;
+}
+
 int main(int argc, char** argv) {
+    if (argc > 1 && std::string(argv[1]) == "clear") return clear();
     if (argc > 2 && std::string(argv[1]) == "gif") return gif(argv[2]);
     if (argc > 2 && std::string(argv[1]) == "sheet") return sheet(argv[2]);
     const std::string dir = argc > 1 ? argv[1] : ".";

@@ -27,7 +27,7 @@ Spot spot(const Place& p) {
     i32 z = 8192 + i32(p.near >> 2) + ((front * 9830) >> 15);                   // Q15: 0 upstage .. 1 at the apron
     z = clamp(z, 0, 32767);
     Spot s;
-    s.y = (stage_back + (((stage_front - 4 - stage_back) * z) >> 15)) * unit;
+    s.y = (stage_back + (((front_feet - stage_back) * z) >> 15)) * unit;
     const i32 half = half_back + (((half_front - half_back) * z) >> 15) - 44;
     s.x = (240 + ((side * half) >> 15)) * unit;
     s.scale = 614 + ((870 * z) >> 15);                                         // 0.6 .. 1.45
@@ -229,37 +229,51 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     // side at the full split, each with its own mouth and halos; trade leans
     // them toward each other and swings them through each other.
     const i32 apart = ((i32(split >> 1) * cosine(state.trade)) >> 15) * 72 / 32 * state.scale >> 10;   // Q10 px, up to 72
-    const i32 half_apart = apart / 2, reach = (half_apart < 0 ? -half_apart : half_apart) + 22 * state.scale;
-    const i32 centre = clamp(state.x, 64 * unit + reach, 416 * unit - reach);   // both stay on the stage
+    // Both stay between the pilasters: a figure reaches 36 px out at unit
+    // size, singing, trembling and frayed.
+    const i32 half_apart = apart / 2, reach = (half_apart < 0 ? -half_apart : half_apart) + 36 * state.scale;
+    const i32 centre = clamp(state.x, 62 * unit + reach, 418 * unit - reach);
     const bool twinned = apart > unit / 2 || apart < -unit / 2;
     const i32 lean = twinned ? i32(trade * 200 >> 16) * (apart > 0 ? 1 : -1) : 0;   // tenths of a degree
+    // Leaning drops a corner of the hem (36 px out, frayed and trembling, at
+    // unit size) below the feet: as much lift keeps it off the footlights. It
+    // follows trade alone, so it holds as the twins pass through each other.
+    const i32 lift = split ? (36 * state.scale * rotation(i32(trade * 200 >> 16)).sin) >> 10 : 0;   // Q10
+    const i32 feet = state.y - lift;
     const i32 first_x = centre - half_apart, second_x = centre + half_apart;
-    place(frame, apparition, first_x, state.y, state.scale, u32(shade), stroke);
-    turn(frame, apparition, rotation(lean));
-    place(frame, mouth, first_x, state.y, state.scale, u32(shade), stroke);
-    turn(frame, mouth, rotation(lean));
+    const Turn tilt = rotation(lean), back = rotation(-lean);
+    // Each figure over its black silhouette, which hides what stands behind.
+    place(frame, mask, first_x, feet, state.scale, 0, keep);
+    turn(frame, mask, tilt);
+    place(frame, apparition, first_x, feet, state.scale, u32(shade), stroke);
+    turn(frame, apparition, tilt);
+    place(frame, mouth, first_x, feet, state.scale, u32(shade), stroke);
+    turn(frame, mouth, tilt);
+    // The face, cy above the feet, riding each figure's turn.
+    const Mouth m = mouth_for(sung);
+    const i32 cy = m.cy * state.scale >> 10;
+    const i32 face_x[2] = {first_x - ((tilt.sin * cy) >> 10), second_x - ((back.sin * cy) >> 10)};
+    const i32 face_y[2] = {feet + ((tilt.cos * cy) >> 10), feet + ((back.cos * cy) >> 10)};
     const i32 twin_shade = shade;   // the glass's two faces give images alike
     if (twinned) {
-        const Turn back = rotation(-lean);
-        place(frame, twin, second_x, state.y, state.scale, u32(twin_shade), stroke);
+        place(frame, twin_mask, second_x, feet, state.scale, 0, keep);
+        turn(frame, twin_mask, back);
+        place(frame, twin, second_x, feet, state.scale, u32(twin_shade), stroke);
         turn(frame, twin, back);
-        // Its mouth rides the turn: the face is cy above the feet.
-        const Mouth m = mouth_for(sung);
-        const i32 cy = m.cy * state.scale >> 10;
-        place(frame, twin_mouth, second_x - ((back.sin * cy) >> 10), state.y + ((back.cos * cy) >> 10),
-              (state.scale * (m.rx + m.ry)) / 65, u32(twin_shade), stroke);
-    } else { hide(frame, twin); hide(frame, twin_mouth); }
+        place(frame, twin_mouth, face_x[1], face_y[1], (state.scale * (m.rx + m.ry)) / 65, u32(twin_shade), stroke);
+    } else { hide(frame, twin); hide(frame, twin_mouth); hide(frame, twin_mask); }
 
-    // ring: halos round each, none at 0 to four at the longest; they breathe
-    // at beat's rate while held.
-    const u32 halos = (ring * 4 + 32768) >> 16;
+    // ring: a nimbus round each head, none at 0 to three rings at the
+    // longest; they breathe at beat's rate while held. The figure, drawn
+    // over them, hides what passes behind it.
+    const u32 halos = (ring * 3 + 32768) >> 16;
     const i32 breath = beat_rate && moving ? (sine(beat_phase & 0xe0000000u) * 51) >> 15 : 0;   // +-5%, Q10
     for (u32 k = 0; k < halo_count; ++k) {
         if (k >= halos) { hide(frame, halo_first + k); hide(frame, twin_halo_first + k); continue; }
-        const i32 size = clamp((state.scale * (635 + 205 * i32(k) + breath)) >> 10, unit / 4, 2 * unit);
-        const i32 halo_shade = shade - 3 - i32(k), y = state.y - 34 * state.scale;   // round the upper body, a step down
-        place(frame, halo_first + k, first_x, y, size, u32(halo_shade < 1 ? 1 : halo_shade), stroke);
-        if (twinned) place(frame, twin_halo_first + k, second_x, y, size, u32(halo_shade < 1 ? 1 : halo_shade), stroke);
+        const i32 size = clamp((state.scale * ((683 + 307 * i32(k)) * (1024 + breath) >> 10)) >> 10, unit / 4, 2 * unit);   // 10, 14.5 and 19 px at unit size
+        const i32 halo_shade = shade - 2 - i32(k);                               // a step down, and dimmer outward
+        place(frame, halo_first + k, face_x[0], face_y[0], size, u32(halo_shade < 1 ? 1 : halo_shade), stroke);
+        if (twinned) place(frame, twin_halo_first + k, face_x[1], face_y[1], size, u32(halo_shade < 1 ? 1 : halo_shade), stroke);
         else hide(frame, twin_halo_first + k);
     }
 
@@ -273,6 +287,10 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
 
     // The chalk path, brighter while notes are held.
     place(frame, floor_path, path_x * unit, path_y * unit, 2 * unit, held ? 8 : 6, stroke);
+
+    // No sample: Grains' hint under the apron, the stage playing on above it.
+    if (!overview.assigned) hide(frame, hint_cover);
+    else place(frame, hint_cover, 0, 0, unit, 0, fill_and_stroke);
 
 }
 }

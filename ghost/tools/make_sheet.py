@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Makes the contact sheets: tools/frames.cpp's sheet mode dumps each control
-at 0, 50 and 100 (the others at their defaults, a note held), bed with a
-sample and without; frame2svg.py draws each, and headless Chrome rasterises
-the grid twice: docs/controls-1x.png at 1:1, the device's 480 x 220 pixels,
-and docs/controls.png at twice that, for reading.
+at 0, 50 and 100 (the others at their defaults, a sample loaded, a note
+held), then no sample: the hint, with bed at 0, 50 and 100. frame2svg.py
+draws each, and headless Chrome rasterises the grid twice: docs/controls-1x.png
+at 1:1, the device's 480 x 220 pixels, and docs/controls.png at twice that,
+for reading.
     make_sheet.py <frames binary> <work folder>
 frame2svg.py needs XY_FONT, the path of UniversNextPro-Light.ttf."""
 import pathlib
@@ -15,7 +16,7 @@ binary, work = sys.argv[1], pathlib.Path(sys.argv[2])
 work.mkdir(parents=True, exist_ok=True)
 subprocess.run([binary, "sheet", str(work)], check=True)
 rows = [(n, f"sheet-{n}") for n in ("ring", "voice", "split", "trade", "beat", "orbit", "near")]
-rows += [("bed, a sample", "sheet-bed"), ("bed, none", "sheet-empty")]
+rows += [("bed", "sheet-bed"), ("no sample", "sheet-empty")]
 for scale, name in ((1, "controls-1x.png"), (2, "controls.png")):
     cells = []
     for label, stem in rows:
