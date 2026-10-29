@@ -1,0 +1,190 @@
+{
+  "schema": 1,
+  "id": "ghost",
+  "name": "Ghost",
+  "parameters": [
+    {
+      "id": "ring",
+      "label": "ring",
+      "default": 0.6,
+      "mapping": {
+        "kind": "exponential",
+        "minimum": 0.15,
+        "maximum": 12
+      },
+      "display": "duration"
+    },
+    {
+      "id": "voice",
+      "label": "voice",
+      "default": 0.6,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "split",
+      "label": "split",
+      "default": 0.6,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "trade",
+      "label": "trade",
+      "default": 0.3,
+      "mapping": {
+        "kind": "power",
+        "maximum": 0.33,
+        "exponent": 2
+      },
+      "display": "ratio"
+    },
+    {
+      "id": "beat",
+      "label": "beat",
+      "default": 0.35,
+      "mapping": {
+        "kind": "power",
+        "maximum": 6,
+        "exponent": 2
+      },
+      "display": "ratio"
+    },
+    {
+      "id": "orbit",
+      "label": "orbit",
+      "default": 0.2,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "near",
+      "label": "near",
+      "default": 0.4,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "bed",
+      "label": "bed",
+      "default": 0,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    }
+  ],
+  "presets": {
+    "Seance": {
+      "ring": 0.6,
+      "voice": 0.6,
+      "split": 0.6,
+      "trade": 0.3,
+      "beat": 0.35,
+      "orbit": 0.2,
+      "near": 0.4,
+      "bed": 0
+    },
+    "Whisper": {
+      "ring": 0.25,
+      "voice": 0.0,
+      "split": 0.4,
+      "trade": 0.2,
+      "beat": 0.0,
+      "orbit": 0.22,
+      "near": 0.95,
+      "bed": 0
+    },
+    "Choir": {
+      "ring": 0.75,
+      "voice": 0.42,
+      "split": 0.8,
+      "trade": 0.15,
+      "beat": 0.25,
+      "orbit": 0.5,
+      "near": 0.3,
+      "bed": 0
+    },
+    "Revenant": {
+      "ring": 0.95,
+      "voice": 0.2,
+      "split": 0.5,
+      "trade": 0.1,
+      "beat": 0.6,
+      "orbit": 0.0,
+      "near": 0.5,
+      "bed": 0
+    },
+    "Wraith": {
+      "ring": 0.5,
+      "voice": 0.1,
+      "split": 0.3,
+      "trade": 0.0,
+      "beat": 0.2,
+      "orbit": 0.85,
+      "near": 0.6,
+      "bed": 0
+    },
+    "Skull": {
+      "ring": 0.7,
+      "voice": 0.8,
+      "split": 1.0,
+      "trade": 0.6,
+      "beat": 0.0,
+      "orbit": 0.0,
+      "near": 0.5,
+      "bed": 0
+    },
+    "Glass": {
+      "ring": 0.9,
+      "voice": 1.0,
+      "split": 0.5,
+      "trade": 0.2,
+      "beat": 0.3,
+      "orbit": 0.15,
+      "near": 0.5,
+      "bed": 0
+    },
+    "Haunting": {
+      "ring": 0.7,
+      "voice": 0.5,
+      "split": 0.7,
+      "trade": 0.25,
+      "beat": 0.3,
+      "orbit": 0.4,
+      "near": 0.4,
+      "bed": 1.0
+    }
+  },
+  "resources": {
+    "voiceCapacity": 256,
+    "stereoOutput": 1,
+    "display": {
+      "stateBytes": 84,
+      "stateAlignment": 4,
+      "paths": 4,
+      "points": 64,
+      "nodes": 24,
+      "texts": 16,
+      "palette": 16
+    }
+  }
+}

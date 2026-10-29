@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "id": "cocoa",
+  "name": "Cocoa",
+  "press": "page",
+  "parameters": [
+    {
+      "id": "powder",
+      "label": "Powder",
+      "default": 0.32,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "taps",
+      "label": "Taps",
+      "default": 0.0,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "fizz",
+      "label": "Fizz",
+      "default": 0.7,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "cup",
+      "label": "Cup",
+      "default": 0.1667,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "china",
+          "glass",
+          "tin"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "fill",
+      "label": "Fill",
+      "control": 0,
+      "default": 0.65,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "spoon",
+      "label": "Spoon",
+      "control": 1,
+      "default": 0.6,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "pops",
+      "label": "Pops",
+      "control": 2,
+      "default": 0.15,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "stir",
+      "label": "Stir",
+      "control": 3,
+      "default": 1.0,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    }
+  ],
+  "presets": {
+    "Mug Keys": {
+      "powder": 0.32,
+      "taps": 0.0,
+      "fizz": 0.7,
+      "cup": 0.1667,
+      "fill": 0.65,
+      "spoon": 0.6,
+      "pops": 0.15,
+      "stir": 1.0
+    },
+    "Glass Bells": {
+      "powder": 0.22,
+      "taps": 0.0,
+      "fizz": 0.8,
+      "cup": 0.5,
+      "fill": 0.25,
+      "spoon": 0.8,
+      "pops": 0.05,
+      "stir": 1.0
+    },
+    "Tin Percussion": {
+      "powder": 0.45,
+      "taps": 0.62,
+      "fizz": 0.55,
+      "cup": 0.8333,
+      "fill": 0.45,
+      "spoon": 0.85,
+      "pops": 0.3,
+      "stir": 0.3
+    },
+    "Bass Mug": {
+      "powder": 0.25,
+      "taps": 0.0,
+      "fizz": 0.75,
+      "cup": 0.1667,
+      "fill": 0.8,
+      "spoon": 0.35,
+      "pops": 0.0,
+      "stir": 1.0
+    },
+    "Hot Chocolate": {
+      "powder": 0.87,
+      "taps": 0.55,
+      "fizz": 0.2,
+      "cup": 0.1667,
+      "fill": 0.5,
+      "spoon": 0.6,
+      "pops": 0.35,
+      "stir": 1.0
+    },
+    "Fizz": {
+      "powder": 0.7,
+      "taps": 0.85,
+      "fizz": 0.35,
+      "cup": 0.5,
+      "fill": 0.4,
+      "spoon": 0.9,
+      "pops": 1.0,
+      "stir": 0.5
+    },
+    "Spoonful": {
+      "powder": 0.7,
+      "taps": 0.0,
+      "fizz": 0.45,
+      "cup": 0.1667,
+      "fill": 0.6,
+      "spoon": 0.6,
+      "pops": 0.25,
+      "stir": 0.0
+    }
+  },
+  "resources": {
+    "voiceBytes": 292,
+    "voiceAlignment": 4,
+    "voiceCapacity": 8,
+    "sharedBytes": 96,
+    "outputPeakQ31": 697932186,
+    "display": {
+      "stateBytes": 236,
+      "stateAlignment": 4,
+      "paths": 4,
+      "points": 64,
+      "nodes": 168,
+      "texts": 16,
+      "palette": 16
+    }
+  }
+}

@@ -1,0 +1,214 @@
+{
+  "schema": 1,
+  "id": "coin",
+  "name": "Coin",
+  "press": "page",
+  "parameters": [
+    {
+      "id": "spin",
+      "label": "Spin",
+      "default": 0.3984,
+      "mapping": {
+        "kind": "exponential",
+        "minimum": 200,
+        "maximum": 36857
+      },
+      "display": "duration"
+    },
+    {
+      "id": "size",
+      "label": "Size",
+      "default": 0.3,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "1:2",
+          "1:4",
+          "1:8",
+          "1:16",
+          "1:32"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "disk",
+      "label": "Disk",
+      "default": 0.125,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "steel",
+          "brass",
+          "glass",
+          "wood"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "base",
+      "label": "Base",
+      "default": 0.1667,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "glass",
+          "wood",
+          "stone"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "wobble",
+      "label": "Wobble",
+      "control": 0,
+      "default": 0.25,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "air",
+      "label": "Air",
+      "control": 1,
+      "default": 0.0,
+      "mapping": {
+        "kind": "linear",
+        "minimum": -0.3333,
+        "maximum": -0.1667
+      },
+      "display": "ratio"
+    },
+    {
+      "id": "ring",
+      "label": "Ring",
+      "control": 2,
+      "default": 0.6596,
+      "mapping": {
+        "kind": "exponential",
+        "minimum": 50,
+        "maximum": 4000
+      },
+      "display": "duration"
+    },
+    {
+      "id": "many",
+      "label": "Many",
+      "control": 3,
+      "default": 0.125,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "display": "enum"
+    }
+  ],
+  "presets": {
+    "Euler": {
+      "spin": 0.3984,
+      "size": 0.3,
+      "disk": 0.125,
+      "base": 0.1667,
+      "wobble": 0.25,
+      "air": 0.0,
+      "ring": 0.6596,
+      "many": 0.125
+    },
+    "Tick": {
+      "spin": 0.0428,
+      "size": 0.1,
+      "disk": 0.375,
+      "base": 0.8333,
+      "wobble": 0.3,
+      "air": 0.0,
+      "ring": 0.1341,
+      "many": 0.125
+    },
+    "Knock": {
+      "spin": 0.1554,
+      "size": 0.3,
+      "disk": 0.875,
+      "base": 0.5,
+      "wobble": 0.2,
+      "air": 0.2,
+      "ring": 0.4089,
+      "many": 0.125
+    },
+    "Bell": {
+      "spin": 0.24,
+      "size": 0.1,
+      "disk": 0.625,
+      "base": 0.1667,
+      "wobble": 0.1,
+      "air": 0.4,
+      "ring": 0.9186,
+      "many": 0.125
+    },
+    "Chorus": {
+      "spin": 0.5484,
+      "size": 0.3,
+      "disk": 0.375,
+      "base": 0.1667,
+      "wobble": 0.3,
+      "air": 0.3,
+      "ring": 0.7252,
+      "many": 0.875
+    },
+    "Thrum": {
+      "spin": 0.4761,
+      "size": 0.1,
+      "disk": 0.125,
+      "base": 0.1667,
+      "wobble": 0.45,
+      "air": 0.2,
+      "ring": 0.7909,
+      "many": 0.125
+    },
+    "Drone": {
+      "spin": 1.0,
+      "size": 0.1,
+      "disk": 0.625,
+      "base": 0.1667,
+      "wobble": 0.35,
+      "air": 0.0,
+      "ring": 0.7762,
+      "many": 0.375
+    },
+    "Settle": {
+      "spin": 0.7495,
+      "size": 0.5,
+      "disk": 0.125,
+      "base": 0.1667,
+      "wobble": 0.25,
+      "air": 1.0,
+      "ring": 0.8636,
+      "many": 0.125
+    }
+  },
+  "resources": {
+    "voiceBytes": 372,
+    "voiceAlignment": 4,
+    "voiceCapacity": 8,
+    "sharedBytes": 0,
+    "outputPeakQ31": 1073741824,
+    "display": {
+      "stateBytes": 156,
+      "stateAlignment": 4,
+      "paths": 4,
+      "points": 64,
+      "nodes": 104,
+      "texts": 16,
+      "palette": 16
+    }
+  }
+}

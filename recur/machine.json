@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "sdk": "1.4",
+  "kind": "sample",
+  "description": "A window of the sample laid out as a square and scrambled by Arnold's cat map, until it returns exactly.",
+  "identity": {
+    "engine": 43,
+    "page": 2,
+    "screen": 120
+  }
+}

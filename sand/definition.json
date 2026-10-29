@@ -1,0 +1,213 @@
+{
+  "schema": 1,
+  "id": "sand",
+  "name": "Sand",
+  "press": "page",
+  "parameters": [
+    {
+      "id": "figure",
+      "label": "Figure",
+      "default": 0.2083,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "1:2+",
+          "1:3+",
+          "2:3+",
+          "1:4+",
+          "2:4-",
+          "3:4+",
+          "2:5+",
+          "2:5-",
+          "3:5+",
+          "1:6-",
+          "3:6+",
+          "4:6-"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "bow",
+      "label": "Bow",
+      "default": 0.6,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "sand",
+      "label": "Sand",
+      "default": 0.6,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "grain",
+      "label": "Grain",
+      "default": 0.3,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "plate",
+      "label": "Plate",
+      "control": 0,
+      "default": 0.1667,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "metal",
+          "glass",
+          "wood"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "settle",
+      "label": "Settle",
+      "control": 1,
+      "default": 0.5,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "tilt",
+      "label": "Tilt",
+      "control": 2,
+      "default": 0,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "shake",
+      "label": "Shake",
+      "control": 3,
+      "default": 0,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    }
+  ],
+  "presets": {
+    "Chladni": {
+      "figure": 0.2083,
+      "bow": 0.6,
+      "sand": 0.6,
+      "grain": 0.3,
+      "plate": 0.1667,
+      "settle": 0.5,
+      "tilt": 0,
+      "shake": 0
+    },
+    "Glass Pad": {
+      "figure": 0.125,
+      "bow": 0.55,
+      "sand": 0.3,
+      "grain": 0.08,
+      "plate": 0.5,
+      "settle": 0.7,
+      "tilt": 0,
+      "shake": 0
+    },
+    "Bowed Metal": {
+      "figure": 0.4583,
+      "bow": 0.75,
+      "sand": 0.45,
+      "grain": 0.4,
+      "plate": 0.1667,
+      "settle": 0.55,
+      "tilt": 0,
+      "shake": 0
+    },
+    "Bell Keys": {
+      "figure": 0.0417,
+      "bow": 0.06,
+      "sand": 0.35,
+      "grain": 0.12,
+      "plate": 0.1667,
+      "settle": 0.6,
+      "tilt": 0,
+      "shake": 0
+    },
+    "Sand Shaker": {
+      "figure": 0.5417,
+      "bow": 0,
+      "sand": 0.85,
+      "grain": 0.45,
+      "plate": 0.8333,
+      "settle": 0.75,
+      "tilt": 0,
+      "shake": 0
+    },
+    "Drone": {
+      "figure": 0.9583,
+      "bow": 0.85,
+      "sand": 0.5,
+      "grain": 0.1,
+      "plate": 0.1667,
+      "settle": 0.25,
+      "tilt": 0,
+      "shake": 0.18
+    },
+    "Hourglass": {
+      "figure": 0.7083,
+      "bow": 0.6,
+      "sand": 0.8,
+      "grain": 0.15,
+      "plate": 0.1667,
+      "settle": 0.4,
+      "tilt": 0.6,
+      "shake": 0
+    },
+    "Gravel": {
+      "figure": 0.2917,
+      "bow": 0.7,
+      "sand": 1,
+      "grain": 0.85,
+      "plate": 0.1667,
+      "settle": 0.35,
+      "tilt": 0,
+      "shake": 0
+    }
+  },
+  "resources": {
+    "voiceBytes": 688,
+    "voiceAlignment": 4,
+    "voiceCapacity": 8,
+    "sharedBytes": 396,
+    "outputPeakQ31": 1073741824,
+    "display": {
+      "stateBytes": 468,
+      "stateAlignment": 4,
+      "paths": 4,
+      "points": 64,
+      "nodes": 136,
+      "texts": 16,
+      "palette": 16
+    }
+  }
+}

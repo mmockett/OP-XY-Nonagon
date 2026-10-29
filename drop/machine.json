@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "sdk": "1.4",
+  "kind": "synth",
+  "description": "A drop on a hot skillet: past the Leidenfrost point it floats as a star and beats at the key, stepping down its lobes as it evaporates.",
+  "identity": {
+    "engine": 41,
+    "page": 119
+  },
+  "presetDefaults": {
+    "amp": {
+      "attack": 0,
+      "decay": 32767,
+      "sustain": 32767,
+      "release": 14000
+    }
+  }
+}

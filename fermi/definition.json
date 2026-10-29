@@ -1,0 +1,273 @@
+{
+  "schema": 1,
+  "id": "fermi",
+  "name": "Fermi",
+  "press": "page",
+  "parameters": [
+    {
+      "id": "energy",
+      "label": "Energy",
+      "default": 0.5,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "masses",
+      "label": "Masses",
+      "default": 0.3571,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "8",
+          "12",
+          "16",
+          "20",
+          "24",
+          "28",
+          "32"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "springs",
+      "label": "Springs",
+      "default": 0,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "time",
+      "label": "Time",
+      "default": 0.22,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "dispersion",
+      "label": "Disperse",
+      "control": 0,
+      "default": 0.2,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "mode",
+      "label": "Mode",
+      "control": 1,
+      "default": 0.125,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "damping",
+      "label": "Damping",
+      "control": 2,
+      "default": 0,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "seed",
+      "label": "Seed",
+      "control": 3,
+      "default": 0,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "15",
+          "16",
+          "17",
+          "18",
+          "19",
+          "20",
+          "21",
+          "22",
+          "23",
+          "24",
+          "25",
+          "26",
+          "27",
+          "28",
+          "29",
+          "30",
+          "31",
+          "32",
+          "33",
+          "34",
+          "35",
+          "36",
+          "37",
+          "38",
+          "39",
+          "40",
+          "41",
+          "42",
+          "43",
+          "44",
+          "45",
+          "46",
+          "47",
+          "48",
+          "49",
+          "50",
+          "51",
+          "52",
+          "53",
+          "54",
+          "55",
+          "56",
+          "57",
+          "58",
+          "59",
+          "60",
+          "61",
+          "62",
+          "63"
+        ]
+      },
+      "display": "enum"
+    }
+  ],
+  "presets": {
+    "Breath": {
+      "energy": 0.5,
+      "masses": 0.3571,
+      "springs": 0,
+      "time": 0.22,
+      "dispersion": 0.2,
+      "mode": 0.125,
+      "damping": 0,
+      "seed": 0.0078
+    },
+    "Organ": {
+      "energy": 0.2,
+      "masses": 0.6429,
+      "springs": 0,
+      "time": 0.37,
+      "dispersion": 0,
+      "mode": 0.125,
+      "damping": 0,
+      "seed": 0.0078
+    },
+    "Tsingou": {
+      "energy": 0.5,
+      "masses": 0.9286,
+      "springs": 0,
+      "time": 0.0,
+      "dispersion": 0.3,
+      "mode": 0.125,
+      "damping": 0,
+      "seed": 0.0078
+    },
+    "Clarinet": {
+      "energy": 0.42,
+      "masses": 0.3571,
+      "springs": 1,
+      "time": 0.42,
+      "dispersion": 0.1,
+      "mode": 0.125,
+      "damping": 0,
+      "seed": 0.0078
+    },
+    "Bell": {
+      "energy": 0.6,
+      "masses": 0.0714,
+      "springs": 0.3,
+      "time": 0.12,
+      "dispersion": 1,
+      "mode": 0.375,
+      "damping": 0.55,
+      "seed": 0.0078
+    },
+    "Pluck": {
+      "energy": 0.62,
+      "masses": 0.2143,
+      "springs": 0.15,
+      "time": 0.0,
+      "dispersion": 0.15,
+      "mode": 0.125,
+      "damping": 0.5,
+      "seed": 0.0078
+    },
+    "Thermal": {
+      "energy": 1.0,
+      "masses": 0.6429,
+      "springs": 0.25,
+      "time": 0.12,
+      "dispersion": 0.3,
+      "mode": 0.125,
+      "damping": 0,
+      "seed": 0.1172
+    },
+    "Flutter": {
+      "energy": 0.6,
+      "masses": 0.0714,
+      "springs": 0,
+      "time": 0.0,
+      "dispersion": 0.2,
+      "mode": 0.125,
+      "damping": 0.2,
+      "seed": 0.0078
+    }
+  },
+  "resources": {
+    "voiceBytes": 552,
+    "voiceAlignment": 4,
+    "voiceCapacity": 8,
+    "sharedBytes": 0,
+    "outputPeakQ31": 1073741824,
+    "display": {
+      "stateBytes": 1060,
+      "stateAlignment": 4,
+      "paths": 4,
+      "points": 64,
+      "nodes": 147,
+      "texts": 16,
+      "palette": 16
+    }
+  }
+}

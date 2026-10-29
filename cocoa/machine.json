@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "sdk": "1.4",
+  "kind": "synth",
+  "description": "The hot chocolate effect: each note stirs bubbles into the drink and a spoon taps the mug, each tap ringing higher as the bubbles rise out.",
+  "identity": {
+    "engine": 55,
+    "page": 114
+  },
+  "presetDefaults": {
+    "amp": {
+      "attack": 0,
+      "decay": 32767,
+      "sustain": 32767,
+      "release": 16000
+    }
+  }
+}

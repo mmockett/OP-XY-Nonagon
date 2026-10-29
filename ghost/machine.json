@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "sdk": "1.4",
+  "kind": "sample",
+  "description": "Apparitions between the ears: tuned resonators split harmonics, beat and circle round the listener's head.",
+  "identity": {
+    "engine": 42,
+    "page": 2,
+    "screen": 121
+  },
+  "presetDefaults": {
+    "amp": {
+      "attack": 6000,
+      "decay": 32767,
+      "sustain": 32767,
+      "release": 22000
+    }
+  }
+}

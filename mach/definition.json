@@ -1,0 +1,206 @@
+{
+  "schema": 1,
+  "id": "mach",
+  "name": "Mach",
+  "parameters": [
+    {
+      "id": "mach",
+      "label": "Mach",
+      "default": 0.6667,
+      "mapping": {
+        "kind": "anchors",
+        "values": [
+          0.3,
+          1,
+          3
+        ]
+      },
+      "display": "ratio"
+    },
+    {
+      "id": "pass",
+      "label": "Pass",
+      "default": 0.301,
+      "mapping": {
+        "kind": "exponential",
+        "minimum": 3,
+        "maximum": 300
+      },
+      "display": "ratio"
+    },
+    {
+      "id": "source",
+      "label": "Source",
+      "default": 0.7,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "Organ",
+          "Pad",
+          "Voice",
+          "Bell",
+          "Siren"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "dur",
+      "label": "Dur",
+      "default": 0.5805,
+      "mapping": {
+        "kind": "exponential",
+        "minimum": 500,
+        "maximum": 8000
+      },
+      "display": "duration"
+    },
+    {
+      "id": "boom",
+      "label": "Boom",
+      "control": 0,
+      "default": 0.3,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "air",
+      "label": "Air",
+      "control": 1,
+      "default": 0.3,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "tune",
+      "label": "Tune",
+      "control": 2,
+      "default": 1.0,
+      "mapping": {
+        "kind": "linear",
+        "minimum": -1,
+        "maximum": 1
+      },
+      "display": "bipolar"
+    },
+    {
+      "id": "echo",
+      "label": "Echo",
+      "control": 3,
+      "default": 0.0,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    }
+  ],
+  "presets": {
+    "Init": {
+      "mach": 0.6667,
+      "pass": 0.301,
+      "source": 0.7,
+      "dur": 0.5805,
+      "boom": 0.3,
+      "air": 0.3,
+      "tune": 1.0,
+      "echo": 0.0
+    },
+    "Flyby Pad": {
+      "mach": 0.1071,
+      "pass": 0.5625,
+      "source": 0.3,
+      "dur": 0.75,
+      "boom": 0.0,
+      "air": 0.4,
+      "tune": 1.0,
+      "echo": 0.25
+    },
+    "Reverse Swell": {
+      "mach": 1.0,
+      "pass": 0.412,
+      "source": 0.7,
+      "dur": 0.6462,
+      "boom": 0.15,
+      "air": 0.25,
+      "tune": 0.0,
+      "echo": 0.0
+    },
+    "Boom Drum": {
+      "mach": 0.875,
+      "pass": 0.1505,
+      "source": 0.1,
+      "dur": 0.0,
+      "boom": 1.0,
+      "air": 0.3,
+      "tune": 0.5,
+      "echo": 0.0
+    },
+    "Siren Lead": {
+      "mach": 0.0357,
+      "pass": 0.1505,
+      "source": 0.9,
+      "dur": 0.5,
+      "boom": 0.0,
+      "air": 0.2,
+      "tune": 1.0,
+      "echo": 0.0
+    },
+    "Drone Pass": {
+      "mach": 0.0,
+      "pass": 0.8495,
+      "source": 0.1,
+      "dur": 1.0,
+      "boom": 0.0,
+      "air": 0.55,
+      "tune": 0.5,
+      "echo": 0.6
+    },
+    "Choir Jet": {
+      "mach": 0.6,
+      "pass": 0.6505,
+      "source": 0.5,
+      "dur": 0.8305,
+      "boom": 0.35,
+      "air": 0.4,
+      "tune": 1.0,
+      "echo": 0.4
+    },
+    "Doppler Bass": {
+      "mach": 0.3571,
+      "pass": 0.0,
+      "source": 0.1,
+      "dur": 0.3962,
+      "boom": 0.0,
+      "air": 0.5,
+      "tune": 1.0,
+      "echo": 0.0
+    }
+  },
+  "resources": {
+    "voiceBytes": 1044,
+    "voiceAlignment": 4,
+    "voiceCapacity": 8,
+    "sharedBytes": 4,
+    "outputPeakQ31": 1073741824,
+    "display": {
+      "stateBytes": 412,
+      "stateAlignment": 4,
+      "paths": 4,
+      "points": 64,
+      "nodes": 35,
+      "texts": 16,
+      "palette": 16
+    }
+  },
+  "press": "page"
+}

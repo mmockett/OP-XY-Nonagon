@@ -1,0 +1,198 @@
+{
+  "schema": 1,
+  "id": "butterfly",
+  "name": "Butterfly",
+  "press": "page",
+  "parameters": [
+    {
+      "id": "flux",
+      "label": "Flux",
+      "default": 0.764,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 0.5
+      },
+      "display": "ratio"
+    },
+    {
+      "id": "coupling",
+      "label": "Coupling",
+      "default": 0.5,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 2
+      },
+      "display": "ratio"
+    },
+    {
+      "id": "spread",
+      "label": "Spread",
+      "default": 0.75,
+      "mapping": {
+        "kind": "exponential",
+        "minimum": 3,
+        "maximum": 48
+      },
+      "display": "semitones"
+    },
+    {
+      "id": "strike",
+      "label": "Strike",
+      "default": 0.9,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent"
+    },
+    {
+      "id": "glow",
+      "label": "Glow",
+      "default": 0.844,
+      "mapping": {
+        "kind": "exponential",
+        "minimum": 40,
+        "maximum": 8000
+      },
+      "display": "duration",
+      "control": 0
+    },
+    {
+      "id": "site",
+      "label": "Site",
+      "default": 0.25,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 8
+      },
+      "display": "ratio",
+      "control": 1
+    },
+    {
+      "id": "tilt",
+      "label": "Tilt",
+      "default": 0.4,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 3
+      },
+      "display": "ratio",
+      "control": 2
+    },
+    {
+      "id": "wingbeat",
+      "label": "Wingbeat",
+      "default": 0.15,
+      "mapping": {
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "display": "percent",
+      "control": 3
+    }
+  ],
+  "presets": {
+    "Specimen": {
+      "flux": 0.764,
+      "coupling": 0.5,
+      "spread": 0.75,
+      "strike": 0.9,
+      "glow": 0.844,
+      "site": 0.25,
+      "tilt": 0.4,
+      "wingbeat": 0.15
+    },
+    "Glass Keys": {
+      "flux": 0.8284,
+      "coupling": 0.812,
+      "spread": 0.666,
+      "strike": 1.0,
+      "glow": 0.608,
+      "site": 0.12,
+      "tilt": 0.6,
+      "wingbeat": 0.0
+    },
+    "Gamelan": {
+      "flux": 0.8,
+      "coupling": 0.4,
+      "spread": 0.83,
+      "strike": 1.0,
+      "glow": 0.891,
+      "site": 0.5,
+      "tilt": 0.3,
+      "wingbeat": 0.08
+    },
+    "Shimmer": {
+      "flux": 0.62,
+      "coupling": 0.329,
+      "spread": 0.5,
+      "strike": 0.0,
+      "glow": 0.815,
+      "site": 0.4,
+      "tilt": 0.5,
+      "wingbeat": 0.55
+    },
+    "Struck Bass": {
+      "flux": 0.6667,
+      "coupling": 0.577,
+      "spread": 0.5,
+      "strike": 0.8,
+      "glow": 0.756,
+      "site": 0.125,
+      "tilt": 0.5,
+      "wingbeat": 0.0
+    },
+    "Fractal": {
+      "flux": 0.54,
+      "coupling": 0.5,
+      "spread": 0.934,
+      "strike": 0.35,
+      "glow": 0.946,
+      "site": 0.7,
+      "tilt": 0.2,
+      "wingbeat": 0.85
+    },
+    "Chime": {
+      "flux": 0.5,
+      "coupling": 0.235,
+      "spread": 0.896,
+      "strike": 1.0,
+      "glow": 0.78,
+      "site": 0.6,
+      "tilt": 0.5,
+      "wingbeat": 0.0
+    },
+    "Bowed Glass": {
+      "flux": 0.8284,
+      "coupling": 0.671,
+      "spread": 0.666,
+      "strike": 0.15,
+      "glow": 0.869,
+      "site": 0.3,
+      "tilt": 0.6,
+      "wingbeat": 0.4
+    }
+  },
+  "resources": {
+    "voiceBytes": 352,
+    "voiceAlignment": 4,
+    "voiceCapacity": 8,
+    "sharedBytes": 0,
+    "outputPeakQ31": 1073741824,
+    "display": {
+      "stateBytes": 520,
+      "stateAlignment": 4,
+      "paths": 4,
+      "points": 64,
+      "nodes": 58,
+      "texts": 16,
+      "palette": 16
+    }
+  }
+}

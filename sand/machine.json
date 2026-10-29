@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "sdk": "1.4",
+  "kind": "synth",
+  "description": "A bowed plate covered in sand: grains rattle on its moving areas, then settle into the figure's nodal lines, leaving a glassy tone.",
+  "identity": {
+    "engine": 54,
+    "page": 113
+  },
+  "presetDefaults": {
+    "amp": {
+      "release": 20000
+    }
+  }
+}
