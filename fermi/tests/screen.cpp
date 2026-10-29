@@ -226,7 +226,7 @@ void same_chain() {
 // The contact sheet: each control at 0, 0.5 and 1 with the others at their
 // defaults, idle, once the screen has eased (24 frames, a control a row).
 void contact(const char* path) {
-    const double defaults[8] = {0.5, 2.5 / 7, 0, 0.22, 0.2, 0.125, 0, 0.5 / 64};
+    const double defaults[8] = {0.5, 2.5 / 7, 0, 0.39, 0.15, 0.125, 0, 0.5 / 64};
     std::FILE* f = std::fopen(path, "w");
     for (int k = 0; k < 8; ++k)
         for (int v = 0; v < 3; ++v) {
@@ -245,9 +245,9 @@ void contact(const char* path) {
 }
 }
 
-// Each control's caption at 0, 25, 50, 75 and 100, the others at defaults.
+// Every caption with each control at 0, 25, 50, 75 and 100, the others at defaults.
 void captions() {
-    const double defaults[8] = {0.5, 2.5 / 7, 0, 0.22, 0.2, 0.125, 0, 0.5 / 64};
+    const double defaults[8] = {0.5, 2.5 / 7, 0, 0.39, 0.15, 0.125, 0, 0.5 / 64};
     for (int k = 0; k < 8; ++k)
         for (int v = 0; v < 5; ++v) {
             opxy::draw::Input in;
@@ -257,7 +257,9 @@ void captions() {
             fermi::chain::configure(s, in.slots);
             char values[8][opxy::draw::header_capacity];
             fermi::screen::captions(values, s, in);
-            std::printf("%d %d %s\n", k, v, values[k]);
+            std::printf("%d %d", k, v);
+            for (int j = 0; j < 8; ++j) std::printf("\t%s", values[j]);
+            std::printf("\n");
         }
 }
 

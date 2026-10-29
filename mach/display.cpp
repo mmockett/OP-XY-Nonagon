@@ -2,8 +2,8 @@
 #include "plate.h"
 
 // Mach's screen is one object: a photograph after Mach and Salcher's 1887
-// schlieren images of a bullet in flight, its round field mounted on an
-// engraved card (tools/make_panel.py). Every control acts on something in it:
+// schlieren images of a bullet in flight, its round field's edge framing it
+// (tools/make_panel.py). Every control acts on something in it:
 //
 //   mach    the cone: the bow and tail shocks' half-angle, asin(1/M); none
 //           below Mach 1, where the sound waves nest ahead of the projectile
@@ -15,12 +15,12 @@
 //           blunter the nose, the further its bow shock stands off
 //   dur     the turbulent wake: from a short wisp to a long, broad trail
 //   boom    the shocks: off a faint hairline; a soft thump a broad, dim
-//           band; the full crack a crisp, bright line
+//           band; the full crack a crisp, bright line; below Mach 1 a bow
+//           wave ahead of the nose (the pass's pressure pulse), drawn alike
 //   air     the sound-wave rings: the thicker the air, the sooner they fade
 //           and the nearer they stop (it absorbs the outer waves)
-//   tune    the trigger, a wire on two posts across the line of flight
-//           where the flight sounds the key: before the pass, at it, or
-//           after it
+//   tune    the sound waves' spacing, the source's pitch: 20 px apart at
+//           tune's low end, 10 at its top
 //   echo    the polished plate under the listener, and the shock it reflects
 //
 // Idle, the photograph is still: the projectile at its closest pass with the
@@ -42,8 +42,10 @@ const i32 radius = 58;               // the largest sound wave, pixels
 const i32 fastest = 11200;           // the photograph's scale at most 700 px a sound-second, Q4
 const i32 flash = 358;               // Q10 seconds a boom's ring takes to spread
 // Palette greys (make_panel.py: GREYS).
-const u32 bright = 15, metal = 13, ring_near = 12, wire_grey = 12, trigger_grey = 11, plate_grey = 12,
-          wake_grey = 11, reflected_grey = 11;
+// Three steps: the projectile and a crack brightest, the field's edge, the
+// listener, the plate and a thump a step down, the wake and the waves dimmer.
+const u32 bright = 15, metal = 15, ring_near = 10, wire_grey = 10, plate_grey = 10,
+          wake_grey = 8, reflected_grey = 9;
 
 // Exponential approach to a target, as the SDK's header eases (halving every
 // 21 ms); snaps when the remaining step rounds away.
@@ -55,16 +57,12 @@ inline i32 ease(i32 value, i32 target, i32 dt) {
 
 // The photograph's scale: the flight, M dur sound-seconds long, spans 320 px of
 // the field (within 20 .. 700 px a sound-second), and sound crosses it on the
-// same scale.
+// same scale. The waves' spacing: 20 px * 2^-(tune + 1) / 2, the source's
+// pitch rising an octave over tune's travel on the screen.
 inline void scale(Scene& s) {
     const i32 span = flight::mul16(s.mach, s.length);                         // M dur, Q16
     s.scale = opxy::draw::clamp(span > 0 ? 335544320 / span : fastest, 320, fastest);   // 320 * 16 / span
-    // The trigger wire: the landing point (at most 0.5 s of flight from the
-    // pass), a fraction tune of the way there. Pixels: scale * M * seconds.
-    const i32 before = flight::approach(s.length, s.tune);
-    const i32 edge = s.tune < 0 ? -opxy::draw::clamp(before, 0, 32768) : opxy::draw::clamp(s.length - before, 0, 32768);
-    const i32 pixels = (((s.scale * (s.mach >> 4)) >> 8) * (edge >> 6)) >> 8;   // Q10: Q8 px/s * Q10 s >> 8
-    s.land = ((pixels >> 4) * ((s.tune < 0 ? -s.tune : s.tune) >> 6)) >> 6;
+    s.wave = (flight::exp2_q16(65536 - ((s.tune + 65536) >> 1)) * 10) >> 6;
 }
 
 // The photograph's scene from the controls.
@@ -139,21 +137,22 @@ inline void shock_points(Frame::path_type& path, i32 mach, i32 b4, i32 up, i32 d
     }
 }
 
-// The turbulent wake behind the tail: a band `length` pixels long, widening
-// and wandering as its eddies grow, drawn at twice its points' size; phase
-// rolls the eddies along.
+// The turbulent wake behind the tail: a straight trail `length` pixels long,
+// widening as its eddies grow, its two edges billowing out of step, drawn at
+// twice its points' size; phase rolls the eddies along.
 inline void wake_points(Frame::path_type& path, i32 length, i32 phase) {
     using opxy::draw::sine;
     for (u32 i = 0; i < 32; ++i) {
         const i32 s = static_cast<i32>(i) * length * unit / 31;                // Q10 pixels behind the tail
         const i32 grow = s / length;                                            // 0 .. 1024
-        const i32 tenths = (s >> 10) * 225 + phase;                             // a 16 px eddy
-        const i32 wander = ((256 + 2 * grow) * sine(tenths)) >> 10;             // Q10, up to 2.3 px
-        const i32 half = 1200 + ((4000 * grow) >> 10);                          // half its width, Q10: 2.4 to 10 px wide
+        const i32 half = 1000 + ((2600 * grow) >> 10);                          // half its width, Q10: 2 to 7 px wide
+        // each edge billows by up to a third of the half-width, in 14 and 19 px eddies
+        const i32 up = (half * (1024 + ((sine((s >> 10) * 257 + phase) * 340) >> 10))) >> 10;
+        const i32 down = (half * (1024 + ((sine((s >> 10) * 189 + 1800 - phase) * 340) >> 10))) >> 10;
         path.points[i].x = -s >> 1;
-        path.points[i].y = opxy::draw::clamp((wander - half) >> 1, -64 * unit, 64 * unit);
+        path.points[i].y = opxy::draw::clamp(-up >> 1, -64 * unit, 64 * unit);
         path.points[63 - i].x = (-s - 40) >> 1;
-        path.points[63 - i].y = opxy::draw::clamp((wander + half) >> 1, -64 * unit, 64 * unit);
+        path.points[63 - i].y = opxy::draw::clamp(down >> 1, -64 * unit, 64 * unit);
     }
 }
 
@@ -232,11 +231,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         e.echo = target.echo;
         e.boom = target.boom;
         e.source = target.source;
-        // The scale follows the eased mach and dur; the listener and the trigger ease on their own.
-        const i32 land = e.land;
+        // The scale and the waves follow the eased mach, dur and tune; the listener eases on its own.
         scale(e);
         e.reach = ease(e.reach, target.reach, dt);
-        e.land = ease(land, e.land, dt);
     }
 
     // A note launches a flight, fixed at note-on; releasing every note, or
@@ -251,6 +248,10 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             state.boom_age = state.echo_age = -1;
             state.before = flight::approach(target.length, target.tune);
             state.line = flight::timeline(target.mach, target.distance, target.length, state.before);
+            // The boom is heard as the cone arrives; without one, the pass's
+            // pulse as the pass is heard (with boom on, the pass in the flight).
+            state.boom_at = state.line.has_cone ? state.line.cone
+                          : target.boom > 0 && state.before > 0 && target.length > state.before ? target.distance - state.line.start : -1;
             // The plate's image of the flight passes at d + 2h, at the same time.
             state.echo_cone = -1;
             if (target.echo) {
@@ -309,11 +310,12 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         i32 x = 0, r = 0;
         if (state.flying) {
             // Waves leave the projectile on a fixed grid of its own time, one
-            // every step; the slot is the grid index, so a wave keeps its node.
-            const i32 step = (9666666 / k) * 16;                                // microseconds: radius / 6 at k
+            // every step; wave i is the i-th newest, so it is drawn near its
+            // node's own size (10 (i + 1) px) and its line keeps its weight.
+            const i32 step = (sc.wave * 15625) / k;                             // microseconds: the spacing at k
             const i32 t_us = ((now >> 6) * 15625) >> 4;                         // Q16 s to us (to 16 s)
             const i32 newest = t_us >= 0 ? t_us / step : -((-t_us + step - 1) / step);
-            const i32 j = newest - ((newest - static_cast<i32>(i)) % 12 + 12) % 12;
+            const i32 j = newest - static_cast<i32>(i);
             const i32 tau_us = j * step;
             if (tau_us >= -(((before >> 7) * 15625) >> 3) && tau_us <= (((after >> 7) * 15625) >> 3) && tau_us <= t_us) {
                 r = (k * (t_us - tau_us)) / 15625;   // Q10 px (k * step is constant, so no overflow)
@@ -321,10 +323,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
                 if (r > radius * unit) r = 0;
             }
         } else {
-            // Idle: the steady diagram, wave i + 1 sent out i + 1 steps ago
-            // (six of them, 10 px apart: closer would blur on the screen).
-            const i32 n = static_cast<i32>(i) + 1;
-            r = i < 6 ? n * radius * unit / 6 : 0;
+            // Idle: wave i + 1 sent out i + 1 steps ago, the spacing apart
+            // (at least 10 px: closer would blur on the screen).
+            r = (static_cast<i32>(i) + 1) * sc.wave;
             x = cx - ((r * (sc.mach >> 4)) >> 12);
         }
         if (r > extent || (r && !inside(x, ly, r, 1))) r = 0;
@@ -335,36 +336,45 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             // Quantized to half a pixel; dimmer with distance, more so in thick air.
             const i32 far = (m.r * 16) / (radius * unit);                     // 0..16
             const i32 grey = ring_near - ((far * (2 * 32768 + 8 * air)) >> 19);
-            place(frame, node::ring + i, m.x & ~511, ly, clamp(((m.r & ~511) + 256) / plate::ring_radius, 1, 2 * unit),
+            place(frame, node::ring + i, m.x & ~511, ly, clamp(((m.r & ~511) + 256) / (plate::ring_radius * static_cast<i32>(i + 1)), 1, 2 * unit),
                   static_cast<u32>(clamp(grey, 5, 15)), stroke);
         } else hide(frame, node::ring + i);
     }
 
-    // --- the shocks, above Mach 1: a thump broad and dim, a crack fine and bright ---
+    // --- the shocks, above Mach 1: a thump a broad, dim band, a crack a fine,
+    // bright line; below it (boom on) a bow wave ahead of the nose, as wide as
+    // a shock at Mach 1.05, its arms 10 px long at Mach 0.3 and 28 near 1 ---
     const bool cone = sc.mach > flight::one + 256;
-    const i32 root = cone ? (static_cast<i32>(flight::isqrt(static_cast<u32>(flight::mul16(sc.mach, sc.mach) - flight::one) << 12)) << 2) : 0;
-    const i32 sin_mu = cone ? static_cast<i32>((1u << 31) / static_cast<u32>(sc.mach >> 1)) : 0;
-    const i32 cos_mu = cone ? flight::div16(root, sc.mach) : 0;
-    const i32 width = sc.boom <= 0 ? 360 : 900 + (((32768 - sc.boom) * 7300) >> 15);      // Q10 px: 8 px as a thump, 0.9 as a crack
-    const u32 shock_grey = sc.boom <= 0 ? 6u : static_cast<u32>(10 + ((sc.boom * 5) >> 15));
-    const i32 look = (static_cast<i32>(shape) << 16) + width;
+    const bool bow_wave = !cone && sc.boom > 0;
+    const i32 shape_mach = cone ? sc.mach : 68813;
+    const i32 root = static_cast<i32>(flight::isqrt(static_cast<u32>(flight::mul16(shape_mach, shape_mach) - flight::one) << 12)) << 2;
+    const i32 sin_mu = static_cast<i32>((1u << 31) / static_cast<u32>(shape_mach >> 1));
+    const i32 cos_mu = flight::div16(root, shape_mach);
+    // A ribbon the device outlines with a 1 px line, so it reads as one line:
+    // 2.6 px, dim and rounded (its front standing up to 16 px further off) as
+    // a thump; 1.4 px, bright and sharp as a crack; a dim hairline off.
+    const i32 width = sc.boom <= 0 ? 200 : 400 + (((32768 - sc.boom) * 1200) >> 15);      // Q10 px between its edges
+    const u32 shock_grey = sc.boom <= 0 ? 5u : static_cast<u32>(9 + ((sc.boom * 6) >> 15));
+    const i32 blunt = sc.boom <= 0 ? 0 : ((32768 - sc.boom) * 256) >> 15;                // Q4 px: up to 16
+    const i32 look = (static_cast<i32>(shape) << 16) + width + (blunt << 12);
     for (u32 which = 0; which < 2; ++which) {
         const u32 n = which ? node::tail : node::bow;
-        const i32 offset = which ? plate::tail[shape] : plate::nose[shape] + (plate::standoff[shape] << 6);
+        const i32 standoff = plate::standoff[shape] + blunt + (bow_wave ? 48 : 0);           // Q4 px: a bow wave 3 px further off
+        const i32 offset = which ? plate::tail[shape] : plate::nose[shape] + (standoff << 6);
         const i32 ax = state.bullet.x + offset;
         i32* last = state.shock[which];
-        if (!cone || !state.bullet.r || !inside(ax, ly, 0, 2)) { hide(frame, n); last[2] = -1; continue; }
-        const i32 most = which ? 100 : 124;
+        if (!(cone || (bow_wave && !which)) || !state.bullet.r || !inside(ax, ly, 0, 2)) { hide(frame, n); last[2] = -1; continue; }
+        const i32 most = bow_wave ? 10 + ((18 * sc.mach) >> 16) : which ? 100 : 124;
         const i32 up = reach_edge(ax, ly, -cos_mu, -sin_mu, most) & ~3, down = reach_edge(ax, ly, -cos_mu, sin_mu, most) & ~3;
         if (up < 8 || down < 8) { hide(frame, n); last[2] = -1; continue; }
-        if (last[2] != up || last[3] != down || state.shock_mach != sc.mach || state.shock_look != look) {
-            shock_points(frame.paths[n], sc.mach, which ? 8 : plate::standoff[shape], up, down, which ? (width * 3) >> 2 : width);
+        if (last[2] != up || last[3] != down || state.shock_mach != shape_mach || state.shock_look != look) {
+            shock_points(frame.paths[n], shape_mach, which ? 8 + (blunt >> 1) : standoff, up, down, which ? (width * 3) >> 2 : width);
             frame.paths[n].key = ++state.key;
             last[2] = up; last[3] = down;
         }
-        place(frame, n, ax & ~255, ly, 2 * unit, which ? (shock_grey > 5 ? shock_grey - 3 : 2) : shock_grey, stroke);
+        place(frame, n, ax & ~255, ly, 2 * unit, which ? (shock_grey > 8 ? shock_grey - 3 : 5) : shock_grey, stroke);
     }
-    state.shock_mach = sc.mach;
+    state.shock_mach = shape_mach;
     state.shock_look = look;
 
     // --- the plate, and the shock it reflects ---
@@ -390,8 +400,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
                             const i32 x = -(((a >> 4) * (cos_mu >> 4)) >> 8), y = -(((a >> 4) * (sin_mu >> 4)) >> 8);
                             path.points[i].x = x >> 1;
                             path.points[i].y = y >> 1;
-                            path.points[63 - i].x = (x + ((900 * sin_mu) >> 16)) >> 1;
-                            path.points[63 - i].y = (y - ((900 * cos_mu) >> 16)) >> 1;
+                            path.points[63 - i].x = (x + ((500 * sin_mu) >> 16)) >> 1;
+                            path.points[63 - i].y = (y - ((500 * cos_mu) >> 16)) >> 1;
                         }
                         path.key = ++state.key;
                         last[2] = len; last[3] = cos_mu >> 8;
@@ -422,7 +432,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
 
     // --- the listener, and the booms' flashes at its ear ---
     place(frame, node::wire, wx, wy & ~511, unit, wire_grey, fill_and_stroke);
-    if (state.flying && state.line.has_cone && state.boom_age < 0 && (state.elapsed << 6) >= state.line.cone) state.boom_age = 0;
+    if (state.flying && state.boom_at >= 0 && state.boom_age < 0 && (state.elapsed << 6) >= state.boom_at) state.boom_age = 0;
     if (state.flying && state.echo_cone >= 0 && state.echo_age < 0 && (state.elapsed << 6) >= state.echo_cone) state.echo_age = 0;
     const i32 age = state.boom_age >= 0 && state.boom_age < flash ? state.boom_age
                   : state.echo_age >= 0 && state.echo_age < flash ? state.echo_age : -1;
@@ -430,9 +440,6 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 s = 614 + (age * 1434) / flash;                     // 0.6 .. 2 of its 10 px
         place(frame, node::glow, wx, (wy - unit) & ~511, s & ~63, static_cast<u32>(15 - (age * 9) / flash), stroke);
     } else hide(frame, node::glow);
-
-    // --- the trigger wire, where the flight sounds the key ---
-    place(frame, node::trigger, (cx + sc.land) & ~511, ly, unit, trigger_grey, fill_and_stroke);
 
     // --- where the sound heard now left the projectile ---
     // The roots of t = tau + |r(tau)|, in Q10 seconds: forwards, and above
@@ -483,28 +490,23 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         o = values[DUR];
         decimal(o, flight::dur(input.slots[DUR]), 1);
         *o++ = 's'; *o = 0;
-        // boom: the shock's rise, 250 Hz * 40^boom (a thump low, a crack high)
+        // boom: the shock's rise, 100 Hz * 100^boom (a thump low, a crack high)
         const i32 b = flight::amount(input.slots[BOOM]);
         if (b <= 0) copy(values[BOOM], header_capacity, "off");
-        else hertz(values[BOOM], (250 * flight::exp2_q16((b * 10899) >> 10)) >> 16);
-        // air: the corner of its low-pass 100 m away, 75 Hz * 2^(10 (1 - air))
-        const i32 a = flight::amount(input.slots[AIR]);
-        const i32 corner = a <= 0 ? 1 << 30 : (75 * (flight::exp2_q16((32768 - a) * 20) >> 6)) >> 10;
+        else hertz(values[BOOM], (100 * flight::exp2_q16((b * 13607) >> 10)) >> 16);
+        // air: the corner of its low-pass at the closest pass
+        const i32 corner = flight::air_hertz(flight::amount(input.slots[AIR]), metres);
         if (corner >= 20000) copy(values[AIR], header_capacity, "open");
         else hertz(values[AIR], corner);
-        // tune: where the flight sounds the key, in seconds of its own time from
-        // the pass (at most half a second before or after it)
-        const i32 u = flight::tune(input.slots[TUNE]);
-        const i32 len = flight::dur(input.slots[DUR]), early = flight::approach(len, u);
-        const i32 edge = clamp(u < 0 ? early : len - early, 0, 32768);
-        const i32 landing = ((edge >> 4) * ((u < 0 ? -u : u) >> 4)) >> 8;          // Q16 s
-        if (landing < 3277) copy(values[TUNE], header_capacity, "pass");
-        else {
-            o = values[TUNE];
-            *o++ = u < 0 ? '-' : '+';
-            decimal(o, landing, 1);
-            *o++ = 's'; *o = 0;
-        }
+        // tune: where the flight's end settles against the key, semitones:
+        // 0 at tune's top, where it lands on the key
+        const i32 u = flight::tune(input.slots[TUNE]), len = flight::dur(input.slots[DUR]);
+        const i32 span = flight::tune_span(flight::mach(input.slots[MACH]), flight::sound_seconds(metres), len, flight::approach(len, u));
+        const i32 st = (flight::mul16(span, (65536 - u) >> 1) * 12 + 32768) >> 16;
+        o = values[TUNE];
+        if (st > 0) *o++ = '-';
+        digits(o, static_cast<u32>(st));
+        *o++ = 's'; *o++ = 't'; *o = 0;
         if (flight::echo_level(input.slots[ECHO]) <= 0) copy(values[ECHO], header_capacity, "off");
         else {
             o = values[ECHO];

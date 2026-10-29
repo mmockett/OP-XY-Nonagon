@@ -170,8 +170,13 @@ inline i32 spread_semitones(i32 control) {
 }
 
 // Strike: how hard a note strikes, Q15. The gate holds at 1 - strike while
-// the note is held, and every strike above 0 pulses it fully open first.
-inline i32 strike(i32 control) { return q15(control); }
+// the note is held, and every strike above 0 pulses it open first. The
+// knob's curve, 1 - (1 - k) 2^(-3k), lowers that held hum 3 to 6 dB every
+// tenth of its travel (-7 dB at 25, -15 at 50, -26 at 75), a pluck at 100.
+inline i32 strike(i32 control) {
+    const i32 k = q15(control);
+    return 32767 - (((32767 - k) * exp2_down(-6 * k)) >> 15);
+}
 
 // Glow: the time a struck gate takes to close from open to -60 dB, 40 ms to
 // 8 s, exponentially; log2 seconds, Q16.
@@ -180,8 +185,11 @@ inline i32 glow_log2(i32 control) { return -304340 + ((q15(control) * 15655) >> 
 // Site: the struck site's distance from the middle of the chain, 0 to 8, Q16.
 inline i32 site(i32 control) { return q15(control) << 4; }
 
-// Tilt: how much more quickly the top of the spectrum follows the gate down:
-// a partial's gate is the note's to the power 1 + tilt x place, tilt 0 to 3, Q16.
+// Tilt: how dark the top of the spectrum is, and how much more quickly it
+// follows the gate down: a partial's gate is the note's to the power
+// 1 + tilt x place, and the upper three quarters of the span a further
+// tilt x 8 dB down at the top (and all of it tilt x 1 dB up, to keep the
+// note's loudness, never above a partial's own level), tilt 0 to 3, Q16.
 inline i32 tilt(i32 control) { return q15(control) * 6; }
 
 // Wingbeat: a slow beat of the flux (up to 1/48 either way) and of the
@@ -395,8 +403,20 @@ inline i32 keep(i32 log2_tau) { return exp2_down(-static_cast<i32>(exp2_q16(bloc
 // tail falls at its own pace rather than the rounding's.
 inline i32 scale_gap(i32 d, i32 k) { return (d >> 15) * k + (((d & 0x7fff) * k) >> 15); }
 
+// The held level, Q30: 3/4 of 1 - strike, fading `blocks` after a strike
+// with a time constant of 4 glows over strike squared, so a short glow's hum
+// dies with its ring and a long glow's sustains, and an unstruck pad holds.
+inline i32 held_level(u32 blocks, i32 struck, i32 glow) {
+    const i32 held = (32767 - struck) * 24576;
+    if (struck <= 0 || !blocks) return held;
+    const i32 log2_t = 131072 + glow - 2 * (log2_q16(static_cast<u32>(struck)) - (15 << 16));   // log2 (4 glow / strike^2)
+    const i32 per_block = static_cast<i32>(exp2_q16(block_log2e - log2_t));                   // log2 units a block, Q16
+    const i32 fade = exp2_down(-static_cast<i32>(blocks) * per_block);
+    return (held >> 15) * fade;
+}
+
 inline i32 gate_step(i32 g, u32 blocks, i32 struck, i32 glow) {
-    const i32 held = (32767 - struck) * 24576;   // 3/4 of 1 - strike, Q30
+    const i32 held = held_level(blocks, struck, glow);
     if (struck > 0 && blocks < pulse_blocks) {
         // The pulse lights the cell the strike's share of the way from the held level to open.
         const i32 lit = held + ((open - held) >> 15) * struck;
@@ -421,6 +441,11 @@ inline i32 partial_gate(i32 g, i32 slope, i32 place) {
     const u32 light = static_cast<u32>(g) >> 15;   // Q15
     if (!light) return 0;
     const i32 e = log2_q16(light) - (15 << 16);    // <= 0
-    return exp2_down(mul16(e, 65536 + mul16(slope, place > 0 ? place : 0)));
+    const i32 tp = mul16(slope, place > 0 ? place : 0);   // tilt x place, Q16
+    // And darker by tilt x 8 dB at the top, from nothing a quarter of the
+    // span up, so the low partials that carry the note's loudness keep it,
+    // made up by tilt x 1 dB, never above the partial's own level.
+    const i32 above = place > 16384 ? (((place - 16384) >> 2) * 87381) >> 14 : 0;   // 0 to 1 over the upper 3/4, Q16
+    return exp2_down(mul16(e, 65536 + tp) - ((mul16(slope, above) * 85) >> 6) + (((slope >> 2) * 21845) >> 15));
 }
 }

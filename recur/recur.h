@@ -7,6 +7,7 @@
 namespace recur {
 using opxy::i32;
 using opxy::u32;
+using opxy::u8;
 
 // The controls, by saved parameter index (definition.json).
 enum Control : unsigned { kPos, kGrid, kSlice, kMap, kStep, kRate, kDepth, kChrd };
@@ -115,8 +116,9 @@ const u32 iteration_bits = 20;
 // rate's iterations a second, Q8, at a tempo (BPM, Q1 tenths as the transport gives it).
 inline u32 rate256(u32 rate64_, u32 bpm_x10) { return rate64_ ? bpm_x10 * 4096 / (600 * rate64_) : 0; }
 
-// step: where in the period the iteration starts, Q20.
-inline u32 step_position(i32 parameter, u32 period) { return (level(parameter) * period) << 4; }
+// step: where in the period the iteration starts, Q20, from the first
+// iteration to the last (so its ends differ).
+inline u32 step_position(i32 parameter, u32 period) { return (level(parameter) * (period - 1)) << 4; }
 
 // blend's crossfade: how far toward the next iteration the sound is, Q16, at
 // fraction f (Q16) of the way through an iteration. blend 0 steps at once;
@@ -129,25 +131,60 @@ inline u32 toward_next(u32 f, u32 blend16, u32 reciprocal) {
     return w > 65536 ? 65536 : w;
 }
 
-// depth: which cells move. The map's orbits (the cells one cell visits as it
-// iterates) move or stay whole, so every iteration is still a permutation and
-// still comes round at the period. An orbit moves when the hash of its first
-// cell falls under depth (Q16, 65536 all). For squares up to 8 a side: a bit
-// a cell, in two words.
+// depth and step: which cells move, and which of those start an iteration
+// ahead. The map's orbits (the cells one cell visits as it iterates) move or
+// stay whole, and move by one power each, so every state is still a
+// permutation. The orbits are ranked by a hash of their first cell; the first
+// of them move, as many as cover depth's share of the cells (Q16, 65536 all),
+// and of those the first covering ahead's share (Q16) of the moving cells are
+// one iteration ahead: step's fraction between two iterations. For squares up
+// to 8 a side: a bit a cell, in two words.
 inline u32 orbit_hash(u32 cell) { return ((cell + 1) * 2654435761u) >> 16; }
-inline void moving_cells(u32 map, u32 bits, u32 depth16, u32 (&moving)[2]) {
+struct Orbits { u32 moving[2], ahead[2], moving_cells; };
+inline void rank_orbits(u32 map, u32 bits, u32 depth16, u32 ahead16, Orbits& o) {
     const u32 side = 1u << bits, cells = side * side;
     const Mat one = power(map, 1, bits);
-    moving[0] = moving[1] = 0;
+    // Walk each orbit once, from its least cell, noting its cells.
+    u8 orbit_of[64], first[64], size[64], ranked[64];
+    u32 seen[2] = {0, 0}, count = 0;
     for (u32 c = 0; c < cells; ++c) {
-        u32 x = c & (side - 1), y = c >> bits, first = c;
-        for (u32 n = 0; n < 64; ++n) {
+        if ((seen[c >> 5] >> (c & 31)) & 1) continue;
+        u32 x = c & (side - 1), y = c >> bits, at = c, n = 0;
+        do {
+            seen[at >> 5] |= 1u << (at & 31);
+            orbit_of[at] = u8(count);
+            ++n;
             send(one, map, bits, x, y);
-            const u32 at = y * side + x;
-            if (at == c) break;
-            if (at < first) first = at;
-        }
-        if (orbit_hash(first) < depth16) moving[c >> 5] |= 1u << (c & 31);
+            at = y * side + x;
+        } while (at != c && n < 64);
+        first[count] = u8(c);
+        size[count] = u8(n);
+        // Ranked by the hash of the least cell.
+        u32 i = count++;
+        for (; i && orbit_hash(first[ranked[i - 1]]) > orbit_hash(c); --i) ranked[i] = ranked[i - 1];
+        ranked[i] = u8(count - 1);
+    }
+    // The orbits that move, then those a step ahead: an orbit counts while
+    // its middle falls under the share.
+    u8 moving[64], ahead[64];
+    u32 cum = 0, moved = 0;
+    for (u32 i = 0; i < count; ++i) {
+        const u32 orbit = ranked[i], n = size[orbit];
+        moving[orbit] = (2 * cum + n) * 32768 < depth16 * cells;
+        if (moving[orbit]) moved += n;
+        cum += n;
+    }
+    cum = 0;
+    for (u32 i = 0; i < count; ++i) {
+        const u32 orbit = ranked[i], n = size[orbit];
+        ahead[orbit] = moving[orbit] && (2 * cum + n) * 32768 < ahead16 * moved;
+        if (moving[orbit]) cum += n;
+    }
+    o.moving[0] = o.moving[1] = o.ahead[0] = o.ahead[1] = 0;
+    o.moving_cells = moved;
+    for (u32 c = 0; c < cells; ++c) {
+        if (moving[orbit_of[c]]) o.moving[c >> 5] |= 1u << (c & 31);
+        if (ahead[orbit_of[c]]) o.ahead[c >> 5] |= 1u << (c & 31);
     }
 }
 inline bool moves(const u32 (&moving)[2], u32 cell) { return (moving[cell >> 5] >> (cell & 31)) & 1; }

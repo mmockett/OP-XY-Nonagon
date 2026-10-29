@@ -32,57 +32,72 @@ device.
 
 | Page | Encoder 1 | 2 | 3 | 4 |
 | --- | --- | --- | --- | --- |
-| 1 | **Energy**: the load on the springs. Still, breathing from about 0.4, chaos above about 0.85 | **Masses**: 8, 12, 16, 20, 24, 28 or 32 | **Springs**: from quadratic (the α chain) to cubic (the β chain) | **Time**: the chain's clock, independent of pitch |
-| 2 | **Dispersion**: partials from exact harmonics to the chain's own ratios | **Mode**: the mode the note strikes, 1 to 4, always tuned to the key | **Damping**: lossless, or the struck mode's T60, with the high modes faster | **Seed**: a nudge of 3 parts in a million to the starting shape |
+| 1 | **Energy**: the load on the springs. Still at 0, breathing from about 0.05, deeper to 0.5, chaos above about 0.85 | **Masses**: 8, 12, 16, 20, 24, 28 or 32 | **Springs**: from quadratic (the α chain) to cubic (the β chain), the even partials fading on the way | **Time**: the chain's clock, independent of pitch: a breath from 1.4 s to 32 s at 16 masses |
+| 2 | **Dispersion**: partials from exact harmonics to the top one 500 cents flat, along the chain's own law | **Mode**: the mode the note strikes, 1 to 4, always tuned to the key | **Damping**: lossless, or the struck mode's T60, with the high modes faster | **Seed**: a nudge to the starting shape, from none to two thirds of the note's energy in the low modes |
 
-Measured on an 8 s A3 note through Fermi's own `render()`
+Measured on a 12 s A3 note through Fermi's own `render()`
 (`tools/sweep.py`), each control at 0, 25, 50, 75 and 100 with the others at
-their defaults. Each cell gives the header's caption, then the spectral
-centroid's median and its 10th–90th percentile range, which is how far the
-timbre moves.
+their defaults. Each cell gives the header's caption; the spectral
+centroid's median and its 10th–90th percentile range (how far the timbre
+moves); the breath's depth (the 10th–90th percentile range of the struck
+partial's share of the energy), with its period where the control moves it;
+what the control acts on where the centroid misses it (the even harmonics'
+share for springs, the harmonic share and roughness for dispersion, the fall
+by 2 s for damping); and Δ, how far the long-term spectrum stands from the
+previous setting's, in dB.
 
 | Control | 0 | 25 | 50 | 75 | 100 |
 | --- | --- | --- | --- | --- | --- |
-| Energy | `3e-7` 246 Hz (246–246) | `2e-4` 246 Hz (241–253) | `0.04` 335 Hz (253–416) | `0.57` 558 Hz (272–678) | `7.7` 722 Hz (411–900) |
-| Masses | `8` 309 Hz (263–373) | `12` 313 Hz (250–394) | `20` 368 Hz (251–410) | `28` 248 Hz (237–283) | `32` 246 Hz (237–257) |
-| Springs | `quad` 335 Hz (253–416) | `75:25` 284 Hz (254–387) | `50:50` 298 Hz (253–442) | `25:75` 282 Hz (241–409) | `cubic` 314 Hz (250–495) |
-| Time | `1.4s` 319 Hz (256–416) | `5.7s` 318 Hz (251–404) | `23s` 283 Hz (242–363) | `92s` 246 Hz (238–261) | `367s` 246 Hz (244–249) |
-| Dispersion | `0c` 400 Hz (270–449) | `-61c` 340 Hz (250–406) | `-124c` 344 Hz (249–409) | `-189c` 357 Hz (245–408) | `-257c` 343 Hz (249–411) |
-| Mode | `1` 335 Hz (253–416) | `1` 335 Hz (253–416) | `2` 307 Hz (266–354) | `3` 303 Hz (273–316) | `4` 268 Hz (258–280) |
-| Damping | `off` 335 Hz (253–416) | `13s` 279 Hz (256–325), −7 dB by 2 s | `5.5s` 249 Hz (239–273), −17 dB by 2 s | `2.3s` 250 Hz (242–253), −41 dB by 2 s | `1.0s` silent by 2 s |
-| Seed | `off` | `#15` | `#31` | `#47` | `#63` (same sound: the chain at default energy recurs) |
+| Energy | `3e-7` 246 Hz (246–246), still | `1e-3` 249 Hz (236–268), breath 0.13, Δ 8.3 dB | `0.04` 326 Hz (256–414), breath 0.50, Δ 11.5 dB | `0.57` 570 Hz (265–671), breath 0.65, Δ 10.6 dB | `7.7` 706 Hz (426–881), breath 0.58, Δ 4.7 dB |
+| Masses | `8` 311 Hz (252–378), breath 0.38 every 0.37s | `12` 312 Hz (257–388), breath 0.37 every 1.7s, Δ 0.2 dB | `20` 373 Hz (262–418), breath 0.49 every 14s, Δ 3.1 dB | `28` 261 Hz (242–304), breath 0.20 every 51s, Δ 6.7 dB | `32` 250 Hz (239–276), breath 0.14 every 79s, Δ 4.7 dB |
+| Springs | `quad` 326 Hz (256–414), breath 0.50 every 4.8s, even 0.36 | `75:25` 300 Hz (243–369), breath 0.36 every 5.4s, even 0.28, Δ 2.3 dB | `50:50` 277 Hz (244–388), breath 0.36 every 5.1s, even 0.21, -1 dB by 2 s, Δ 1.8 dB | `25:75` 262 Hz (243–335), breath 0.19 every 7.2s, even 0.14, Δ 2.2 dB | `cubic` 311 Hz (251–500), breath 0.34 every 1.5s, even 0.12, Δ 8.0 dB |
+| Time | `1.4s` 327 Hz (254–415), breath 0.49 | `3.1s` 331 Hz (258–422), breath 0.51, Δ 0.1 dB | `6.8s` 348 Hz (249–415), breath 0.50, Δ 0.3 dB | `15s` 375 Hz (259–417), breath 0.48, Δ 0.8 dB | `32s` 292 Hz (243–378), breath 0.33, Δ 2.7 dB |
+| Dispersion | `0c` 378 Hz (274–451), breath 0.47, harmonic 0.79, rough 0.001 | `-118c` 316 Hz (248–409), breath 0.49, harmonic 0.76, rough 0.001, Δ 1.3 dB | `-238c` 324 Hz (250–405), breath 0.48, harmonic 0.75, rough 0.003, Δ 0.6 dB | `-367c` 326 Hz (252–409), breath 0.48, harmonic 0.72, rough 0.007, Δ 0.4 dB | `-502c` 327 Hz (251–408), breath 0.46, harmonic 0.69, rough 0.006, Δ 1.1 dB |
+| Mode | `1` 326 Hz (256–414), breath 0.50 every 4.8s | `1` 326 Hz (256–414), breath 0.50 every 4.8s, Δ 0.0 dB | `2` 303 Hz (250–373), breath 0.41 every 0.66s, Δ 2.8 dB | `3` 297 Hz (273–324), breath 0.33 every 0.15s, Δ 12.5 dB | `4` 265 Hz (246–277), breath 0.50 every 0.24s, Δ 10.9 dB |
+| Damping | `off` 326 Hz (256–414), breath 0.50 | `13s` 288 Hz (249–321), breath 0.28, -6 dB by 2 s, Δ 6.8 dB | `5.5s` 268 Hz (237–293), breath 0.19, -16 dB by 2 s, Δ 4.4 dB | `2.3s` 251 Hz (237–301), breath 0.07, -41 dB by 2 s, Δ 3.4 dB | `1.0s` 250 Hz (246–448), breath 0.30, -154 dB by 2 s, Δ 2.7 dB |
+| Seed | `off` 326 Hz (256–414), breath 0.50 | `22%` 323 Hz (280–435), breath 0.47, Δ 3.2 dB | `41%` 427 Hz (330–519), breath 0.58, Δ 4.6 dB | `56%` 459 Hz (344–581), breath 0.53, Δ 1.6 dB | `66%` 494 Hz (464–542), breath 0.15, Δ 1.8 dB |
+
+Time and masses act mostly on the breath's rate, which the spectrum's change
+(Δ) does not see: the time caption gives it. Mode is a four-position switch.
 
 The captions use real units:
 - **Energy** is the chain's energy in the 1955 runs' units: a chain with
-  α = 1/4, or β = 1 when mostly cubic. The report's run was 0.07.
+  α = 1/4, or β = 1 when mostly cubic. The report's run was 0.07. The knob
+  crosses the stillest stretch, where a chain barely stirs, in its first
+  twentieth.
 - **Masses** and **mode** are numbers.
 - **Springs** shows the quadratic and cubic shares.
-- **Time** is the breathing period in seconds. Larger chains breathe more
-  slowly: 1.4 s at 16 masses at the fastest, 23 s at 32.
+- **Time** is the breathing period in seconds, from 1.4 s to 32 s at 16
+  masses. Larger chains breathe more slowly: 23 s at 32 masses at the
+  fastest.
 - **Dispersion** is how far the top voiced partial sits from harmonic, in
-  cents.
+  cents: −500 at full for every number of masses. The partials between bend
+  as the chain's own law does, growing as (k/N)², so the low ones stay close
+  and beat against the body's harmonics, and the high ones fall well flat.
 - **Damping** is the struck mode's T60, and the measured fades match it. A
   chaotic note fades faster than its caption, because the chain keeps feeding
   the high modes that damping drains fastest.
-- **Seed** only matters once the chain is chaotic. At energy 1, seeds 1 and 2
-  part ways (a mode's share differs by up to 0.48). At energy 0.5 they stay
-  within 0.0003.
+- **Seed** is the share of the note's energy its nudge takes from the struck
+  mode, into modes 1 to 6 at random amplitudes (a different pattern at each
+  step of the knob). At low energy those modes sound beside the struck one,
+  like drawbars; breathing, they change the breath's course; in chaos the
+  note goes somewhere else. The note stays as loud.
 
 Energy, springs, time, dispersion and damping act live on a sounding chain.
-Masses and mode restring it, as a new chain would. The seed applies from the
-next note.
+Masses and mode restring it, as a new chain would. The seed shapes the next
+note.
 
 ## Presets
 
 | Preset | Role | Sound | Phrase peak |
 | --- | --- | --- | --- |
-| Breath | pad (the defaults) | 16 masses breathing every 5 s: a soft tone that brightens and returns | 0.50 (four-note chords) |
+| Breath | pad (the defaults) | 16 masses breathing every 5 s: a soft tone that brightens and returns | 0.55 (four-note chords) |
 | Organ | organ | 24 masses at low energy on exact harmonics: still and round, like a flute stop, with a slow shimmer | 0.47 (four-note chords) |
-| Tsingou | long pad | The 1955 chain: 32 masses, a breath of 23 s, super-recurrences under long chords | 0.48 (five-note chords) |
+| Tsingou | long pad | The 1955 chain: 32 masses, a breath of 23 s, super-recurrences under long chords | 0.52 (five-note chords) |
 | Clarinet | lead | The cubic chain: odd partials only, a hollow reed tone that breathes slowly | 0.12 (single notes) |
-| Bell | bell | 8 masses struck in mode 2 with the chain's full stretch: inharmonic, a sub-partial beneath, damped | 0.15 (single notes) |
-| Pluck | bass | 12 masses at the fastest clock: each note flares bright as energy flows up, then damping settles it round | 0.12 (single notes) |
-| Thermal | texture | 24 masses past the crossing: a slow-churning, shimmering cloud | 0.39 (a four-note cluster) |
+| Bell | bell | 8 masses struck in mode 2 with the chain's full stretch: inharmonic, a sub-partial beneath, damped | 0.14 (single notes) |
+| Pluck | bass | 12 masses at the fastest clock: each note flares bright as energy flows up, then damping settles it round | 0.11 (single notes) |
+| Thermal | texture | 24 masses past the crossing: a slow-churning, shimmering cloud | 0.35 (a four-note cluster) |
 | Flutter | keys | 8 masses at the fastest clock: the breath becomes a quick bright flutter, lightly damped | 0.37 (four-note chords) |
 
 Presets ship with full sustain and release 20000 (`machine.json`), so a
@@ -92,88 +107,90 @@ in the same roles, on the same phrases, through each engine's own `render()`:
 
 | Sound | Role | RMS dBFS | Peak | Crest dB | Tonal dB | Centroid Hz (10–90%) | Roughness | Pitch c (median / worst) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Fermi Breath | pad | −19.2 | 0.50 | 13.2 | 34.3 | 432 (303–514) | 0.09 | 0.3 / 2.1 |
+| Fermi Breath | pad | −19.1 | 0.55 | 13.9 | >60 | 409 (316–533) | 0.08 | 0.3 / 2.1 |
 | Orbit Dusk Pad | pad | −18.0 | 0.54 | 12.6 | >60 | 312 (257–366) | 0.10 | 0.9 / 27.6 |
 | Hollow Choir | pad | −20.5 | 0.51 | 14.7 | >60 | 773 (722–850) | 0.17 | 2.4 / 5.8 |
 | Fermi Organ | organ | −18.8 | 0.47 | 12.2 | 29.6 | 327 (314–366) | 0.04 | 0.1 / 0.6 |
 | Orbit Drawbars | organ | −17.6 | 0.54 | 12.2 | >60 | 638 (574–770) | 0.05 | 0.3 / 11.7 |
-| Fermi Tsingou | long pad | −18.6 | 0.48 | 12.2 | 29.4 | 383 (318–480) | 0.07 | 0.1 / 1.3 |
-| Fermi Clarinet | lead | −25.6 | 0.12 | 7.3 | 17.8 | 515 (384–654) | 0.00 | 0.1 / 0.1 |
+| Fermi Tsingou | long pad | −18.6 | 0.52 | 12.9 | 30.4 | 372 (321–463) | 0.07 | 0.1 / 1.3 |
+| Fermi Clarinet | lead | −25.6 | 0.12 | 7.2 | 17.8 | 512 (390–654) | 0.00 | 0.1 / 0.1 |
 | Wane Clean | lead | −25.7 | 0.17 | 10.4 | >60 | 918 (769–1128) | 0.02 | 0.1 / 17.0 |
-| Fermi Bell | bell | −28.6 | 0.15 | 12.1 | 28.5 | 1492 (1219–2431) | 0.02 | 0.0 / 0.1 |
+| Fermi Bell | bell | −28.8 | 0.14 | 11.9 | 28.9 | 1448 (1201–2373) | 0.02 | 0.0 / 0.1 |
 | Moth Bell | bell | −25.5 | 0.17 | 10.4 | 29.0 | 1725 (1324–2320) | 0.01 | 0.4 / 1.9 |
 | Bloom Glass Bells | bell | −30.3 | 0.17 | 15.0 | 26.8 | 3374 (2265–4956) | 0.02 | 0.0 / 0.1 |
-| Fermi Pluck | bass | −28.1 | 0.12 | 9.7 | 15.7 | 95 (67–141) | 0.07 | 0.4 / 1.6 |
+| Fermi Pluck | bass | −28.4 | 0.11 | 9.5 | 17.5 | 93 (66–134) | 0.07 | 0.4 / 1.6 |
 | Bend Wah Bass | bass | −30.0 | 0.13 | 12.2 | 13.3 | 214 (189–268) | 0.16 | 3.3 / 8.3 |
 | Moth Marimba | bass | −32.9 | 0.14 | 15.9 | 10.9 | 93 (73–125) | 0.01 | (its pitch is not the key's) |
-| Fermi Thermal | texture | −21.9 | 0.39 | 13.7 | 24.5 | 909 (644–1089) | 0.11 | 0.1 / 0.2 |
+| Fermi Thermal | texture | −23.5 | 0.35 | 14.3 | 23.0 | 832 (588–964) | 0.10 | 0.1 / 0.2 |
 | Bloom Fog | texture | −21.3 | 0.42 | 13.7 | >60 | 569 (436–773) | 0.32 | 3.5 / 7.6 |
 | Hollow Whisper | texture | −21.8 | 0.44 | 14.8 | 1.6 | 2914 (2477–3414) | 0.48 | (breath noise) |
-| Fermi Flutter | keys | −23.4 | 0.37 | 14.7 | >60 | 476 (447–541) | 0.08 | 0.2 / 0.4 |
+| Fermi Flutter | keys | −23.4 | 0.37 | 14.7 | >60 | 480 (448–540) | 0.08 | 0.2 / 0.4 |
 
-- **Level and peaks** match Hexagon's in every role. Chords peak at 0.39 to
-  0.50.
+- **Level and peaks** match Hexagon's in every role. Chords peak at 0.35 to
+  0.55 (Hexagon's pads 0.51 to 0.54).
 - **Pitch:** every Fermi note sits within 2.1 cents of its key.
-- **Roughness** is low throughout. Thermal's (0.11) is a third of Bloom
+- **Roughness** is low throughout. Thermal's (0.10) is a third of Bloom
   Fog's.
-- **Tonality:** the breathing's slow motion counts against this figure, so
-  pads read 29–34 dB against 60+ for Hexagon's static waves. Short notes in
-  its 0.37 s window read low too: Clarinet 18 dB, though a held note reads
-  60+.
-- **Clicks:** none in any Fermi render.
+- **Tonality:** the breathing's motion counts against this figure, so the
+  slower-moving pads read 29–30 dB against 60+ for Hexagon's static waves.
+  Short notes in its 0.37 s window read low too: Clarinet 18 dB, though a
+  held note reads 60+.
+- **Clicks:** none from Fermi. The one the measurement finds in Tsingou's
+  five-note chords is the renderer's: it gives a new note a voice whose last
+  note is still releasing and restarts that voice's envelope at zero, a cut
+  the OP-XY's own voice stealing smooths.
 
 ## Screen
 
-One object, engraved in greys and fine line (`tools/make_panel.py`): **the
-chain as a laboratory apparatus.**
+One object, drawn boldly in two weights of line and three greys
+(`tools/make_panel.py`): **the chain as a laboratory apparatus.** The chain
+is brightest, the apparatus around it a step down, and the swing's ghost
+faint.
 
 ![Fermi's screen: energy drawing the chain back, a breathing note, the crossing into chaos, then eight bobs on cubic coils](docs/fermi.gif)
 
 - **The apparatus:**
-  - Brass bobs strung on coil springs between the hooks of two retort
-    stands, on a wooden plank.
-  - A **stroboscope** on the base, clocked by a **regulator pendulum** hung
-    from the left stand, lights the bobs once a period of the struck
-    mode, at the peak of that mode's own swing. It locks to the mode itself,
-    since loading the springs shifts its period. So the struck mode stands
-    still and only the energy's flow moves the shape. While the chain
-    breathes, the arch ripples into higher modes and comes back clean at each
-    return. In chaos it shivers.
+  - Brass bobs strung on coil springs between the clamps of two retort
+    stands, on a plank.
+  - A **stroboscope** on the plank, clocked by a **regulator pendulum** hung
+    from the left stand, lights the bobs once a period of the struck mode,
+    at the peak of that mode's own swing. It locks to the mode itself, since
+    loading the springs shifts its period. So the struck mode stands still
+    and only the energy's flow moves the shape. While the chain breathes,
+    the arch ripples into higher modes and comes back clean at each return.
+    In chaos it shivers.
   - A faint ghost around the chain holds the swing's recent extremes, like a
     long exposure.
-  - An **index board** behind the chain carries a harmonic index: a
-    graduation at each harmonic, and a needle per partial that brightens while
-    its mode holds energy.
-  - A brass plate on the plank, solid so the grain stops at its edge, reads
-    *FPUT 1955*.
+  - A felt damper on a long lever from the right stand.
 - **Every control moves a part of it.** `docs/controls.png` shows each
-  control at 0, 50 and 100 with the others at their defaults:
+  control at 0, 50 and 100 with the others at their defaults, and
+  `docs/controls-1x.png` the same at the screen's own size:
   - **Energy** draws the chain back before the note, from a 4 px arch to a
     34 px one.
   - **Masses** sets the number of bobs (8 to 32), which shrink as they crowd.
-  - **Springs** swaps the coils. Quadratic coils are open, conical and
-    dim (they stiffen one way). Cubic coils are straight, tall and white
-    (alike both ways).
+  - **Springs** swaps the coils. Quadratic coils are open, conical and grey
+    (they stiffen one way). Cubic coils are straight, tall and white (alike
+    both ways).
   - **Time** slides the regulator's bob down its rod, from fast near the
     knife edge to slow at the rod's foot: the longer the pendulum, the slower
     the clock. While a note runs, the pendulum swings once a breath, out at
     each flash of the lamp.
   - **Dispersion** sizes the bobs. At 0 they are beads on what is nearly a
     continuous spring, and a continuous string is harmonic. At 100 they are
-    lumped into heavy bobs: a lattice, which disperses. The needles on the
-    index fall short of their graduations as well.
+    lumped into heavy bobs: a lattice, which disperses.
   - **Mode** sets the arch's humps.
-  - **Damping** lowers a long felt-tipped lever from the right stand down
-    onto the chain.
-  - **Seed** presses a flagged pin down on the bob it nudges hardest, denting
-    the arch by 6 px. The pin lifts off when a note lets the chain go. With
-    the seed off, there is no pin.
+  - **Damping** lowers the felt pad from above the chain onto it.
+  - **Seed** reshapes the arch itself: between notes the chain is drawn in
+    the next note's starting shape, its nudge drawn three times over so it
+    reads, and a flagged pin marks the bob the nudge moves most. The pin
+    lifts off when a note lets the chain go.
 
 ![Each control at 0, 50 and 100](docs/controls.png)
 
-The sheet is at 1:1, each cell 480 x 220 like the screen, lettered in the
-device's face. The artwork is drawn for that size: no part under about 3 px,
-no lines closer than 3 px, no lettering under 8 px.
+The sheets are lettered in the device's face, and `docs/controls-1x.png` is
+at 1:1, each cell 480 × 220 like the screen. The artwork is drawn for that
+size: no part under about 3 px, no lines closer than 3 px, and no lettering
+of its own.
 
 The screen cannot hear the voices. It runs its own copy of the latest note's
 chain with the same code (`chain.h`), a block of time at a time. With the
@@ -186,10 +203,10 @@ the chain eases back to its drawn rest. Motion eases out in 0.15 s, and
 reduced motion snaps. A bob moves with both its coils, three nodes at a time,
 so the chain never tears, however the budget falls. The idle screen is still.
 
-**Churn** (host, the GIF's 31 s scene): a mean of 8.3 nodes a frame at
-60 fps and 10.2 at 30 fps, peaking at 21 at a note-on or a change of masses.
-The swinging pendulum is 2 of those a frame. Idle: 0. The artwork has 42
-static paths and 147 nodes, and is 49 KB (the preview's limit is 64 KiB).
+**Churn** (host, the GIF's 31 s scene): a mean of 8.9 nodes a frame at
+60 fps and 10.4 at 30 fps, peaking at 20 at a note-on or a change of masses.
+The swinging pendulum is 2 of those a frame. Idle: 0. The artwork has 15
+static paths and 115 nodes, and is 39 KB (the preview's limit is 64 KiB).
 
 ## How it works
 
@@ -216,12 +233,13 @@ integers only.
   - A guard every fourth block restrikes a chain that ever left the force's
     range. No test reaches it.
 - **The clock.** Each block runs a whole number of steps, at most 96/N: 12
-  for 8 masses, 3 for 32. Time slows it by up to 2^8.
+  for 8 masses, 3 for 32. Time slows it by up to 2^4.5.
 - **Calibration.** `tools/calibrate.py` simulates every masses, mode and
   springs setting in double precision. For each it finds where mode m stays
   pure, where it gives up 70% and comes back, and where the spectrum
-  thermalizes. The energy knob runs through those three on log scales. The
-  same runs measure the breathing period for the time caption and the
+  thermalizes. The energy knob runs through those three on log scales, the
+  first 0.22 of the way to the second in its first twentieth. The same runs
+  measure the breathing period for the time caption and the
   strobe's flashes.
 - **Voicing.**
   - A third of the modes are projected each block, in turn. Each one's energy
@@ -229,11 +247,22 @@ integers only.
   - Each partial's level is the square root of its mode's share (a table
     square root), eased an eighth of the way each time.
   - The lowest min(N, 10) modes are voiced. Partial k sits at the key times
-    ω_k/ω_m, blended toward k/m by dispersion. Increments are recomputed only
-    when the pitch, the dispersion or the chain changes.
+    k/m + D(ω_k/ω_m − k/m): harmonic at D = 0, the chain's own at D = 1.
+    Dispersion runs D from 0 to the value that sets the top voiced partial
+    500 cents flat, from 0.86 for 8 masses to 6.8 for 32.
+  - Springs fades the partials at even multiples of the struck mode, which
+    the cubic law never feeds, by its own amount, so the cubic chain's hollow
+    tone arrives across the knob rather than at its end.
+  - Increments and these fades are recomputed only when the pitch, the
+    dispersion, the springs or the chain changes.
   - Above the struck mode, levels are tilted by √(m/k). A gain taken once a
     block restores the chain's own total, so the tilt changes colour, not
     loudness.
+- **The seed.** Each note starts in the same shape: mode m at its widest
+  plus the seed's nudge, modes 1 to 6 (but m) at random amplitudes falling
+  as 1/k. The two are scaled so the nudge takes its share of the springs'
+  energy and the struck mode the rest. Voices share the shape, made once for
+  a seed, masses and mode.
 - **Synthesis.**
   - Ten table oscillators run two to a pass, with levels stepped every 16
     samples. A note's first block ramps every sample, so the attack never
@@ -294,13 +323,15 @@ a voice block runs about:
 - and up to 1,200 of straight-line code, counted as if it all ran.
 
 That is about 14,300, and 14,900 at most. A note's first block costs about
-2,000 more for its per-sample ramps. Ten voiced partials are what fit this
-budget.
+2,000 more for its per-sample ramps; the seed's starting shape is made once
+for every note that shares it (about 1,400 instructions, when the seed,
+masses or mode change). Ten voiced partials are what fit this budget.
 
-- `sdk.py test --firmware` compiles for the Blackfin: Fermi is 91.3 KiB of
+- `sdk.py test --firmware` compiles for the Blackfin: Fermi is 89.5 KiB of
   the 2040 KiB module region.
 - There is no division per sample, and one per block (the tilt's gain).
-- **Memory:** a voice is 552 bytes and the screen state 1,044.
+- **Memory:** a voice is 556 bytes, the voices' shared starting shape 140
+  and the screen state 1,060.
 
 ## Tests
 
@@ -314,17 +345,19 @@ budget.
   double precision swings 0.63%, 1.74% and 4.23%: the swings are the
   leapfrog's own, and fixed point adds none.
 - **Recurrence:** at energy 0.5, mode 1 falls to 0.24 and returns to 0.988 at
-  the stated period for 16 masses (4.9 s at the default time). It returns to
+  the stated period for 16 masses (4.8 s at the default time). It returns to
   0.991 for 8 masses, 0.986 for 24 and 0.982 for 32.
-- **Equipartition:** at energy 1, time-averaged mode shares come within 0.85
-  to 1.36 of equal.
+- **Equipartition:** at energy 1, time-averaged mode shares come within 0.77
+  to 1.23 of equal.
 - **Still at energy 0:** mode 2 stays 46 dB down, and the tone's harmonics
-  hold within 0.09 dB.
-- **Damping:** it darkens a chaotic note. The mean mode number falls from 3.7
-  to 2.6, while the lossless chain rises to 5.3.
-- **Seed:** it changes chaotic runs and not recurrent ones (figures above).
-- **Dispersion:** partials sit within 0.1 cent of ω_k/ω_1, or of k at
-  dispersion 0.
+  hold within 0.07 dB.
+- **Damping:** it darkens a chaotic note. The mean mode number falls from 3.0
+  to 2.3, while the lossless chain rises to 6.8.
+- **Seed:** the nudge takes the energy share the caption states (0.23, 0.42
+  and 0.66 for seeds 16, 32 and 63), all of it in modes 2 to 6, and the
+  note's energy stays within 1.3% of the plain note's.
+- **Dispersion:** at 8 masses, partials sit within 0.1 cent of
+  k + D(ω_k/ω_1 − k) at dispersion 1, or of k at dispersion 0.
 - **Level:** as above.
 
 `tests/screen.cpp` checks:
@@ -357,7 +390,7 @@ clock and voices the energy flow between its modes.
 | `tools/calibrate.py`, `tools/calibration.json` | The energy knob's and the clock's calibration |
 | `tests/sound.cpp`, `tests/screen.cpp` | Host checks |
 | `tools/render.cc`, `tools/phrases.py`, `tools/sweep.py`, `tools/measure.py` | Phrase renders, Hexagon comparisons, the control sweep and the measurements |
-| `tools/make_gif.py` | `docs/fermi.gif`, `docs/controls.png`, and stills such as `docs/breathing.png`, `docs/into-chaos.png` and `docs/cubic.png` |
+| `tools/make_gif.py` | `docs/fermi.gif`, `docs/controls.png` and `docs/controls-1x.png`, and stills such as `docs/breathing.png`, `docs/into-chaos.png` and `docs/cubic.png` |
 
 Each tool's usage is at the head of its file. `tools/phrases.py` and
 `tools/sweep.py` take an Open-XY SDK checkout (`--sdk`) and an output folder

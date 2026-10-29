@@ -64,8 +64,10 @@ for c, name in enumerate(names):
             size = (16 * g) ** 2
             home = int(values[0] * (span - size + 1))
             window = source[home:home + size]
-        else:
+        else:   # the window from the start to ending at the end; longer, it wraps and pos turns it
             size = g * g * slices[sl] * 1378.125
+            room = span - size if span > size else span - slices[sl] * 1378.125
+            home = int(values[0] * room)
             idx = (home + np.arange(int(size))) % span
             window = source[idx]
         unscrambled = np.tile(window, len(out) // max(1, len(window)) + 2)[:len(out)]
@@ -74,7 +76,7 @@ for c, name in enumerate(names):
             p, o = out[b * BAR:(b + 1) * BAR], unscrambled[b * BAR:(b + 1) * BAR]
             k = np.sqrt(np.mean(p ** 2)) / (np.sqrt(np.mean(o ** 2)) + 1e-12)
             ds.append(np.sqrt(np.mean((p - o * k) ** 2)) / (np.sqrt(np.mean(p ** 2)) + 1e-12))
-        caption = {"pos": f"{values[0] * span / RATE:.2f}s", "grid": f"{g}x{g}", "slice": slice_names[sl],
+        caption = {"pos": f"{home / RATE:.2f}s", "grid": f"{g}x{g}", "slice": slice_names[sl],
                    "map": maps[pick(values[3], 6)], "step": f"{v * 25}", "rate": rates[pick(values[5], 8)],
                    "depth": f"{v * 25}%", "chrd": chords[pick(values[7], 7)]}[name]
         peak = 20 * np.log10(np.abs(out).max() / 2 + 1e-12)
@@ -82,6 +84,7 @@ for c, name in enumerate(names):
             p, o = out[:BAR], unscrambled[:BAR]
             k = np.sqrt(np.mean(p ** 2)) / (np.sqrt(np.mean(o ** 2)) + 1e-12)
             ds = [np.sqrt(np.mean((p - o * k) ** 2)) / (np.sqrt(np.mean(p ** 2)) + 1e-12)]
-            caption = f"{min(int(values[4] * 3), 2)}/3"
+            position = round(values[4] * 2 * 10) / 10   # step runs from iteration 0 to the last (2 of 3)
+            caption = f"{position:g}/3"
         cells.append(f"{caption}: {np.mean(ds):.2f}, {on_grid(onsets(out)):.2f}, {peak:.1f}")
     print(f"| **{name}** | " + " | ".join(cells) + " |")

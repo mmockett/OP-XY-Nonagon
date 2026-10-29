@@ -89,6 +89,17 @@ out += ["// Partial k's ratio to the struck mode's: the chain's, ratio[(n * 4 + 
         "// and harmonic, harmonic[(m - 1) * 17 + k].",
         arr("ratio", "u32", ratio), arr("harmonic", "u32", harmonic), ""]
 
+# Dispersion's reach: the blend toward the chain's own ratios that sets the top
+# voiced partial (struck in mode 1) 500 cents flat, Q12. Below 1 for small
+# chains, whose own law is already steeper; above 1 for large ones.
+TOP_FLAT = 1 - 2 ** (-500 / 1200)
+stretch = []
+for N in NS:
+    top = min(N, 10)
+    stretch.append(round(4096 * min(8.0, TOP_FLAT / (1 - omega(N, top) / omega(N, 1) / top))))
+out += ["// Dispersion 1's blend toward the chain's own ratios, Q12: the top voiced partial 500 cents flat.",
+        arr("stretch", "u32", stretch), ""]
+
 # The energy knob: log2 of the strengths pure, deep and thermal (Q12) at the
 # five springs positions; and log2 of the breathing period in chain time
 # units (Q12) at nine energy positions.
@@ -114,8 +125,8 @@ out += ["// 2^(i / 256) - 1, Q16.",
         arr("exp2_fraction", "u16", [min(65535, round(65536 * (2 ** (i / 256) - 1))) for i in range(257)]), ""]
 
 # The screen's: the masses' spacing, reciprocals and log2.
-out += ["// The spacing of weights between hooks 404 px apart, Q10.",
-        arr("spacing", "u32", [round(404 * 1024 / (N + 1)) for N in NS]),
+out += ["// The spacing of bobs between hooks 348 px apart, Q10.",
+        arr("spacing", "u32", [round(348 * 1024 / (N + 1)) for N in NS]),
         "// 1 / i, Q16, for i = 0..64 (0 unused).",
         arr("reciprocal", "u32", [0] + [round(65536 / i) for i in range(1, 65)]),
         "// 1 / (i / 4) px, Q20, for lengths in quarter pixels, i = 0..255 (0 unused).",

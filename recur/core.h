@@ -42,7 +42,8 @@ struct Voice {
     u32 carry;               // the passes' lengths' fractions, Q8
     u32 iteration;           // iterations rate has moved on since the note began
     u32 counted;             // 64th notes since the last iteration
-    u32 moving[2], moving_key;   // which cells move at this depth, for this map and square
+    Orbits orbits;           // which cells move at this depth, and which start a step ahead
+    u32 moving_key, ahead_key;   // the map, square and depth, and step's fraction, they were worked out for
     Mat gather;              // the inverse map's power for one iteration
     u32 gather_key;
     // The hiss path.

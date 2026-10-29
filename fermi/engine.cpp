@@ -5,7 +5,9 @@
 // one mode, and the sound is its modes' energies, voiced. Mode k is a partial
 // at the note's pitch times w_k / w_m (the chain's own dispersion, slightly
 // flat of harmonic, blended toward k / m by dispersion), with the square root
-// of the mode's share of the energy as its amplitude. Two touches make it an
+// of the mode's share of the energy as its amplitude. Springs, moving toward
+// the cubic law that never feeds them, also fades the partials at even
+// multiples of the struck mode. Two touches make it an
 // instrument: each partial carries a little body (its own second and third
 // harmonics, while they fit under Nyquist), and the modes above the struck
 // one are tilted down by sqrt(m / k), the note's loudness held, so a
@@ -27,7 +29,8 @@ const u32 fade_to = 1932735283u;            // ...to silence at 0.45
 const i32 ceiling = 1 << 30;                // half scale
 }
 
-inline void initialize(Voice& voice, Shared&, opxy::u32) {
+inline void initialize(Voice& voice, Shared& shared, opxy::u32) {
+    shared.key = 0;
     for (u32 k = 0; k < chain::voiced; ++k) {
         voice.phase[k] = 0;
         voice.amp[k] = 0;
@@ -38,6 +41,7 @@ inline void initialize(Voice& voice, Shared&, opxy::u32) {
     }
     voice.key = 0;
     voice.dispersion = -1;
+    voice.springs = -1;
     voice.turn = 0;
     voice.chain.n = 0;
     voice.fresh = 1;
@@ -85,7 +89,7 @@ inline void pair_ramped(i32* out, const i16* w1, u32& p1, u32 i1, i32 from1, i32
     p2 = q2;
 }
 
-inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
+inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
                    opxy::Parameters parameters, opxy::Pitch pitch) {
     using namespace sound;
     chain::Setup s;
@@ -95,7 +99,14 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
     // A new note, or a new chain: masses and the struck mode restart it.
     const bool load = voice.fresh || s.n != c.n || s.m != c.m;
     if (load) {
-        chain::init(c, s);
+        // The starting shape is made once for all the notes that share it:
+        // the seed's nudge costs about 1,400 instructions at 32 masses.
+        const u32 key = ((s.seed << 8) | (s.size << 4) | s.m) + 1;
+        if (shared.key != key) {
+            chain::shape(shared.start, s);
+            shared.key = key;
+        }
+        chain::init(c, s, shared.start);
         voice.fresh = 0;
     }
     const u32 steps = chain::advance(c, s);
@@ -115,7 +126,8 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
     }
 
     // Each partial's increment, from the mode's ratio to the struck mode's:
-    // the chain's own, blended toward harmonic. Partials near Nyquist fade.
+    // the chain's own, blended toward harmonic. Partials near Nyquist fade,
+    // and those at even multiples of the struck mode fade with springs.
     const u32 key = pitch[0];
     const u32* chain_ratio = &tables::ratio[(c.size * 4 + c.m - 1) * 17];
     const u32* harmonic = &tables::harmonic[(c.m - 1) * 17];
@@ -132,23 +144,29 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
     const u32 lean = chain::root(leaned);
     u32 hold = lean ? (chain::root(plain) << 12) / lean : 4096;   // Q12, once a block
     hold = hold > 16384 ? 16384 : hold;
-    // The increments (and their fades toward Nyquist) change only with the
-    // pitch, the dispersion or the chain.
+    // The increments (and their fades) change only with the pitch, the
+    // dispersion, the springs or the chain.
     const u32 third = fade_to / 3;   // the body's third harmonic stays under 0.45 of the rate
-    if (load || key != voice.key || s.dispersion != voice.dispersion) {
+    if (load || key != voice.key || s.stretch != voice.dispersion || s.springs != voice.springs) {
+        const u32 even = static_cast<u32>(32768 - s.springs);   // Q15: gone at the cubic law
+        u32 next = 2 * c.m;                                      // the next even multiple, 1-based
         for (u32 k = 0; k < chain::voiced; ++k) {
+            const bool doubled = k + 1 == next;   // an even multiple of the struck mode
+            if (doubled) next += 2 * c.m;
             voice.inc[k] = 0;
             voice.fade[k] = 0;
             if (k >= count) continue;
             const i32 h = static_cast<i32>(harmonic[k + 1]), r = static_cast<i32>(chain_ratio[k + 1]);
-            const u32 ratio = static_cast<u32>(h + ((((r - h) >> 4) * s.dispersion) >> 11));   // Q16
+            const u32 ratio = static_cast<u32>(h + ((((r - h) >> 4) * s.stretch) >> 11));   // Q16
             const u32 scaled = static_cast<u32>(multiply(static_cast<i32>(key >> 1), static_cast<i32>(ratio << 10)));
             if (scaled >= (fade_to >> 6)) continue;
             voice.inc[k] = scaled << 6;   // key x ratio / 64, back to Q32
             voice.fade[k] = voice.inc[k] > fade_from ? (((fade_to - voice.inc[k]) >> 13) * 1280) >> 10 : 32768;
+            if (doubled) voice.fade[k] = (voice.fade[k] * even) >> 15;
         }
         voice.key = key;
-        voice.dispersion = s.dispersion;
+        voice.dispersion = s.stretch;
+        voice.springs = s.springs;
     }
     const i16* wave[chain::voiced];
     i32 gains[chain::voiced][4];   // each partial's level over the block's four quarters, Q16

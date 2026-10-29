@@ -4,23 +4,21 @@
 
 namespace coin {
 // Matches resources.display in definition.json: paths, points, nodes, texts, palette.
-using Frame = opxy::draw::Frame<4, 64, 104, 16, 16>;
+using Frame = opxy::draw::Frame<4, 64, 86, 16, 16>;
 
 // Nodes, as tools/make_panel.py writes them into panel.svg.fragment.
 namespace node {
 const u32 disk = 0, edge = 1, reflection = 2, face = 3,   // the note's disk: the reshaping outlines
           header = 4,                                     // the two-page header's eight bar steps
           trail = 12, trails = 24,                        // the contact path's motion lines
-          scuff = 36, scuffs = 8,                         // slip's scuffs on the base
-          weight = 44,                                    // the eccentric weight on the face
-          glint = 45,                                     // the contact point
-          mirror_mark = 46, mirror_marks = 6,             // each base's surface marks
-          grain = 52, grains = 5,
-          speck = 57, specks = 10,
-          companion = 67,                                 // three disks for many: face, edge, reflection, glint
-          air = 79, airs = 5,                             // the air squeezed from under the low edge
-          ripple = 84, ripples = 8,                       // the ring's ripples across the mirror
-          ghost = 92, ghosts = 12;                        // wobble's ghost of the rim, in dashes
+          weight = 36,                                    // the eccentric weight on the rim
+          glint = 37,                                     // the contact point
+          grain = 38, grains = 5,                         // wood's grain
+          speck = 43, specks = 6,                         // stone's four specks and two veins
+          companion = 49,                                 // three disks for many: face, edge, reflection, glint
+          air = 61, airs = 5,                             // the air squeezed from under the low edge
+          ripple = 66, ripples = 8,                       // the ring's ripples across the mirror
+          ghost = 74, ghosts = 12;                        // wobble's ghost of the rim, in dashes
 }
 
 // The projection (make_panel.py has the same): X right, Y away, Z up, pixels

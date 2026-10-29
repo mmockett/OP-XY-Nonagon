@@ -169,6 +169,15 @@ inline void stir(i32* d, i32* s, i32 x0, i32 amount) {
         s[i] = depth;
     }
 }
+// How far a note's stir takes a drink still settling toward a fresh one
+// (stir), Q15: the square root of the control, so each quarter of its travel
+// scoops a second note about as much further.
+inline i32 restir(i32 control) {
+    const u32 c = q16(control);
+    if (!c) return 0;
+    const u32 r = exp2_int((log2_q16(c) + 14 * octave) / 2);
+    return r > 32767u ? 32767 : static_cast<i32>(r);
+}
 // The spoon's tapping rate, Q32 cycles a block: 0.5 to 12 Hz, 0 for a single tap.
 inline u32 tap_step(i32 control) {
     const u32 c = q16(control);

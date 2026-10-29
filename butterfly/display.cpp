@@ -4,14 +4,10 @@
 // drawn in Moth's line. Each wing is the chain, in two zones.
 //
 // Its breadth, from the body out to the submarginal band, is the chain from
-// its middle site to its end. Three pigment bands, at sites 0, 4 and 8, are
-// dark or pale with the strike's density there: even below lambda = 1, where every
-// state spreads, and gathered at the struck site above it, where they
-// localize. The localized states are eyespots, at their sites and energies.
-// The lit band lies at the struck site and rings with the gate: one thin
-// line at no strike, a broad band between two bright edges at full strike,
-// and on it a row of lunules, filled scales, pinpricks at no strike and
-// bright 6 px spots at full.
+// its middle site to its end. The localized states (above lambda = 1) are
+// eyespots, at their sites and energies. The lit band lies at the struck
+// site and rings with the gate: a fine grey line at no strike, a bold
+// near-white one at full.
 //
 // Outside it the margin is the spectrum, read from the forewing's leading
 // edge (the top) round to the hindwing's tail (the bottom): each band of the
@@ -19,9 +15,13 @@
 // Tilt sweeps the forewing back over the hindwing, as it darkens the top of
 // the spectrum; glow draws a swallowtail's tail out of the hindwing, none at
 // 40 ms and long at 8 s, as it draws out the ring. Spread is the wingspan;
-// the wingbeat breathes the wings while a note sounds; strike widens the lit
+// the wingbeat breathes the wings while a note sounds; strike lights the lit
 // band and stands the antennae up, short and folded back at none, long and
 // upright at full, and a strike flicks them.
+//
+// Three weights: the margin, white and 2 px; the lit band, 1 to 1.6 px; the
+// veins, rings and antennae a step down (the palette's brighter greys draw
+// heavier lines).
 //
 // The wings are the chain's two halves, mirror images as the chain is. The
 // screen reads the tables as the engine does (harper.h): a solve costs about
@@ -36,13 +36,12 @@ const i32 flick_time = 205;       // Q10 seconds: the antennae flick out and bac
 const i32 sweep_per_tilt = 70;    // tenths of a degree the forewing sweeps back a unit of tilt (21 degrees at 3)
 const i32 tail_longest = 40;      // px: the tail at the longest glow, while the screen's foot allows
 const i32 foot = 88;              // px below the centre the tail may reach (212, its strap and stroke within 216)
-const i32 lunule_small = 640;     // Q10 of the artwork's 3 px radius: the smallest lunule shown (2 at full)
-const i32 lit_thin = 197, lit_broad = 2294;   // the lit band's half width at no strike and full, Q15 of the reach (0.006, 0.07)
+const i32 lit_half = 98;          // the lit band's two edges, a hair either side of its share (0.003 of the reach): one line
 const i32 block_q16 = 95;         // a block, Q16 seconds
 const i32 bump = 3932;            // a state's lobe spans 0.12 of the spectrum either way, Q15
 const i32 lobe_low = 23593;       // the margin's reach at a gap and at a band, Q15: 0.72 to 1
-const i32 floor_reach = 22282;    // and never inside 0.68, clear of the veins and bands (0.66)
-enum { VEIN = 8, EDGE = 12, LIT_REST = 6, ANTENNA = 12, BAND_PALE = 5, BAND_DARK = 11 };
+const i32 floor_reach = 22282;    // and never inside 0.68, clear of the veins (0.66)
+enum { VEIN = 7, EDGE = 15, LIT_LOW = 7, LIT_HIGH = 13, LIT_MOST = 14, ANTENNA = 11, RING = 11 };
 // ---------------------------------------------------------------- captions
 
 // Decimal digits by subtraction (no division on the device): at least `width` of them.
@@ -113,6 +112,39 @@ inline void site_caption(char* out, i32 at) {
     if (!d) copy(out, header_capacity, "mid");
     else if (d >= 8) copy(out, header_capacity, "end");
     else digits(out, d, 1);
+}
+// Decibels down: "-21dB", "0dB".
+inline void down_caption(char* out, u32 db) {
+    if (db) {
+        out[0] = '-';
+        digits(out + 1, db, 1);
+    } else {
+        digits(out, 0, 1);
+    }
+    append(out, "dB");
+}
+// Strike: "pad" at none, "pluck" at full, else the held hum's level under
+// the strike, against a pad's: 20 log10 (1 - strike).
+inline void strike_caption(char* out, i32 knob, i32 struck) {
+    if (!knob) {
+        copy(out, header_capacity, "pad");
+    } else if (struck >= 32767) {
+        copy(out, header_capacity, "pluck");
+    } else {
+        const u32 down = static_cast<u32>((15 << 16) - log2_q16(static_cast<u32>(32767 - struck)));   // log2 units, Q16
+        down_caption(out, ((down >> 4) * 24660u + (1u << 23)) >> 24);                                  // x 6.02 dB
+    }
+}
+// Wingbeat: "off", else its beats a second, ".20Hz" to ".60Hz".
+inline void wingbeat_caption(char* out, i32 control) {
+    if (q15(control) <= 0) {
+        copy(out, header_capacity, "off");
+        return;
+    }
+    const u32 hundredths = 20u + ((40u * static_cast<u32>(q15(control)) + 16384u) >> 15);
+    out[0] = '.';
+    digits(out + 1, hundredths, 2);
+    append(out, "Hz");
 }
 
 
@@ -191,10 +223,8 @@ inline void margin_outline(Frame& frame, DisplayState& state, u32 side, const i3
     seal(frame, state, side, changed);
 }
 
-// A wing's lit band: a ribbon `width` (Q15 of the reach) either side of
-// `share`, out along every other margin point and back, swept and scaled.
-// Mutable outlines take no fill, so a broad band is its two bright edges,
-// with the lunules between them.
+// A wing's lit band: out along every other margin point a hair outside
+// `share` and back a hair inside, one line, swept and scaled.
 inline void lit_outline(Frame& frame, DisplayState& state, u32 side, i32 share, i32 width, i32 scale, i32 sweep) {
     const Turn back = rotation(-sweep);
     const i32 outer = (share + width) >> 3, inner = (share - width) >> 3;
@@ -276,26 +306,6 @@ inline void draw_wings(DisplayState& state, u32 alpha, i32 lambda, i32 at) {
         const i32 r = lobe_low + (((32768 - lobe_low) * swell[i]) >> 15);
         state.reach[i] = (r < floor_reach ? floor_reach : r) >> 3;   // Q12
     }
-    // The bands: the strike's density at sites 0, 4 and 8, the sum
-    // over states of how much the strike excites each and how much of it
-    // lives there; the densest is darkest.
-    const Grid g = grid(alpha, lambda);
-    i32 density[plate::bands_a_wing], densest = 1;
-    for (u32 b = 0; b < plate::bands_a_wing; ++b) {
-        i32 sum = 0;
-        for (u32 k = 0; k < partials; ++k) {
-            const i32 a = amplitude_at(g, k, plate::band_step * b) >> 1;   // Q14
-            sum += (s.weight[k] >> 2) * ((a * a) >> 14) >> 14;           // Q14 x Q14 >> 14
-        }
-        density[b] = sum;
-        densest = densest > sum ? densest : sum;
-    }
-    const i32 per_densest = reciprocal(densest << 2);   // Q16 of 1 / (Q14 >> -2)
-    for (u32 b = 0; b < plate::bands_a_wing; ++b) {
-        const i32 x = clamp(mul16(density[b] << 2, per_densest), 0, 65536);   // Q16
-        const i32 lifted = x * 2 - ((x >> 1) * (x >> 1) >> 14);              // 2x - x^2: a little density shows
-        state.band_shade[b] = static_cast<u32>(BAND_PALE + (((BAND_DARK - BAND_PALE) * lifted) >> 16));
-    }
     // The eyespots: the most localized states, at their energy along the
     // margin and their distance from the chain's middle out from the root.
     i32 centre[partials], spread[partials];
@@ -327,54 +337,29 @@ inline void draw_wings(DisplayState& state, u32 alpha, i32 lambda, i32 at) {
     state.lit_share = site_share(at >> 8);
 }
 
-// One wing's nodes at the wing's pose: its margin and lit band, veins,
-// bands and eyespots, the forewing's swept back with it.
-inline void place_wing(Frame& frame, DisplayState& state, u32 side, i32 scale, i32 light, i32 struck) {
+// One wing's nodes at the wing's pose: its margin and lit band, veins and
+// eyespots, the forewing's swept back with it.
+inline void place_wing(Frame& frame, DisplayState& state, u32 side, i32 scale, i32 light) {
     const i32 seen = light * 2 - ((light * light) >> 15);   // light (2 - light): a fading ring stays in view
     const i32 sweep = state.sweep;
     margin_outline(frame, state, side, state.reach, scale, sweep, state.tail);
-    lit_outline(frame, state, side, state.lit_share, state.lit_width, scale, sweep);
+    lit_outline(frame, state, side, state.lit_share, lit_half, scale, sweep);
     i32 x, y;
     on_screen(side, -plate::wing_middle * unit, 0, scale, x, y);
     place(frame, plate::edges + side, x, y, 2 * unit, EDGE, stroke);
-    // The lit band: brighter as the strike is harder, and brighter still as it rings.
-    const i32 ring_gain = 13107 + ((19661 * struck) >> 15);   // 0.4 to 1, Q15
-    const i32 lit_shade = LIT_REST + ((4 * struck) >> 15) + ((5 * ((seen * ring_gain) >> 15)) >> 15);
-    place(frame, plate::edges + 2 + side, x, y, 2 * unit, static_cast<u32>(lit_shade > 15 ? 15 : lit_shade), stroke);
-    // The lunules on the lit band, as large as it is broad, and smaller as
-    // it lies nearer the body (0.6 of their size at the root, all at the end);
-    // none below an eighth of the strike's breadth, so never a 1 px dot.
-    const Turn back = rotation(-sweep);
-    const bool beads = state.lit_width - lit_thin >= (lit_broad - lit_thin) >> 3;
-    const i32 near = 19661 + ((state.lit_share * 20480) >> 15);   // Q15
-    const i32 bead = ((lunule_small + (((state.lit_width - lit_thin) * 683) >> 10)) * near) >> 15;   // Q10, to 2
-    for (u32 j = 0; j < plate::lunules_a_wing; ++j) {
-        if (!beads) {
-            hide(frame, plate::lunules + side * plate::lunules_a_wing + j);
-            continue;
-        }
-        i32 lx, ly;
-        swept(plate::lunule_at[j], state.lit_share >> 3, sweep, back, lx, ly);
-        on_screen(side, lx, ly, scale, x, y);
-        place(frame, plate::lunules + side * plate::lunules_a_wing + j, x, y, clamp((bead * (scale >> 5)) >> 10, 1, 2 * unit),
-              static_cast<u32>(lit_shade > 15 ? 15 : lit_shade), fill_and_stroke);
-    }
+    // The lit band: brighter, so bolder, as the strike is harder (grey 7 to
+    // 13), and a step brighter still as it rings.
+    const i32 lit_shade = LIT_LOW + (((LIT_HIGH - LIT_LOW) * state.lit_strike + 16384) >> 15) + ((2 * seen) >> 15);
+    place(frame, plate::edges + 2 + side, x, y, 2 * unit, static_cast<u32>(lit_shade > LIT_MOST ? LIT_MOST : lit_shade), stroke);
     const Turn fore = rotation(side ? sweep : -sweep);
     on_screen(side, plate::pivot_x * unit, 0, scale, x, y);
-    for (u32 half = 0; half < 2; ++half) {
-        place(frame, plate::veins + 2 * side + half, x, y, scale >> 5, VEIN, fill_and_stroke);
-        if (!half) turn(frame, plate::veins + 2 * side, fore);
-        for (u32 b = 0; b < plate::bands_a_wing; ++b) {
-            const u32 n = plate::bands + (2 * side + half) * plate::bands_a_wing + b;
-            place(frame, n, x, y, scale >> 5, state.band_shade[b], fill_and_stroke);
-            if (!half) turn(frame, n, fore);
-        }
-    }
+    place(frame, plate::veins + 2 * side, x, y, scale >> 5, VEIN, fill_and_stroke);
+    turn(frame, plate::veins + 2 * side, fore);
+    place(frame, plate::veins + 2 * side + 1, x, y, scale >> 5, VEIN, fill_and_stroke);
     for (u32 j = 0; j < plate::eyes_a_wing; ++j) {
-        const u32 ring = plate::eyes + 2 * (side * plate::eyes_a_wing + j);
+        const u32 ring = plate::eyes + side * plate::eyes_a_wing + j;
         if (!state.spot_state[j]) {
             hide(frame, ring);
-            hide(frame, ring + 1);
             continue;
         }
         i32 sx = state.spot_x[j], sy = state.spot_y[j];
@@ -386,15 +371,14 @@ inline void place_wing(Frame& frame, DisplayState& state, u32 side, i32 scale, i
         }
         on_screen(side, sx, sy, scale, x, y);
         const i32 lit = mul16(state.spot_light[j] << 1, seen << 1) >> 1;   // Q15
-        const u32 shade = static_cast<u32>(11 + ((4 * (lit >> 11)) >> 4));
+        const u32 shade = static_cast<u32>(RING + ((3 * (lit >> 11)) >> 4));   // 11 to 13
         const i32 size = (state.spot_scale[j] * (scale >> 5)) >> 10;
         place(frame, ring, x, y, size, shade, stroke);
-        place(frame, ring + 1, x, y, size, shade - 2, fill_and_stroke);
     }
     state.drawn_scale[side] = scale;
     state.drawn_sweep[side] = sweep;
     state.drawn_tail[side] = state.tail;
-    state.drawn_width[side] = state.lit_width;
+    state.drawn_strike[side] = state.lit_strike;
 }
 }
 
@@ -440,7 +424,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     }
     // The latest strike's gate and wingbeat, a block at a time, while held;
     // let go, the light fades in about 0.2 s, as the amp envelope takes it.
-    const i32 struck = strike(p[STRIKE]), glow = glow_log2(p[GLOW]);
+    // The strike as the gate takes it, and the knob as the picture does, so
+    // the antennae and the lit band move evenly over its travel.
+    const i32 struck = strike(p[STRIKE]), knob = q15(p[STRIKE]), glow = glow_log2(p[GLOW]);
     const u32 rate = wingbeat_rate(p[WINGBEAT]);
     for (i32 t = dt * 64; t > 0; t -= block_q16) {
         if (held || state.blocks < pulse_blocks) {
@@ -454,22 +440,22 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             state.gate -= state.gate >> 6;
         }
     }
-    if (still && held) state.gate = (32767 - struck) * 24576;   // reduced motion: the held light at once
+    if (still && held) state.gate = held_level(0, struck, glow);   // reduced motion: the held light at once
 
     // The chain the wings show: as the engine's, easing to the controls in about 0.15 s.
     const u32 beat = held ? state.beat : 0, beat_site = held ? state.beat_site : 0;
     const u32 alpha = warp(flux(p[FLUX]), snap_pull) + static_cast<u32>(wingbeat_flux(p[WINGBEAT], beat));
     const i32 lambda = coupling(p[COUPLING]);
     const i32 at = clamp(site(p[SITE]) + wingbeat_site(p[WINGBEAT], beat_site), 0, 8 << 16);
-    // The wings' scale: spread's wingspan, 0.12 an octave of span, Moth's at
-    // 24 semitones (0.64 at 3, 1.1 at 48), breathing in by up to 28% with the wingbeat.
-    const i32 span = clamp(32768 + (((spread_log2(p[SPREAD]) - 65536) * 3932) >> 16), 0, 36045);
+    // The wings' scale: spread's wingspan, 0.1 an octave of span, 0.94 of
+    // Moth's at 24 semitones (0.64 at 3, 1.04 at 48, clear of the header),
+    // breathing in by up to 28% with the wingbeat.
+    const i32 span = clamp(30802 + (((spread_log2(p[SPREAD]) - 65536) * 3277) >> 16), 0, 34079);
     const i32 breath = (((q15(p[WINGBEAT]) * 9175) >> 15) * ((32768 - cosine(beat)) >> 1)) >> 15;   // 0.28 x amount x (1 - cos) / 2
     const i32 scale = (span * (32768 - breath)) >> 15;
-    // Tilt's sweep, glow's tail, strike's band.
+    // Tilt's sweep, glow's tail, strike's lit band.
     const i32 sweep = (((tilt(p[TILT]) >> 4) * sweep_per_tilt) + 2048) >> 12;
     const i32 tail = (q15(p[GLOW]) * tail_longest) >> 5;
-    const i32 width = lit_thin + (((lit_broad - lit_thin) * struck) >> 15);
     const i32 share = clamp(dt * 600, 0, 32768);   // Q15 of the gap a frame
     if (fresh || still) {
         state.eased_alpha = alpha;
@@ -478,7 +464,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         state.scale = scale;
         state.sweep = sweep;
         state.tail = tail;
-        state.lit_width = width;
+        state.lit_strike = knob;
     } else {
         const i32 da = static_cast<i32>(alpha - state.eased_alpha);
         state.eased_alpha += static_cast<u32>(da > -(1 << 14) && da < (1 << 14) ? da : (da >> 15) * share);
@@ -486,21 +472,20 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         state.eased_lambda += dl > -8 && dl < 8 ? dl : (dl * share) >> 15;
         state.eased_site += ds > -256 && ds < 256 ? ds : (ds >> 15) * share;
         state.scale += dw > -64 && dw < 64 ? dw : (dw * share) >> 15;
-        const i32 dv = sweep - state.sweep, dt2 = tail - state.tail, dh = width - state.lit_width;
+        const i32 dv = sweep - state.sweep, dt2 = tail - state.tail, dh = knob - state.lit_strike;
         state.sweep += dv > -2 && dv < 2 ? dv : (dv * share) >> 15;
         state.tail += dt2 > -256 && dt2 < 256 ? dt2 : (dt2 * share) >> 15;
-        state.lit_width += dh > -32 && dh < 32 ? dh : (dh * share) >> 15;
+        state.lit_strike += dh > -32 && dh < 32 ? dh : (dh * share) >> 15;
     }
 
     // The wings' shapes, when what they show moved, at most eight times a second.
     state.since += dt;
     if (fresh || state.since >= frame_gap) {
-        i32 old[plate::margin + 2 + plate::bands_a_wing + 4 * plate::eyes_a_wing];
+        i32 old[plate::margin + 2 + 4 * plate::eyes_a_wing];
         u32 n = 0;
         for (u32 i = 0; i < plate::margin; ++i) old[n++] = state.reach[i];
         old[n++] = state.lit_share;
         old[n++] = 0;
-        for (u32 b = 0; b < plate::bands_a_wing; ++b) old[n++] = static_cast<i32>(state.band_shade[b]);
         for (u32 j = 0; j < plate::eyes_a_wing; ++j) {
             old[n++] = state.spot_x[j];
             old[n++] = state.spot_y[j];
@@ -513,7 +498,6 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         for (u32 i = 0; i < plate::margin; ++i) changed = changed || old[n++] != state.reach[i];
         changed = changed || old[n++] != state.lit_share;
         ++n;
-        for (u32 b = 0; b < plate::bands_a_wing; ++b) changed = changed || old[n++] != static_cast<i32>(state.band_shade[b]);
         for (u32 j = 0; j < plate::eyes_a_wing; ++j) {
             changed = changed || old[n] != state.spot_x[j] || old[n + 1] != state.spot_y[j] || old[n + 2] != state.spot_scale[j] ||
                       old[n + 3] != static_cast<i32>(state.spot_state[j]) + (state.spot_light[j] >> 11) * 2;
@@ -542,9 +526,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const u32 side = (first + k) & 1;
         const i32 moved = state.scale - state.drawn_scale[side];
         const bool posed = state.sweep != state.drawn_sweep[side] || state.tail != state.drawn_tail[side] ||
-                           state.lit_width != state.drawn_width[side];
+                           (state.lit_strike >> 11) != (state.drawn_strike[side] >> 11);
         if ((state.dirty & (1u << side)) || moved >= 64 || moved <= -64 || posed) {
-            place_wing(frame, state, side, state.scale, light, struck);
+            place_wing(frame, state, side, state.scale, light);
             state.dirty &= ~(1u << side);
             state.turn = side ^ 1;
             if (!fresh) break;
@@ -553,12 +537,12 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
 
     // The antennae: stood up by the strike, folded back along the forewings
     // and short at none (35 degrees out, 0.7 of their length), upright and
-    // long at full (13 degrees in, 1.2), turned and drawn out from their
+    // long at full (13 degrees in, 1.05), turned and drawn out from their
     // bases; a strike flicks them out and back within 0.2 s.
     if (state.flick < flick_time) state.flick += dt;
     const i32 flicked = state.flick < flick_time / 2 ? 40 : state.flick < flick_time ? 20 : 0;   // tenths of a degree
-    const i32 out = 350 - ((struck * 480) >> 15) + ((flicked * struck) >> 15);
-    const i32 length = 717 + ((struck * 512) >> 15);   // Q10
+    const i32 out = 350 - ((knob * 480) >> 15) + ((flicked * knob) >> 15);
+    const i32 length = 717 + ((knob * 358) >> 15);   // Q10
     for (u32 side = 0; side < 2; ++side) {
         const Turn r = rotation(side ? out : -out);
         const i32 bx = side ? plate::antenna_x : -plate::antenna_x, by = plate::antenna_y;
@@ -575,11 +559,11 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     decimal(values[COUPLING], static_cast<u32>((lambda * 100 + 2048) >> 12), 2);
     digits(values[SPREAD], static_cast<u32>((spread_semitones(p[SPREAD]) + 128) >> 8), 1);
     append(values[SPREAD], "st");
-    header_amount(values[STRIKE], sizeof(values[STRIKE]), p[STRIKE]);
+    strike_caption(values[STRIKE], knob, struck);
     glow_caption(values[GLOW], glow);
     site_caption(values[SITE], site(p[SITE]));
-    decimal(values[TILT], static_cast<u32>((tilt(p[TILT]) * 10 + 32768) >> 16), 1);
-    header_amount(values[WINGBEAT], sizeof(values[WINGBEAT]), p[WINGBEAT]);
+    down_caption(values[TILT], static_cast<u32>((tilt(p[TILT]) * 8 + 32768) >> 16));   // the top partial's darkening
+    wingbeat_caption(values[WINGBEAT], p[WINGBEAT]);
     page_header(state.header, input, frame, titles, values, plate::header);
 }
 }

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Makes docs/controls.png, the contact sheet: one row a control, at 0, 25,
-50, 75 and 100 with the others at Specimen's, each 0.6 s into a held note, as
-the display code draws it (tests/screen.cpp's "controls" scenario). Each
-cell is the screen at 1:1, 480 x 220 pixels, in the device's face.
+"""Makes the contact sheets: one row a control, at 0, 25, 50, 75 and 100
+with the others at Specimen's, each 0.6 s into a held note, as the display
+code draws it (tests/screen.cpp's "controls" scenario), in the device's face
+when XY_FONT is set. docs/controls-1x.png is the screen at 1:1, each cell
+480 x 220 pixels, as the device shows it; docs/controls.png the same at 2x.
 
     python tools/make_controls.py --sdk ../open-xy [--chrome PATH]
 
@@ -20,7 +21,7 @@ VALUES = [0, 25, 50, 75, 100]
 parser = argparse.ArgumentParser()
 parser.add_argument('--sdk', required=True)
 parser.add_argument('--chrome', default=render.CHROME)
-parser.add_argument('--out', default=str(render.ROOT / 'docs' / 'controls.png'))
+parser.add_argument('--out', default=str(render.ROOT / 'docs'), help='the folder for controls.png and controls-1x.png')
 args = parser.parse_args()
 S = tempfile.mkdtemp(prefix='butterfly-controls-')
 frames = render.frames(args.sdk, S, 'controls')
@@ -39,5 +40,7 @@ html = f'{S}/sheet.html'
 open(html, 'w').write(f'<html>{render.head()}<style>{style}</style><body>{"".join(rows)}</body></html>')
 width = LABEL + len(VALUES) * (W + GAP)
 height = TOP + len(CONTROLS) * (H + GAP)
-render.screenshot(html, args.out, width, height, args.chrome)
-print('->', args.out, f'({width} x {height})')
+for scale, name in ((1, 'controls-1x.png'), (2, 'controls.png')):
+    out = os.path.join(args.out, name)
+    render.screenshot(html, out, width, height, args.chrome, scale)
+    print('->', out, f'({width * scale} x {height * scale})')

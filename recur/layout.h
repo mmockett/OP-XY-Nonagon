@@ -4,28 +4,25 @@
 
 namespace recur {
 // The screen's nodes: the header's bar (0..7), the tiles' squares, each map's
-// print in pieces, the prints' ghosts, depth's pins, the tape's bars, then the moving parts.
+// print in pieces, depth's pins, the tape's bars, then the moving parts.
 const opxy::u32 small_first = 8, large_first = 72;
-const opxy::u32 print_first[6] = {76, 102, 124, 144, 158, 178}, print_count[6] = {26, 22, 20, 14, 20, 16};
-// The ghosts: 1 copies of every print's main outline, a copy after another.
-const opxy::u32 ghost_first = 194, ghost_copies = 1, ghosts_a_copy = 7;
-const opxy::u32 ghost_count[6] = {1, 1, 1, 1, 2, 1};
-const opxy::u32 pin_first = 201, pin_count = 16, bar_first = 217, bar_count = 20,
-                pointer_node = 237, lever_node = 238, teeth_first = 239, teeth = 7,
-                rod_node = 246, weight_node = 247, key_first = 248, key_poses = 2, jaw_first = 250,
-                cover_stage = 252, cover_hint = 253, node_total = 254;
+// The share of its size a tile's print pieces take, Q10, by grid (2, 4, 8): inside its square.
+const opxy::i32 tile_fit[3] = {899, 765, 736};
+const opxy::u32 print_first[6] = {76, 102, 122, 141, 160, 180}, print_count[6] = {26, 20, 19, 19, 20, 16};
+const opxy::u32 pin_first = 196, pin_count = 16, bar_first = 212, bar_count = 20,
+                lever_node = 232, teeth_first = 233, teeth = 7,
+                rod_node = 240, weight_node = 241, jaw_first = 242,
+                cover_stage = 244, cover_hint = 245, node_total = 246;
 // The cell (of the 8 grid) each print piece sits in, from print_first[0] on.
-const opxy::u8 piece_cell[118] = {10, 13, 18, 18, 19, 20, 21, 21, 26, 26, 27, 28, 29, 29, 34, 34, 35, 35, 36, 36, 37, 37, 42, 43, 44, 45, 18, 19, 19, 20, 20, 21, 25, 26, 27, 28, 29, 30, 33, 34, 37, 38, 42, 45, 50, 51, 52, 53, 22, 23, 23, 27, 28, 28, 29, 30, 31, 34, 35, 36, 38, 39, 43, 44, 45, 46, 52, 53, 17, 18, 19, 25, 26, 29, 33, 34, 35, 41, 42, 43, 43, 44, 10, 13, 18, 21, 27, 28, 35, 35, 36, 36, 42, 43, 43, 44, 44, 45, 50, 51, 52, 53, 11, 12, 13, 18, 19, 21, 22, 26, 30, 34, 35, 37, 38, 43, 44, 45};
+const opxy::u8 piece_cell[120] = {10, 13, 18, 18, 19, 20, 21, 21, 26, 26, 27, 28, 29, 29, 34, 34, 35, 35, 36, 36, 37, 37, 42, 43, 44, 45, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 33, 34, 37, 38, 42, 45, 50, 51, 52, 53, 22, 23, 23, 27, 28, 28, 29, 30, 31, 34, 35, 36, 38, 39, 43, 45, 46, 52, 53, 17, 18, 19, 19, 19, 25, 26, 29, 29, 33, 34, 35, 41, 42, 43, 43, 43, 44, 44, 10, 13, 18, 21, 27, 28, 35, 35, 36, 36, 42, 43, 43, 44, 44, 45, 50, 51, 52, 53, 11, 12, 13, 18, 19, 21, 22, 26, 30, 34, 35, 37, 38, 43, 44, 45};
 // The semitone each comb tooth stands for.
 const opxy::u8 tooth_notes[7] = {0, 1, 3, 4, 7, 12, 19};
-// Where things sit, px: the print's corner and side, the knob, the comb, the lever, the key, the rule.
-const opxy::i32 tray_x = 168, tray_y = 52, tray_side = 144;
-const opxy::i32 knob_x = 112, knob_y = 100, lever_x = 366, lever_y = 192;
-const opxy::i32 comb_x = 330, comb_pitch = 9, comb_y = 52;
-const opxy::i32 pendulum_x = 112, pendulum_y = 192;
+// Where things sit, px: the print's corner and side, the lever, the comb, the pendulum, the rule.
+const opxy::i32 tray_x = 172, tray_y = 54, tray_side = 136;
+const opxy::i32 lever_x = 365, lever_y = 188;
+const opxy::i32 comb_x = 338, comb_pitch = 9, comb_y = 58;
+const opxy::i32 pendulum_x = 114, pendulum_y = 188;
 // The weight's distance up the rod for each slice, px.
-const opxy::i32 weight_heights[6] = {12, 20, 28, 36, 44, 52};
-const opxy::i32 key_x = 423, key_y = 116, rule_x0 = 84, rule_x1 = 396, rule_y = 207;
-// The map selector's six positions, tenths of a degree from upright.
-const opxy::i32 map_angles[6] = {-1000, -600, -200, 200, 600, 1000};
+const opxy::i32 weight_heights[6] = {16, 34, 52, 70, 88, 106};
+const opxy::i32 rule_x0 = 84, rule_x1 = 396, rule_y = 205;
 }

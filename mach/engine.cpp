@@ -174,7 +174,7 @@ inline void prepare(Voice& v, Image& im) {
         const i32 root = cone_root(v.mach, k27);                                      // Q28
         const i32 reach = static_cast<i32>(shr(mul(v.mach, root), 29));               // M sqrt(M^2 - 1), Q27
         const i32 star = -ratio(im.d, reach, 27);                                     // Q26
-        if (star + im.tau0 > v.sigma_start + 1342177) {   // 20 ms inside the flight
+        if (star + im.tau0 > v.sigma_start - 67109) {   // at most 1 ms before the flight
             im.cone = 1;
             im.sigma_star = star;
             im.s_star = ratio(mul(im.d, root), make(v.mach), 0);
@@ -194,10 +194,9 @@ inline void prepare(Voice& v, Image& im) {
             const i32 ld = flight::log2_q16(static_cast<u32>(im.d)) - flight::log2_q16(3912100u);
             im.boom_length = clamp((flight::nwave(v.mach >> 12, im.d >> 10) * 44100) >> 16, 132, 2205);
             im.boom_at = static_cast<i32>(shr(mul(im.birth - v.t_start, 44100), 26));
-            // Louder nearer: (20 m / d)^1/4, and faded in over Mach 1 .. 1.1.
+            // Louder nearer: (20 m / d)^1/4.
             const i32 near = clamp(flight::exp2_q16(clamp((4 << 16) - (ld >> 2), 0, 13 << 16)) >> 4, 22938, 98304);   // Q16
-            const i32 over = smooth(((v.mach - (1 << 28)) >> 12) * 10);
-            im.boom_scale = mul30(mul30(near << 14, over), im.level);
+            im.boom_scale = mul30(near << 14, im.level);
             const i32 end = im.boom_at + im.boom_length + 2205;
             if (end > v.boom_end) v.boom_end = end;
             return;
@@ -207,33 +206,51 @@ inline void prepare(Voice& v, Image& im) {
     const i32 x = static_cast<i32>(shr(mul(v.mach, sigma0), 28));
     const i32 r = static_cast<i32>(isqrt(wide::add(mul(x, x), mul(im.d, im.d))));
     im.birth = im.tau0 + sigma0 + r;
+    // Without a cone the boom is the bow wave's pressure pulse as the object
+    // passes (when the pass is in its flight): an N-wave a Mach 1.4 shock's
+    // length, heard with the pass, at 0.4 + 0.6 M^2 of a shock's level.
+    if (sigma0 < 0 && v.sigma_end - im.tau0 > 0) {
+        const i32 ld = flight::log2_q16(static_cast<u32>(im.d)) - flight::log2_q16(3912100u);
+        im.boom_length = clamp((flight::nwave(91750, im.d >> 10) * 44100) >> 16, 132, 2205);
+        im.boom_at = static_cast<i32>(shr(mul(im.tau0 + im.d - v.t_start, 44100), 26));
+        const i32 near = clamp(flight::exp2_q16(clamp((4 << 16) - (ld >> 2), 0, 13 << 16)) >> 4, 22938, 98304);   // Q16
+        const i32 m2 = clamp(static_cast<i32>(shr(mul(v.mach, v.mach), 26)), 0, unity30);              // M^2, Q30
+        im.boom_scale = mul30(mul30(near << 14, 429496730 + mul30(644245094, m2)), im.level);
+        const i32 end = im.boom_at + im.boom_length + 2205;
+        if (end > v.boom_end) v.boom_end = end;
+    }
     // dsigma/dt = R / (R + M x) at the first sound, Q24 below
     const i32 den = (r >> 2) + static_cast<i32>(shr(mul(v.mach, x), 30));
     im.birth_step = den > 0 ? ratio(mul(substep_time, r >> 2), make(den), 0) : substep_time;
 }
 
-// The landing point: where the flight sounds the key, Q26 seconds of its own
-// time from the pass. tune 0 is the pass; toward 1 (or -1) it moves out to
-// the flight's end (or start), but no further than half a second from the
-// pass, so a played note (not the whole flight) is in tune through its
-// sustain; the glide then continues a few cents on.
-inline i32 landing(const Voice& v, i32 u) {
-    const i32 edge = u < 0 ? (v.sigma_start > -33554432 ? v.sigma_start : -33554432)
-                           : (v.sigma_end < 33554432 ? v.sigma_end : 33554432);
-    return static_cast<i32>(shr(mul(edge, u < 0 ? -u : u), 16));
+// The flight's two landing points, Q26 seconds of its own time from the
+// pass: its start (side -1) and its end (side 1), but no further from the pass
+// than half a second or the time it takes to fly four closest distances
+// (where the glide is within a few cents of its end), so a played note (not
+// the whole flight) is in tune through its sustain.
+inline i32 landing(const Voice& v, i32 d, i32 side) {
+    const i32 most = wider(33554432, ratio(make(d), make(v.mach), 30));
+    return side < 0 ? (v.sigma_start > -most ? v.sigma_start : -most) : (v.sigma_end < most ? v.sigma_end : most);
 }
 
-// tune: the source's pitch over the key, so that the heard pitch is exactly
-// the key at the landing point (above Mach 1, a landing before the pass is
-// where the backward image ends). Held within 2.5 octaves.
-inline void tune(Voice& v, i32 d, i32 u) {
-    const i32 at = landing(v, u);
-    const i32 x = static_cast<i32>(shr(mul(v.mach, at), 28));
+// log2 of the rate the flight is heard at for its emission at sigma (Q26),
+// dtau/dt = r / |r + M x|, Q16.
+inline i32 heard(const Voice& v, i32 d, i32 sigma) {
+    const i32 x = static_cast<i32>(shr(mul(v.mach, sigma), 28));
     const i32 r = static_cast<i32>(isqrt(wide::add(mul(x, x), mul(d, d))));
     const i32 den = (r >> 2) + static_cast<i32>(shr(mul(v.mach, x), 30));      // r (1 - M cos theta), Q24
-    // log2 of the heard rate there, dtau/dt = r / |r + M x|
-    const i32 rate = log2_fine(static_cast<u32>(r >> 2)) - log2_fine(static_cast<u32>(den < 0 ? -den : den > 0 ? den : 1));
-    const i32 octaves = clamp(rate, -(5 << 15), 5 << 15);
+    return log2_fine(static_cast<u32>(r >> 2)) - log2_fine(static_cast<u32>(den < 0 ? -den : den > 0 ? den : 1));
+}
+
+// tune: the source's pitch over the key. At -1 the flight's start sounds the
+// key exactly (above Mach 1, where the backward image ends), at 1 its end;
+// between them the source moves evenly in pitch, so the key sounds where the
+// glide passes through it. Held within 2.5 octaves.
+inline void tune(Voice& v, i32 d, i32 u) {
+    const i32 most = 5 << 15;
+    const i32 first = clamp(heard(v, d, landing(v, d, -1)), -most, most), last = clamp(heard(v, d, landing(v, d, 1)), -most, most);
+    const i32 octaves = first + ((((last - first) >> 2) * ((u + 65536) >> 3)) >> 12);
     v.pitch = flight::exp2_q16(3 * 65536 - octaves) >> 3;
 }
 
@@ -278,6 +295,10 @@ inline void setup(Voice& v, opxy::Parameters p) {
         i32 k27;
         v.boom_r = ratio(mul(d, v.mach), make(cone_root(v.mach, k27)), 0);    // where the cone left: d M / sqrt(M^2 - 1)
     } else v.boom_r = d;
+    // The air's corner at the closest pass, over its corner at 12 m: (12 m / d)^1/4,
+    // Q16; and the boom's, over the pass's: sqrt(d / r) where the boom left, Q30.
+    v.air_near = flight::exp2_q16(((log2_fine(2347812u) - v.log_d) >> 2) + (4 << 16)) >> 4;
+    v.boom_near = flight::exp2_q16(((v.log_d - log2_fine(static_cast<u32>(v.boom_r))) >> 1) + (14 << 16));
 
     const i32 echo = flight::echo_level(p[ECHO]);
     Image& ground = v.image[1];
@@ -291,11 +312,11 @@ inline void setup(Voice& v, opxy::Parameters p) {
         prepare(v, ground);
     }
     tune(v, d, u);
-    // The boom: from a soft, long thump (a rise at 250 Hz, three times the
+    // The boom: from a soft, long thump (a rise at 100 Hz, three times the
     // shock's length) to the full crack (10 kHz), its level made up for the
-    // energy the slower rise takes; off at 0, full level from a quarter up.
+    // energy the slower rise takes; off at 0, full level from an eighth up.
     const i32 b = flight::amount(p[BOOM]);
-    const i32 w = static_cast<i32>(shr(mul(2334, flight::exp2_q16((b * 10899) >> 10)), 16));   // 2 pi 250 Hz / fs * 40^b, Q16
+    const i32 w = static_cast<i32>(shr(mul(934, flight::exp2_q16((b * 13607) >> 10)), 16));    // 2 pi 100 Hz / fs * 100^b, Q16
     v.boom_rise = ratio(w, (1 << 16) + w, 31);
     v.boom_gain = mul30(smooth(b << 3), unity30 + ((32768 - b) << 15));
     for (u32 m = 0; m < 2; ++m)
@@ -379,7 +400,8 @@ struct Block {
     u32 f;            // the key's pitch, a phase increment a sample
     i32 inv;          // voice: 97392 / f, Q32 (a formant in Hz over the fundamental)
     u32 part_end[4];  // bell: each partial's phase at the end of a strike period
-    i32 air;          // the air's corner as w = air / r, over the closest distance, Q16 (-1: open)
+    i32 air;          // the air's corner at the closest pass as w = 2 pi f / fs, Q16 (-1: open) ...
+    i32 thick;        // ... and how fast it takes the level with distance: (d / r)^thick, Q16 (0.5 .. 1)
 };
 
 // The compression gain 1.25 rho / (0.25 + rho), Q30, from |rho| as Q24.
@@ -462,13 +484,14 @@ inline void solve(Voice& v, Root& root, const Block& block) {
     i32 g = mul30(im.level, v.loud);
     g = mul30(g, source_level[v.source]);
     // Distance: the true law is d / r, but a flyby's tail (and above Mach 1
-    // both images, emitted far away) would then fall out of hearing; the
-    // voice falls as sqrt(d / r), 3 dB a doubling.
-    // d / r and its root, from their logarithms (Q16; exp2 of x + 14 is
-    // 2^x as Q30).
+    // both images, emitted far away) would then fall out of hearing; in open
+    // air the voice falls as sqrt(d / r), 3 dB a doubling, and thick air
+    // takes it toward d / r, 6 dB.
+    // sqrt(d / r) for the air's corner, and the level's fall, from their
+    // logarithms (Q16; exp2 of x + 14 is 2^x as Q30).
     const i32 fall = clamp(v.log_d - log2_fine(static_cast<u32>(r)), -(13 << 16), 0);
-    const i32 near = flight::exp2_q16(fall + (14 << 16));
-    g = mul30(g, flight::exp2_q16((fall >> 1) + (14 << 16)));
+    const i32 near = flight::exp2_q16((fall >> 1) + (14 << 16));
+    g = mul30(g, flight::exp2_q16(((fall >> 4) * (block.thick >> 4) >> 8) + (14 << 16)));
     g = mul30(g, doppler(speed));                                                  // compression, up to 1.25x
     // The window's fades, and the images' onset at the cone, where they act.
     if (now - v.sigma_start < v.fade_span) g = mul30(g, smooth(wide::shr_within(mul(now - v.sigma_start, v.fade), 26, 1 << 20)));
@@ -542,7 +565,7 @@ inline void solve(Voice& v, Root& root, const Block& block) {
             // The siren winds up into its note: a semitone below, rising over
             // the first 30% of every 0.9 s and holding the key for the rest.
             const i32 u = static_cast<i32>(cycle(since, v.period) >> 16);
-            const i32 e = u < 19661 ? -(5461 - ((5461 * (smooth(u * 10 / 3) >> 15)) >> 15)) : 0;
+            const i32 e = u < 19661 ? -(5461 - ((5461 * (smooth((u * 54613) >> 14) >> 15)) >> 15)) : 0;   // u / 0.3
             const i32 m = flight::exp2_q16(e + 65536) >> 1;
             inc = wide::shr_within(mul(inc, m), 16, max31);
         }
@@ -767,10 +790,11 @@ inline void sound(Voice& v, Root& root, i32* out) {
     root.mix = root.mix_to;
 }
 
-// The booms: each image's N-wave, through a shock's rise and the air.
+// The booms: each image's N-wave, through a shock's rise and the air (its
+// corner at the closest pass as w, Q16; -1 open).
 inline void booms(Voice& v, Shared& shared, opxy::Output out, i32 air) {
     const i32 rise = v.boom_rise;
-    const i32 k = air < 0 ? max31 : quotient(air, v.boom_r + air, 31);
+    const i32 k = air < 0 ? max31 : absorb(mul30(air, v.boom_near));
     for (u32 i = 0; i < opxy::block_frames; ++i) {
         const i32 n = static_cast<i32>(v.samples + i);
         i32 x = 0;
@@ -809,9 +833,9 @@ inline void render(Voice& voice, Shared& shared, u32, opxy::Output output,
     }
     if (voice.done) return;
     // Air, live: the low-pass a distance r gets has its corner at
-    // 250 Hz * 2^(10 (1 - air)) * 30 m / r; with air at 0 it is open.
+    // 200 Hz * 2^(5.5 (1 - air)) * (12 m / d)^1/4 * sqrt(d / r); with air at 0 it is open.
     const i32 a = flight::amount(parameters[AIR]);
-    const i32 air = a <= 0 ? -1 : static_cast<i32>(shr(mul(flight::exp2_q16((32768 - a) * 20), 209150), 16));
+    const i32 air = flight::air_w(a);
     Block block;
     block.f = pitch[0];
     block.inv = voice.source == VOICE ? quotient(97392, pitched(voice, block.f), 32) : 0;
@@ -819,7 +843,8 @@ inline void render(Voice& voice, Shared& shared, u32, opxy::Output output,
         // Where each partial's phase is at a ring's end (mod 2^32).
         for (u32 k = 0; k < 4; ++k) block.part_end[k] = shr(umul(block.f, static_cast<u32>(bell_ratio[k])), 8) * voice.period_samples;
     }
-    block.air = air < 0 ? -1 : quotient(air, voice.image[0].d, 16);
+    block.air = air < 0 ? -1 : static_cast<i32>(shr(mul(air, voice.air_near), 16));
+    block.thick = 32768 + a;
     u32 live = 0;
     for (i32 sub = 0; sub < static_cast<i32>(opxy::block_frames) / substep; ++sub) {
         voice.t += substep_time;
@@ -837,7 +862,7 @@ inline void render(Voice& voice, Shared& shared, u32, opxy::Output output,
             sound(voice, root, output + sub * substep);
         }
     }
-    if (static_cast<i32>(voice.samples) < voice.boom_end) booms(voice, shared, output, air);
+    if (static_cast<i32>(voice.samples) < voice.boom_end) booms(voice, shared, output, block.air);
     else if (voice.boom_held) {
         voice.boom_held = 0;
         if (shared.booming) --shared.booming;

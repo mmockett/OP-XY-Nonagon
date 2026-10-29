@@ -35,14 +35,14 @@ control at 0, 50 and 100 on the screen at 1:1, as the device shows it;
 
 | Page | Control | 0 / 25 / 50 / 75 / 100 | Default | What it does |
 | --- | --- | --- | --- | --- |
-| 1 | powder | `0st` `-3st` `-12st` `-27st` `-48st`<br>first tap −0.0 / −3.0 / −11.9 / −26.9 / −47.8 semitones | `-5st` (32) | How much air a stir puts in, as how far under the key the first tap rings. Squared, so the first half of the control scoops up to an octave and the rest reaches four. On screen, the drink darkens from pale milk (every fourth engraved line) to thick chocolate (every line), with cocoa floating on it, and a stir fills it with more bubbles. |
+| 1 | powder | `0st` `-3st` `-12st` `-27st` `-48st`<br>first tap −0.0 / −3.0 / −11.9 / −26.9 / −47.7 semitones | `-5st` (32) | How much air a stir puts in, as how far under the key the first tap rings. Squared, so the first half of the control scoops up to an octave and the rest reaches four. On screen, the drink darkens from pale milk (every fourth line) to thick chocolate (every line), and a stir fills it with more bubbles. |
 | 1 | taps | `once` `1.1Hz` `2.4Hz` `5.4Hz` `12Hz`<br>0 / 1.0 / 2.3 / 5.3 / 11.8 taps a second | `once` | Once: one tap a note, an instrument. Above that the spoon keeps tapping while the note sounds, each tap softer as they come faster, so tapping holds a single tap's level. On screen, the spoon rests lifted 24° for a single tap and 2° for the fastest. |
-| 1 | fizz | `120um` `210um` `380um` `680um` `1.2mm`<br>in tune after 11.6 / 3.7 / 1.2 / 0.37 / 0.21 s | `600um` (70) | Bubble size, which sets how fast the drink clears. Fine bubbles make long climbs with sparse, high pops; large ones short scoops with low, dense pops. On screen, the rising bubbles and the foam grow from 0.5 to 2 times. |
-| 1 | cup | `china` `china` `glass` `tin` `tin`<br>a tap rings 569 / 569 / 955 / 823 / 823 ms (to −40 dB) | `china` | The wall: china's short tock (1.65 / 4.5 / 9 kHz), a glass tumbler's ting (1.15 / 3.2 / 6.1 kHz) or an enamelled tin mug's clank (0.72 / 1.9 / 3.4 kHz). It also sets how long the column rings once clear. On screen, the mug changes: hatched china with a C handle, a heavy-based glass tumbler, or a thin tin mug with a rolled rim, strap handle and chipped enamel. |
-| 2 | fill | `20mm` `35mm` `50mm` `65mm` `80mm`<br>the second mode at 1.16 / 1.43 / 1.77 / 2.15 / 2.55 times the key | `59mm` (65) | The drink's depth, which tunes the column's upper modes. At 59 mm they sit at 1, 2.00, 3, 3.46, 3.73 and 5 times the key, an octave and a twelfth with a little shimmer. Shallow drinks cluster the modes into bells; deep ones spread them. Deeper drinks also lower and damp the cup's clink. |
-| 2 | spoon | `5.0ms` `2.1ms` `870us` `360us` `150us`<br>upper modes −21.9 / −14.2 / −9.2 / −8.5 / −8.4 dB under the fundamental | `610us` (60) | From a wooden spoon to a silver one, as its contact time: a soft spoon strikes only the fundamental, a hard one the upper modes and the cup's clink too, with a sharper onset. On screen, a fat wooden spoon with grain along its handle becomes a slender silver teaspoon with a shine in its bowl. |
-| 2 | pops | 0 to 100<br>pops −∞ / −17 / −21 / −14 / −13 dB against the rest of a long climb | 15 | How loud the bubbles bursting at the surface are, from 300 Hz to 7 kHz. They burst as often as air leaves the drink, so they thin out as it clears. (The measure is random: pops are.) On screen, the foam grows from none to two rows. |
-| 2 | stir | 0 to 100<br>a second note 0.1 s on scoops −2.0 / −2.7 / −3.4 / −4.1 / −4.9 semitones | 100 | How much a note stirs a drink that is still settling: at 0, overlapping notes carry the drink on and only tap; at 100 every note is fresh. The first note after a pause always stirs fresh. On screen, a heap of undissolved powder lies on the floor at 0 and is gone at 100, and a note's stir dips the surface into a vortex. |
+| 1 | fizz | `120um` `210um` `380um` `680um` `1.2mm`<br>the drink clear after 11.6 / 3.7 / 1.2 / 0.37 / 0.13 s | `600um` (70) | Bubble size, which sets how fast the drink clears. Fine bubbles make long climbs with high pops; large ones short scoops with low pops. On screen, the rising bubbles and the foam grow from 0.5 to 2 times. |
+| 1 | cup | `china` `china` `glass` `tin` `tin`<br>a tap rings 569 / 569 / 1148 / 437 / 437 ms (to −40 dB) | `china` | The mug: china's tock (wall at 1.65 / 4.5 / 9 kHz, the drink ringing 0.9 s), a glass tumbler's long ting (1.15 / 3.2 / 6.1 kHz, 1.8 s) or an enamelled tin mug's short clank (0.72 / 1.9 / 3.4 kHz, 0.7 s). On screen: a thick china wall with a C handle, a heavy-based glass tumbler, or a thin tin mug with a rolled rim and a strap handle. |
+| 2 | fill | `20mm` `35mm` `50mm` `65mm` `80mm`<br>a tap rings 213 / 345 / 488 / 630 / 772 ms (to −40 dB) | `59mm` (65) | The drink's depth. A shallow drink loses its ring to the floor and sounds short and woody; a deep one rings on. Depth also tunes the column's upper modes (at 59 mm they sit at 1, 2.00, 3, 3.46, 3.73 and 5 times the key: shallow drinks cluster them into bells, deep ones spread them) and lowers and damps the cup's clink. |
+| 2 | spoon | `4.0ms` `1.5ms` `550us` `200us` `80us`<br>upper modes −30.3 / −18.3 / −9.9 / −5.5 / −2.4 dB under the fundamental | `370us` (60) | From a wooden spoon to a silver one, as its contact time. A soft spoon strikes the fundamental and little else; a hard one brings the upper modes up to twice their level and rings the cup's clink harder. Its tone follows the key, so it brightens alike at every pitch, and the fundamental keeps its level. On screen, a short, fat, grained wooden spoon becomes a long, slim silver one with a shine in its bowl. |
+| 2 | pops | `off` `7/s` `15/s` `22/s` `30/s`<br>pops −∞ / −26.7 / −21.4 / −18.0 / −15.5 dB against the rest of four notes | `4/s` (15) | Bubbles bursting at the surface, from 300 Hz to 7 kHz: how often (the caption is the rate from a fresh stir's foam) and how loud. Each stir raises a head of foam that crackles away over about a second, more for more powder; a bubbly drink adds pops as fast as its air leaves. On screen, the foam grows from none to two rows. |
+| 2 | stir | `0%` `50%` `71%` `87%` `100%`<br>a second note 0.25 s on scoops −0.2 / −1.5 / −2.8 / −3.9 / −4.9 semitones; the drink sways 0 / 3.7 / 7.4 / 11.1 / 14.8 cents | `77%` (60) | How hard each note stirs. It takes a drink still settling that share of the way to fresh (at 0 an overlapping note only taps; the first note after a pause always stirs fresh), and it sets the drink sloshing: the pitch sways at the mug's sloshing mode (3.4 Hz at 59 mm), up to 20 cents, dying away over about a second. On screen, below 50 a heap of powder lies on the floor with clumps in the drink; above it the drink turns in swirls, one more each quarter, and its surface dips into a vortex. |
 
 ## Presets
 
@@ -52,13 +52,13 @@ spectral centroid.
 
 | Preset | Role | Settings | Peak | Loudest | Centroid |
 | --- | --- | --- | --- | --- | --- |
-| **Mug Keys** | The default: mellow keys for melodies and chords. One tap a note, a five-semitone scoop that lands in under half a second, china's soft tock. | china, 59 mm, −5 st, once, 600 µm | 0.57 | −21.5 | 279 Hz |
-| **Glass Bells** | Bells and arpeggios. A shallow glass gives inharmonic, bell-like modes, struck with a hard spoon and a two-semitone scoop. | glass, 35 mm, −2 st, hard | 0.80 | −17.4 | 341 Hz |
-| **Tin Percussion** | A rhythm instrument. The spoon taps an enamelled tin mug 3.6 times a second while a note is held, each note topping up the drink a little, so held notes chatter and scoop. | tin, 47 mm, −10 st, 3.6 Hz, stir 30 | 0.47 | −18.6 | 287 Hz |
-| **Bass Mug** | Bass lines. A deep, smooth drink, a soft wooden spoon and a three-semitone scoop, with no pops. | china, 68 mm, −3 st, soft | 0.33 | −20.9 | 80 Hz |
-| **Hot Chocolate** | The effect itself: three octaves of climbing over five seconds while the spoon taps and the drink fizzes. | china, −36 st, 2.9 Hz, 190 µm | 0.39 | −22.8 | 220 Hz |
-| **Fizz** | A texture: a glass tapped seven times a second, full of bubbles and pops, half-stirred by each note. | glass, −24 st, 7.4 Hz, pops 100 | 0.55 | −15.8 | 220 Hz |
-| **Spoonful** | The kitchen demonstration as a phrase. At stir 0 the first note stirs and each overlapping note only taps, so a legato line keeps rising. A pause starts it again. | china, −24 st, once, stir 0 | 0.31 | −22.9 | 323 Hz |
+| **Mug Keys** | The default: mellow keys for melodies and chords. One tap a note, a five-semitone scoop that lands in under half a second, china's soft tock, a gentle sway. | china, 59 mm, −5 st, once, 600 µm, stir 60 | 0.64 | −21.2 | 331 Hz |
+| **Glass Bells** | Bells and arpeggios. A shallow glass gives inharmonic, bell-like modes, struck with a hard spoon and a two-semitone scoop. | glass, 35 mm, −2 st, hard | 0.65 | −17.5 | 421 Hz |
+| **Tin Percussion** | A rhythm instrument. The spoon taps an enamelled tin mug 3.6 times a second while a note is held, each note topping up the drink a little, so held notes chatter and scoop. | tin, 47 mm, −10 st, 3.6 Hz, stir 30 | 0.59 | −20.3 | 394 Hz |
+| **Bass Mug** | Bass lines. A deep, long-ringing drink, a soft wooden spoon, a three-semitone scoop and little sway, with no pops. | china, 68 mm, −3 st, soft, stir 30 | 0.27 | −20.5 | 70 Hz |
+| **Hot Chocolate** | The effect itself: three octaves of climbing over five seconds while the spoon taps and the drink fizzes. | china, −36 st, 2.9 Hz, 190 µm | 0.42 | −23.7 | 228 Hz |
+| **Fizz** | A texture: a glass tapped seven times a second, full of bubbles and pops, half-stirred by each note. | glass, −24 st, 7.4 Hz, pops 100 | 0.62 | −16.2 | 274 Hz |
+| **Spoonful** | The kitchen demonstration as a phrase. At stir 0 the first note stirs and each overlapping note only taps, so a legato line keeps rising. A pause starts it again. | china, −24 st, once, stir 0 | 0.32 | −23.0 | 356 Hz |
 
 ## How it works
 
@@ -80,7 +80,7 @@ follow the sound speed together.
 **The bubbles.** There are eight classes of radius, an octave either side of
 the median (fizz), log-normal by volume. Each fills the column above the
 height it has cleared and rises at its Stokes speed, v = 2g r² Δρ / 9μ
-(μ = 2 mPa·s, at most 0.25 m/s). A quarter-wave weighs the compressibility
+(μ = 2 mPa·s, at most 0.4 m/s). A quarter-wave weighs the compressibility
 by p² = cos²(πz/2h), so the column rings as if its void fraction were
 x_eff = Σ d_i W(s_i), with W(s) = (1 − s) − sin(πs)/π. That gives the scoop
 its shape: fast at first, as the floor clears and the big bubbles leave, then
@@ -91,19 +91,38 @@ a soft landing as the fine ones go. Once every class is out, x_eff is exactly
 interpolation (its spurs are about 72 dB down). Its increment glides sample
 by sample, so a ringing tap keeps its level as it climbs. A tap adds to each
 mode's amplitude over the spoon's contact time. Between taps the modes decay,
-(1 + 0.75 × drop) times faster while bubbles damp the column, and higher
-modes faster still (T60 / √ratio). A bubbly column's low impedance takes up
-less of the blow: a tap's level falls a quarter octave for each octave of drop.
+(1 + 0.75 × drop) times faster while bubbles damp the column, higher modes
+faster still (T60 / √ratio), and shallow drinks faster than deep ones (T60 in
+proportion to the depth, 59 mm the reference). A bubbly column's low
+impedance takes up less of the blow: a tap's level falls a quarter octave for
+each octave of drop.
+
+**The spoon.** A contact of τ seconds strikes a mode at f by about
+1 / √(1 + (f / f_c)⁴). For the drink's modes the corner f_c follows the key,
+from half an octave under it (soft) to three and a half octaves over (hard),
+and the fundamental is made up to full level, so the spoon changes the tone,
+not the volume, alike at every pitch. A hard spoon's sharper blow also
+carries more into the upper modes (0.3 to 2 times their level). For the
+cup's wall the corner is the contact's own, 0.6 / τ (150 Hz to 8 kHz), and a
+hard spoon rings it up to 1.75 times harder.
+
+**The slosh.** A stir sets the drink sloshing in its first sloshing mode,
+√(g k tanh(k h)) / 2π with k = 1.84 / a: 3.4 Hz at 59 mm, a little slower in
+a shallow drink. The sloshing swings the column's pitch by up to 20 cents at
+stir 100, dying away over about a second.
 
 **The cup and the pops.** The wall has three modes per material, fixed in
 hertz, as a real mug's are, and the drink lowers and damps them. A chord is
 one cup: only the newest note's taps ring it. Pops are Minnaert rings at
 3.26 / r Hz from the foam (ten times the rising bubbles), held to 0.3–7 kHz,
-two at a time, as often as the air leaves the column.
+two at a time. They come from the head of foam each stir raises (up to 30 a
+second at pops 100, dying away over about a second; the foam is the mug's,
+so only the newest note's pops from it) and from the air leaving a bubbly
+column.
 
 **Playing it.**
 - **Chords strum.** Notes that start in the same block tap a block apart
-  (1.45 ms, at most 7 ms), as a hand's chord does.
+  (1.45 ms, at most 10 ms for eight notes), as a hand's chord does.
 - **Chords share the blow.** Each of n notes struck together taps at
   n^(−¼) of a lone note's strength. An eight-note chord is still 6.7 dB louder
   than one note, but its peaks stay in bounds.
@@ -145,8 +164,11 @@ lengths.
 - Successive taps ring higher in the audio: 56, 108, 167, 237, 314, 380, 423,
   439, then 440 Hz on an A4.
 - With powder at 0, every tap is at the key.
-- The default scoops 4.9 semitones, is within 10 cents at 312 ms and within
-  a cent at 461 ms.
+- The default scoops 4.9 semitones; its drink is within 10 cents at 312 ms
+  and within a cent at 461 ms.
+- At stir 100 the pitch swings 18 cents around the drink's, crossing it six
+  times in the first second, and is within 2 cents after 2 s; at stir 0 it
+  does not swing.
 - A four-note chord's first taps fall a block apart.
 - A stir-0 note after a pause stirs fresh.
 
@@ -161,30 +183,30 @@ roughness are explained in `tools/measure.py`.
 
 | Render | Loudest 0.4 s | Peak | Crest | Centroid (Hz) | HNR | Tonal | Roughness |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Cocoa single A3 | −24.3 | 0.28 | 15.0 | 240 | 33.1 | 0.998 | 0.000 |
+| Cocoa single A3 | −24.1 | 0.30 | 15.4 | 257 | 32.0 | 0.996 | 0.000 |
 | Hollow single A3 | −25.4 | 0.17 | 11.7 | 766 | 13.1 | 0.921 | 0.630 |
 | Wane single A3 | −22.9 | 0.14 | 7.7 | 471 | 21.6 | 0.970 | 0.016 |
 | Moth single A3 | −21.8 | 0.11 | 2.7 | 224 | 49.4 | 1.000 | 0.000 |
-| Cocoa chord, 8 notes | −19.9 | 0.71 | 18.9 | 310 | 5.6 | 0.991 | 0.589 |
+| Cocoa chord, 8 notes | −20.1 | 0.55 | 16.8 | 362 | 6.0 | 0.983 | 0.597 |
 | Moth chord | −12.5 | 0.78 | 11.2 | 335 | 6.9 | 1.000 | 0.582 |
 | Wane chord | −14.5 | 0.69 | 12.6 | 625 | 5.1 | 0.922 | 0.585 |
 | Hollow chord | −15.9 | 0.54 | 12.5 | 750 | 3.2 | 0.830 | 0.410 |
-| Cocoa Mug Keys tune | −21.5 | 0.57 | 19.9 | 279 | 28.1 | 0.806 | 0.629 |
+| Cocoa Mug Keys tune | −21.2 | 0.64 | 20.4 | 331 | 27.3 | 0.758 | 0.363 |
 | Hollow tune | −19.3 | 0.42 | 14.8 | 713 | 7.8 | 0.858 | 0.455 |
 | Wane tune | −17.8 | 0.45 | 13.5 | 493 | 12.8 | 0.938 | 0.220 |
 | Moth tune | −15.7 | 0.42 | 10.5 | 256 | 21.6 | 1.000 | 0.124 |
 
 - **A single note is as loud as Hexagon's.** Cocoa's A3 sits between Hollow
-  and Wane, and is purer: HNR 33 dB, a tonal share of 0.998 and no roughness
+  and Wane, and is purer: HNR 32 dB, a tonal share of 0.996 and no roughness
   once the scoop lands.
-- **Pitch.** The A3 is +0.0 cents, and the tests show 0.0002 cents from C1
-  to C7.
-- **Chords peak like Moth and Wane** (0.71) and are as smooth.
+- **Pitch.** The A3 is +0.4 cents from 0.7 to 1.4 s, the default's sway dying
+  away; the drink itself is within 0.0002 cents from C1 to C7.
+- **Chords peak like Hollow and Moth** (0.55) and are as smooth.
 - **Chords and phrases are 3–7 dB less loud than the pads.** These are
   struck notes with 15–20 dB crest factors, against a pad's 3–13.
-- **Its brightness sits with Moth** (centroid 240–340 Hz), darker than Wane
+- **Its brightness sits with Moth** (centroid 260–420 Hz), darker than Wane
   and Hollow.
-- **Fizz is the one noisy, rough sound** (HNR 1.3 dB, roughness 3.3), and it
+- **Fizz is the one noisy, rough sound** (HNR 0.5 dB, roughness 3.7), and it
   is meant to be: a texture.
 
 **Cleanliness.** DC is under 3 × 10⁻⁵ in every render. Energy above 16 kHz
@@ -215,15 +237,16 @@ python tools/measure.py <folder>/*.wav    # needs numpy
 
 ![The screen while a note stirs the drink and the spoon taps it into tune](docs/cocoa.gif)
 
-One object: a mug of hot chocolate in section, centred, engraved as in
-Tyndall's *Sound* or Ganot's *Physics*, to scale at 1.5 px a millimetre
-(80 mm across inside, 90 mm deep), with steam rising off it. The spoon
-stands in the drink and taps the floor, and the drink shows its own pitch:
-while bubbles remain its engraved lines are frothy, and they clear from the
-floor up as the bubbles rise out; when every line is clear, the note is in
-tune. It is still until a note or a control moves it. It is drawn for the
-480 × 220 screen at 1:1: every line about a pixel, nothing that matters
-under 3 px, no lines closer than 5 px, no difference carried by grey alone.
+One object: a mug of hot chocolate in section, centred, to scale at 1.5 px a
+millimetre (80 mm across inside, 90 mm deep), with a clear margin under the
+header. It is drawn in four greys and three weights: the mug boldest and
+brightest, the spoon and the drink's surface a step down, the drink's detail
+finer. The spoon stands in the drink and taps the floor, and the drink shows
+its own pitch: while bubbles remain its lines are frothy, and they clear
+from the floor up as the bubbles rise out; when every line is clear, the
+note is in tune. It is still until a note or a control moves it. It is drawn
+for the 480 × 220 screen at 1:1: nothing that matters under 3 px, no lines
+closer than 5 px, no difference carried by grey alone.
 
 - **The spoon stands in the drink.** Its bowl rests on the floor. Each tap
   rocks it onto the floor in time with the sound, rippling the surface and
@@ -232,31 +255,29 @@ under 3 px, no lines closer than 5 px, no difference carried by grey alone.
   fastest, where it lies on the floor and shakes, with strokes beside its
   bowl while it taps. **Spoon** turns a short, fat wooden spoon, grained
   along its handle and in its bowl, into a long, slim silver teaspoon with a
-  shine in its bowl. Either leans on the inside of the rim's lip and carries
-  on up past it, and neither crosses a line of the cup: each spoon's rest is
-  worked out against each cup's own outline, and each tap rocks it about the
-  lip, so it stays clear at every cup, spoon and tap (`tests/screen.cpp`
-  checks a gap of at least 1 px).
+  shine in its bowl. Either leans on the inside of the cup and neither
+  crosses a line of it: each spoon's rest is worked out against each cup's
+  own outline, and each tap rocks it about the lip, so it stays clear at
+  every cup, spoon and tap (`tests/screen.cpp` checks a gap of at least 1 px).
 - **The drink shows the pitch.** A note's stir dips the surface further and
   fills the drink with bubbles: five rings to a class, larger for
   larger bubbles (**fizz**), each class rising at its own speed from the
-  voices' own law. The drink's engraved lines are frothy wherever bubbles
-  remain, enough to flatten the note by 3 cents or more, and straight where
-  the drink has cleared. Since the floor clears first, the clear lines climb
-  up the drink as the note climbs. When every line is straight, the note is
-  in tune.
+  voices' own law. The drink's lines are frothy wherever bubbles remain,
+  enough to flatten the note by 3 cents or more, and straight where the
+  drink has cleared. Since the floor clears first, the clear lines climb up
+  the drink as the note climbs. When every line is straight, the note is in
+  tune.
 - **The drink itself.** **Fill** raises it, with a meniscus at the walls.
-  **Powder** sets how dark it is: the engraver's tone, from every fourth line
-  (pale milk) to every line (thick chocolate), with cocoa floating on top.
-  **Stir** at 0 leaves the powder undissolved: a heap on the floor with lumps
-  about it and clumps hanging in the drink. Turned up, the heap shrinks and
-  the clumps go, and the drink turns: swirls narrowing toward the floor, one
-  for each quarter, and a vortex dipping the surface by up to 8 px. **Pops**
-  sets how much foam rides the surface, none to two rows, and fizz its size;
+  **Powder** sets how dark it is, from every fourth line (pale milk) to
+  every line (thick chocolate). **Stir** below 50 leaves powder undissolved:
+  a heap on the floor and clumps hanging in the drink, shrinking away by 50.
+  Above it the drink turns in swirls narrowing toward the floor, one more
+  each quarter, and a vortex dips the surface by up to 8 px. **Pops** sets
+  how much foam rides the surface, none to two rows, and fizz its size;
   bubbles burst from it as the voices pop.
-- **Cup** redraws the wall as cut through: china hatched at 45° with a C
-  handle; a glass tumbler's tapering wall, heavy base and glints; or an
-  enamelled tin mug's thin wall, rolled rim, strap handle and chipped enamel.
+- **Cup** redraws the mug: a thick china wall with a C handle, a glass
+  tumbler's tapering wall and heavy base, or an enamelled tin mug's thin
+  wall, rolled rim and strap handle.
 
 The screen keeps its own drink and spoon, stepped with the voices' code
 (`drink.h`) for each 64 samples of time. It follows the notes and the
@@ -266,8 +287,7 @@ and the pops still, and a reset snaps everything into place.
 
 **Churn.** `tests/screen.cpp` plays a 22 s scene at 60 fps (a long climb,
 page 2 and its controls, a second note, a chord at fast taps, then cup and
-fill changes): 6.0 nodes change a frame on average, 47 at most, at a cup
-change. The idle screen changes nothing. Bubbles move in 2 px steps, at most
+fill changes): 5.7 nodes change a frame on average, 33 at most. The idle screen changes nothing. Bubbles move in 2 px steps, at most
 14 a frame, and the drink's lines change at most six a frame.
 
 ## Files
@@ -302,18 +322,18 @@ falls back to the browser's face.
 
 Not yet measured on an OP-XY. At the heaviest setting:
 
-- **Host estimate.** `sdk.py test` gives 4,900, 5,700, 6,300 and 8,900
-  Blackfin instructions per voice block over four runs; the best is 4,900.
-  The host's timing varies with its load.
+- **Host estimate.** `sdk.py test` gives 5,000 to 8,900 Blackfin
+  instructions per voice block, depending on the host's load.
 - **Counted from the compiled code.** Counting the Blackfin instructions in
   `render`'s loops, from `sdk.py compile`'s disassembly: a mode's sample loop
   is 14–15 instructions, a pop's 17, and the output stage's about 25. With
   all six liquid modes, three cup modes and two pops sounding, plus about
-  2,000 for the block's own work, that makes about 14,300 a block at most. A
-  held note in the default, with the cup rung out, is about 9,400.
+  2,300 for the block's own work (the stir, the slosh, the foam, each mode's
+  strike and decay), that makes about 14,700 a block at most. A held note in
+  the default, with the cup rung out, is about 9,700.
 
-**Memory.** A voice is 292 bytes, `Shared` 96 and the display state 236.
-`sdk.py test --firmware` compiles it for the Blackfin in 67.2 KiB of module
+**Memory.** A voice is 304 bytes, `Shared` 96 and the display state 236.
+`sdk.py test --firmware` compiles it for the Blackfin in 66.9 KiB of module
 memory, 8 KiB of it the sine table.
 
 ## Prior art

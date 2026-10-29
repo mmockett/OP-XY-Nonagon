@@ -188,7 +188,7 @@
       "grid": 0.833333,
       "slice": 0.416667,
       "map": 0.083333,
-      "step": 0.5,
+      "step": 0.601,
       "rate": 0.0625,
       "depth": 1,
       "chrd": 0.071429
@@ -207,11 +207,11 @@
   "resources": {
     "voiceCapacity": 256,
     "display": {
-      "stateBytes": 392,
+      "stateBytes": 384,
       "stateAlignment": 4,
       "paths": 0,
       "points": 0,
-      "nodes": 254,
+      "nodes": 246,
       "texts": 16,
       "palette": 16
     }

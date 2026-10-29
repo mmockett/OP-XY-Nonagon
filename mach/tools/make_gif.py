@@ -4,7 +4,7 @@ would draw it, at 720 x 330 and 12 frames a second (as Hexagon's GIFs are).
 tests/screen.cpp prints the frames, tools/frame2svg.py applies them to the
 artwork, headless Chrome rasterises each and ffmpeg assembles the GIF. Not
 part of the machine.
-  python tools/make_gif.py <screen binary> <scenario> <seconds> <out.gif>"""
+  XY_FONT=<path> python tools/make_gif.py <screen binary> <scenario> <seconds> <out.gif>"""
 import concurrent.futures
 import json
 import pathlib
@@ -29,7 +29,7 @@ def shoot(i_frame):
     svg = apply(frame).replace('width="480" height="220"', 'width="720" height="330"')
     page = work / f"f{i:04d}.html"
     page.write_text('<html><body style="margin:0;background:#000">' + svg + "</body></html>")
-    subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars", f"--screenshot={work / f'f{i:04d}.png'}",
+    subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--allow-file-access-from-files", "--virtual-time-budget=2000", f"--screenshot={work / f'f{i:04d}.png'}",
                     "--window-size=720,330", page.as_uri()], capture_output=True)
 
 

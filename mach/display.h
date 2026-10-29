@@ -4,7 +4,7 @@
 
 namespace mach {
 // Matches resources.display in definition.json: paths, points, nodes, texts, palette.
-using Frame = opxy::draw::Frame<4, 64, 35, 16, 16>;
+using Frame = opxy::draw::Frame<4, 64, 34, 16, 16>;
 
 // Nodes, as tools/make_panel.py writes them into panel.svg.fragment.
 namespace node {
@@ -12,8 +12,8 @@ const u32 bow = 0, tail = 1, reflected = 2, wake = 3,    // the reshaping outlin
           header = 4,                                    // the two-page header's eight bar steps
           ring = 12, rings = 12,                         // the sound waves
           projectile = 24, projectiles = 5,              // one for each source
-          wire = 29, glow = 30, trigger = 31, plate = 32,
-          heard = 33, heards = 2;                        // where the sound heard now left
+          wire = 29, glow = 30, plate = 31,
+          heard = 32, heards = 2;                        // where the sound heard now left
 }
 
 // What the photograph is drawn from: the controls, eased, or a flight's,
@@ -27,7 +27,7 @@ struct Scene {
     i32 echo;        // 1 with a plate
     i32 length;      // dur, Q16 seconds
     i32 tune;        // Q16, -1 .. 1
-    i32 land;        // where the flight sounds the key: Q10 pixels along the line from the pass
+    i32 wave;        // the sound waves' spacing, Q10 pixels (20 to 10): the source's pitch, tighter as tune raises it
     i32 boom;        // Q15
     u32 source;
 };
@@ -43,6 +43,7 @@ struct DisplayState {
     Scene flight;              // the latest flight's, fixed at its note-on
     flight::Timeline line;     // ... its timeline
     i32 before;                // ... its approach, Q16 seconds of its own time before the pass
+    i32 boom_at;               // seconds after note-on its boom is heard, Q16 (-1: none)
     i32 echo_cone;             // seconds after note-on the plate's cone arrives, Q16 (-1: none)
     u32 flying;                // 1 while a flight is shown
     i32 elapsed;               // Q10 seconds since its note-on

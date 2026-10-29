@@ -3,16 +3,16 @@
 display.cpp reshapes its outlines to. Run it after changing a shape here and
 commit all three.
 
-One object fills the screen: a mug of hot chocolate in section, engraved as
-in Tyndall's Sound or Ganot's Physics, to scale at 1.5 px a millimetre: 80 mm
-across inside and 90 mm deep, its wall china, glass or enamelled tin, the
-handle at the left, steam rising off the drink. A teaspoon stands in the
-drink, its bowl on the floor and its handle on the rim or the wall, and rocks
-to tap the floor. The drink shows its own pitch: while bubbles remain
-its engraved lines are frothy, and they clear from the floor up as the
-bubbles rise out; the drink is in tune when every line is clear. The lines'
-density is the drink's darkness (powder), cocoa floats on it and sediment
-lies on the floor where it has not been stirred in.
+One object fills the screen: a mug of hot chocolate in section, to scale at
+1.5 px a millimetre: 80 mm across inside and 90 mm deep, its wall china,
+glass or enamelled tin, the handle at the left. Four greys and three
+weights: the mug boldest and brightest, the spoon and the drink's surface a
+step down, the drink's detail finer. A spoon stands in the drink, its bowl
+on the floor, leaning on the cup's lip or wall, and rocks to tap the floor.
+The drink shows its own pitch: while bubbles remain its lines are frothy,
+and they clear from the floor up as the bubbles rise out; the drink is in
+tune when every line is clear. The lines' density is the drink's darkness
+(powder); powder heaps on the floor where it has not been stirred in.
 
 The four reshaping outlines are the vessel (by cup), the drink's surface
 (meniscus, the stir's dip and the tap's ripples), and the spoon's bowl and
@@ -26,7 +26,7 @@ import re
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 ID = "cocoa"
 FONT = 'font-family="UniversNextPro-Light"'
-STROKE = 0.9              # every node's line: about a pixel, so it holds at 1:1 on the 480 x 220 screen
+STROKE = 0.9              # the finest line: about a pixel, so it holds at 1:1 on the 480 x 220 screen
 GREYS = ["#000000", "#0d0d0d", "#1a1a1a", "#262626", "#333333", "#404040", "#4d4d4d", "#5c5c5c",
          "#6b6b6b", "#7a7a7a", "#8c8c8c", "#a6a6a6", "#bdbdbd", "#d4d4d4", "#e6e6e6", "#f5f5f5"]
 G = lambda i: GREYS[max(0, min(15, round(i)))]
@@ -50,21 +50,20 @@ BUBBLE, BUBBLES = 12, 40
 FOAM, FOAMS = 52, 20
 POP, POPS = 72, 4
 HANDLE_CHINA, HANDLE_TIN = 76, 77
-GLINT, GLINTS = 78, 2
-CHIP, CHIPS = 80, 5
-HATCH = 85
-WATER = 88                # clear lines, then the same lines frothy
-FROTH = 108
-SPECK, SPECKS = 128, 10
-SEDIMENT, SEDIMENTS = 138, 8
-SHINE = 146
-STEAM, STEAMS = 147, 3
-GRAIN, GRAINS = 150, 3    # the wooden spoon's grain: two along the handle, one in the bowl
-SHAKE, SHAKES = 153, 3    # strokes beside the bowl while it taps fast
-RING, RINGS = 156, 3      # ripples on the floor where the bowl taps
-CLUMP, CLUMPS = 159, 5    # undissolved powder suspended in the drink
-SWIRL, SWIRLS = 164, 4    # the stirred drink turning
-NODES = 168
+WATER = 78                # clear lines, then the same lines frothy
+FROTH = 98
+HEAP = 118                # undissolved powder on the floor
+CLUMP, CLUMPS = 119, 3    # and hanging in the drink
+SHINE = 122
+GRAIN, GRAINS = 123, 2    # the wooden spoon's grain: along the handle, a ring in the bowl
+SHAKE, SHAKES = 125, 3    # strokes beside the bowl while it taps fast
+RING, RINGS = 128, 3      # ripples on the floor where the bowl taps
+SWIRL, SWIRLS = 131, 4    # the stirred drink turning
+NODES = 135
+# Three weights: the mug brightest and boldest, the spoon and the drink's
+# surface a step down, the drink's detail finer. A palette entry's stroke is
+# its weight (px).
+WEIGHT = {15: 1.6, 13: 1.1}
 POINTS = 64
 HIDDEN = (640, 320)
 
@@ -226,7 +225,7 @@ def handle(kind):
 MORPHS = 33
 LIFT_MOST = 24.0     # degrees: taps' highest rest (display.cpp)
 CLEAR = 1.4          # px between the spoon's line and the cup's, centre to centre (each about 0.9 px wide)
-HEADER_BOTTOM = 40.0 # px: nothing of the spoon above this, under the header
+HEADER_BOTTOM = 46.0 # px: nothing of the spoon above this, a clear margin under the header
 
 
 def morphed(m):
@@ -326,12 +325,7 @@ for i, (x, y, ink, size) in enumerate(texts):
     out.append(f'<text id="{ID}_text_{i}" transform="matrix(1 0 0 1 {num(x)} {num(y)})" fill="{ink}" {FONT} '
                f'font-size="{size}px">-</text>')
 
-# ---- Behind the drink, the far half of the mug's inside, shaded as a
-# cylinder: upright lines, closer toward the sides, never under 8 px apart.
-for i in (2, 4, 7, 13, 16, 18):
-    x = CX - INNER * math.cos(math.pi * i / 20)
-    out.append(path(outline(ribbon(line(x, RIM + 5, x, BOTTOM - 5, 3), 0.3)), G(4), 0.6))
-# The water lines: engraved horizontals up to the drink's surface, as many
+# ---- The drink's lines: horizontals up to the drink's surface, as many
 # as the drink is dark (powder). Each has a frothy twin, shown while bubbles
 # fill the drink at its height.
 for k in range(WATER_LINES):
@@ -347,22 +341,18 @@ for k in range(WATER_LINES):
            for j in range(n)]
     out.append(path(outline(ribbon(pts, 0.3), 1), G(9), 0.3, FROTH + k, HIDDEN))
 # Undissolved powder, more for less stirring (stir): a heap on the floor
-# beside the spoon, lumps about the floor and clumps hanging in the drink.
-# Each about its own node: the heap about the middle of its foot, scaled
-# down as the drink is stirred in.
+# beside the spoon and clumps hanging in the drink. Each about its own
+# node: the heap about the middle of its foot, scaled down as the drink is
+# stirred in.
 rng = random.Random(1982)   # Crawford's year
-for _ in range(SEDIMENTS * 12):
+for _ in range(8 * 12):
     rng.random()            # the old sediment's draws, so the scatter below stays where it was
 lumpy = random.Random(1879)
 heap = [(x, -15.5 * (1 - (x / 23) ** 2) ** 0.7 * (1 + 0.09 * math.sin(x * 1.3) + 0.05 * math.sin(x * 2.9)))
         for x in [-23 + 46 * j / 22 for j in range(23)]]
-out.append(path(outline(heap), G(6), STROKE, SEDIMENT, HIDDEN, fill="#000000"))
-for k in range(1, SEDIMENTS):
-    r = lumpy.uniform(3.6, 5.2)
-    mound = [(r * math.cos(a), -0.4 - r * 0.8 * math.sin(a) * lumpy.uniform(0.75, 1.15)) for a in [math.pi * j / 8 for j in range(9)]]
-    out.append(path(outline(mound), G(6), STROKE, SEDIMENT + k, HIDDEN, fill="#000000"))
+out.append(path(outline(heap), G(6), STROKE, HEAP, HIDDEN, fill="#000000"))
 for k in range(CLUMPS):
-    r = lumpy.uniform(3.2, 4.6)
+    r = lumpy.uniform(4.0, 5.0)
     clump = [(r * math.cos(a) * lumpy.uniform(0.7, 1.2), r * 0.75 * math.sin(a) * lumpy.uniform(0.7, 1.2))
              for a in [2 * math.pi * j / 9 for j in range(9)]]
     out.append(path(outline(clump), G(7), STROKE, CLUMP + k, HIDDEN, fill="#000000"))
@@ -384,19 +374,13 @@ for k in range(FOAMS):
     out.append(circle(0, 0, 3, G(10), STROKE, FOAM + k, HIDDEN, fill="#000000"))
 for k in range(POPS):
     out.append(circle(0, 0, 3, G(9), 0.35, POP + k, HIDDEN))
-# Cocoa powder floating on the surface: small irregular flecks.
-for k in range(SPECKS):
-    r = rng.uniform(1.6, 2.6) + 1.0
-    fleck = [(r * math.cos(a) * rng.uniform(0.7, 1.2), r * 0.6 * math.sin(a) * rng.uniform(0.7, 1.2))
-             for a in [2 * math.pi * j / 7 for j in range(7)]]
-    out.append(path(outline(fleck), G(7), STROKE, SPECK + k, HIDDEN, fill="#000000"))
+for _ in range(10 * 15):
+    rng.random()            # the floating flecks' draws (gone: the lines' density shows the powder)
 
 # The vessel (outline 0), as china.
 half = [((x - VESSEL_AT[0]) / 2, (y - VESSEL_AT[1]) / 2) for x, y in VESSELS["china"]]
 out.append(path(outline(half), G(14), STROKE, VESSEL, VESSEL_AT))
-# The handles, at the left: china's thick C, tin's strap with its rivets
-# showing as two small rings in the band; and the marks of each material:
-# glass's glints and tin's chipped enamel.
+# The handles, at the left: china's thick C and tin's strap; glass has none.
 L = CX - INNER
 
 
@@ -412,49 +396,8 @@ wall = L - WALL["tin"]
 tin = band([(wall - 1, RIM + 10)] + arc(wall - 18, RIM + 35, 20, -math.pi * 0.5, -math.pi * 1.5, 16) + [(wall - 1, RIM + 60)],
            [(wall - 1, RIM + 13.5)] + arc(wall - 18, RIM + 35, 16.5, -math.pi * 0.54, -math.pi * 1.46, 16) + [(wall - 1, RIM + 56.5)])
 out.append(path(outline(tin), G(14), STROKE, HANDLE_TIN, HIDDEN))
-for k, x in enumerate((L - WALL["glass"] + 1.6, CX + INNER + 1.6)):
-    out.append(path(outline(ribbon(line(x, RIM + 12, x, BOTTOM - 16, 4), 0.7)), G(11), 0.3, GLINT + k, HIDDEN))
-chips = [(L - 1.5, RIM + 3, 3.0), (CX + INNER + 1.2, RIM + 30, 2.6), (L - 0.8, 150, 2.2), (CX + INNER + 0.8, 176, 2.8),
-         (CX - 30, BOTTOM + 4.2, 2.4)]
-for k, (x, y, r) in enumerate(chips):
-    chip = [(x + r * math.cos(a) * rng.uniform(0.6, 1.1), y + r * math.sin(a) * rng.uniform(0.6, 1.1))
-            for a in [2 * math.pi * j / 8 for j in range(8)]]
-    out.append(path(outline(chip), G(10), 0.35, CHIP + k, HIDDEN, fill="#000000"))
-for _ in range(18):
-    rng.random()            # china's crazing, gone (too fine for the screen): its draws, so the scatter below stays
-
-# China's cut wall and base, hatched at 45 degrees as an engraver sections a
-# solid: a sawtooth across each band, its back along the outer edge.
-def hatch(x0, y0, x1, y1, step=5.0):
-    """Diagonal strokes across the band x0..x1 (width) running down y0..y1."""
-    w = x1 - x0
-    pts, y = [], y0
-    while y + w < y1:
-        pts += [(x1, y), (x0, y + w)]
-        y += step
-    back = [(x1 + 0.35, y + w - step), (x1 + 0.35, y0 - 0.35)]
-    return pts + back
-
-
-def hatch_across(x0, x1, y0, y1, step=5.0):
-    """The same across a horizontal band (the base), left to right."""
-    h = y1 - y0
-    pts, x = [], x0
-    while x + h < x1:
-        pts += [(x, y1), (x + h, y0)]
-        x += step
-    return pts + [(x + h - step, y1 + 0.35), (x0 - 0.35, y1 + 0.35)]
-
-
-w = WALL["china"]
-out.append(path(outline(hatch(L - w + 0.6, RIM + 5, L - 0.6, BOTTOM + 2)), G(5), 0.25, HATCH, HIDDEN))
-out.append(path(outline(hatch(CX + INNER + 0.6, RIM + 5, CX + INNER + w - 0.6, BOTTOM + 2)), G(5), 0.25, HATCH + 1, HIDDEN))
-out.append(path(outline(hatch_across(L + 6, CX + INNER - 14, BOTTOM + 0.6, BOTTOM + 8 * MM - 2.2)), G(5), 0.25, HATCH + 2, HIDDEN))
-
-# Steam off the hot drink: three wisps rising from the mouth of the mug.
-for k, (x, phase) in enumerate(((CX - 30, 0.0), (CX - 4, 1.9), (CX + 22, 3.7))):
-    pts = [(x + 3.2 * math.sin(phase + j * 0.55) + j * 0.35, RIM - 3 - j * 1.7) for j in range(11)]
-    out.append(path(outline(ribbon(pts, 0.4)), G(6), 0.3, STEAM + k, HIDDEN))
+for _ in range(5 * 16 + 18):
+    rng.random()            # tin's chips and china's crazing, gone: their draws, so the scatter below stays
 
 # The drink's surface (outline 1), at 59 mm, flat.
 surface = ribbon([(-INNER / 2 + 0.2 + i * (INNER - 0.4) / 31, 0.0) for i in range(32)], 0.18)
@@ -486,20 +429,19 @@ sp = SPOON["silver"]
 bl, bw = sp["bowl"] * MM, sp["width"] * MM
 shine = ribbon(arc(0.55 * bl, 0, 0.3 * bl, math.pi * 0.62, math.pi * 1.15, 8, 0.3 * bw), 0.5)
 out.append(path(outline(shine), G(12), 0.3, SHINE, HIDDEN))
-# The wooden spoon's grain: two wavering lines along its handle (about the
+# The wooden spoon's grain: a wavering line along its handle (about the
 # handle's node) and a growth ring in its bowl (about the tip).
 wp = SPOON["wood"]
 x0, x1 = wp["bowl"] * MM + 3 - HANDLE_MID, wp["length"] * MM - 5 - HANDLE_MID
-for k, (y, phase) in enumerate(((-3.6, 0.0), (3.2, 2.1))):
-    pts = [(x0 + (x1 - x0) * j / 14, y + 0.9 * math.sin(phase + j * 0.8) * (0.4 + 0.6 * j / 14)) for j in range(15)]
-    out.append(path(outline(ribbon(pts, 0.35)), G(9), 0.3, GRAIN + k, HIDDEN))
+pts = [(x0 + (x1 - x0) * j / 14, 0.9 * math.sin(j * 0.8) * (0.4 + 0.6 * j / 14)) for j in range(15)]
+out.append(path(outline(ribbon(pts, 0.35)), G(9), 0.3, GRAIN, HIDDEN))
 bl, bw = wp["bowl"] * MM, wp["width"] * MM
 ring = [(0.62 * bl + 0.3 * bl * math.cos(a), 0.27 * bw * math.sin(a) * (1 + 0.08 * math.sin(3 * a))) for a in
         [math.pi * (0.35 + 1.3 * j / 20) for j in range(21)]]
-out.append(path(outline(ribbon(ring, 0.35)), G(9), 0.3, GRAIN + 2, HIDDEN))
+out.append(path(outline(ribbon(ring, 0.35)), G(9), 0.3, GRAIN + 1, HIDDEN))
 
 for i, grey in enumerate(GREYS):
-    out.append(f'<circle id="{ID}_palette_{i}" cx="640" cy="0" r="1" fill="{grey}" stroke="{grey}" stroke-width="{STROKE}"/>')
+    out.append(f'<circle id="{ID}_palette_{i}" cx="640" cy="0" r="1" fill="{grey}" stroke="{grey}" stroke-width="{WEIGHT.get(i, STROKE)}"/>')
 out.append("</g>")
 
 body = "\n".join(out)
@@ -555,8 +497,6 @@ lines.append("// Each bubble's place across the mug (Q10 px from the axis) and u
 lines.append("// class's column (Q10 of its height): a fixed scatter, five to a class.")
 lines.append("const opxy::i32 across[40] = {" + ", ".join(map(str, across)) + "};")
 lines.append("const opxy::i32 up[40] = {" + ", ".join(map(str, up)) + "};")
-lines.append("// Where each powder fleck floats, Q10 px from the axis.")
-lines.append("const opxy::i32 fleck[10] = {" + ", ".join(str(round((-INNER + 8 + k * (2 * INNER - 16) / 9 + rng.uniform(-2, 2)) * 1024)) for k in range(SPECKS)) + "};")
 lines += ["}", "}"]
 (ROOT / "plate.h").write_text("\n".join(lines) + "\n")
 print("wrote plate.h")

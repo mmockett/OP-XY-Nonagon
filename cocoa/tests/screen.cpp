@@ -170,7 +170,7 @@ struct Run {
 // default (Mug Keys), one JSON frame each, row by row: at rest, or for powder
 // and fizz 0.12 s into a note, and for taps 0.6 s into one.
 void sheet(FILE* out) {
-    const double defaults[8] = {0.32, 0.0, 0.7, 0.1667, 0.65, 0.6, 0.15, 1.0};
+    const double defaults[8] = {0.32, 0.0, 0.7, 0.1667, 0.65, 0.6, 0.15, 0.6};
     const double values[3] = {0.0, 0.5, 1.0};
     for (int k = 0; k < 8; ++k)
         for (double v : values) {

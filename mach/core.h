@@ -80,6 +80,8 @@ struct Voice {
     i32 ring;          // 1 / the bell's second ring (from the pass to the flight's end), Q16 per second
     i32 boom_low, boom_lower;   // the booms' two low-passes (shock rise, air)
     i32 boom_r;        // the distance the straight boom left from, Q26
+    i32 air_near;      // the air's corner at the closest pass over at 12 m, sqrt(12 m / d), Q16
+    i32 boom_near;     // ... and where the straight boom left over at the pass, sqrt(d / r), Q30
     i32 boom_end;      // sample after which no boom sounds
     i32 boom_share;    // Q15: this voice's share of a boom heard with others (1 / how many at once)
     u32 boom_held;     // 1 while this voice is counted among the booms in progress

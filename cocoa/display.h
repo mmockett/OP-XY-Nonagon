@@ -4,7 +4,7 @@
 
 namespace cocoa {
 // Matches resources.display in definition.json: paths, points, nodes, texts, palette.
-using Frame = opxy::draw::Frame<4, 64, 168, 16, 16>;
+using Frame = opxy::draw::Frame<4, 64, 135, 16, 16>;
 
 // Nodes, as tools/make_panel.py writes them into panel.svg.fragment.
 namespace node {
@@ -14,19 +14,14 @@ const u32 vessel = 0, surface = 1, bowl = 2, handle = 3,  // the reshaping outli
           foam = 52, foams = 20,                          // two rows on the surface
           pop = 72, pops = 4,
           handle_china = 76, handle_tin = 77,
-          glint = 78, glints = 2,                         // glass
-          chip = 80, chips = 5,                           // tin's chipped enamel
-          hatch = 85, hatches = 3,                        // china's cut wall and base, hatched
-          water = 88, froth = 108, waters = 20,           // the drink's lines, clear and frothy, bottom up
-          fleck = 128, flecks = 10,                       // powder floating on the drink
-          sediment = 138, sediments = 8,                  // powder left on the floor: a heap, then lumps
-          shine = 146,                                    // the silver bowl's shine
-          steam = 147, steams = 3,
-          grain = 150, grains = 3,                        // the wooden spoon's grain: handle, handle, bowl
-          shake = 153, shakes = 3,                        // strokes beside the bowl tapping fast
-          ring = 156, rings = 3,                          // ripples on the floor where the bowl taps
-          clump = 159, clumps = 5,                        // powder hanging in the drink
-          swirl = 164, swirls = 4;                        // the stirred drink turning
+          water = 78, froth = 98, waters = 20,            // the drink's lines, clear and frothy, bottom up
+          heap = 118,                                     // undissolved powder on the floor
+          clump = 119, clumps = 3,                        // and hanging in the drink
+          shine = 122,                                    // the silver bowl's shine
+          grain = 123, grains = 2,                        // the wooden spoon's grain: handle, bowl
+          shake = 125, shakes = 3,                        // strokes beside the bowl tapping fast
+          ring = 128, rings = 3,                          // ripples on the floor where the bowl taps
+          swirl = 131, swirls = 4;                        // the stirred drink turning
 }
 
 // The mug in section, at 1.5 px a millimetre (make_panel.py has the same).

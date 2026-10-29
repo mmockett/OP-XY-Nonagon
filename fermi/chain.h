@@ -103,7 +103,7 @@ inline Coefficient coefficient(u32 q24, i32 scale) {
 struct Setup {
     u32 size;               // index into the tables' sizes
     u32 n, m;               // masses and the struck mode
-    u32 seed;               // 0..63
+    u32 seed;               // 0..63: the nudge's pattern, and its size (seed / 128 of the strike's swing)
     i32 energy, springs;    // Q15
     u32 strength;           // g, Q24
     u32 alpha, beta;        // Q24
@@ -117,8 +117,22 @@ struct Setup {
     u32 per_block;          // ticks a block, Q16
     u32 loss;               // damping: the share of every mode's swing lost a block, Q24
     u32 smooth;             // and the Laplacian's share, which grows as w^2: high modes die first, Q24
-    i32 dispersion;         // Q15: 0 harmonic partials, 1 the chain's own
+    i32 dispersion;         // Q15, the knob: 0 harmonic partials, 1 the top partial 500 cents flat
+    i32 stretch;            // Q15, the partials' blend from harmonic toward the chain's own (above 1 past it)
 };
+
+// The energy knob: the calibration's pure, deep and thermal anchors sit at
+// 0, 1/2 and 1 of the chain's energy. Near pure a chain barely stirs, so the
+// knob crosses the first 0.22 of it in its first twentieth, and the onset of
+// breathing gets the rest of its lower half.
+inline i32 energy_of(i32 knob) {
+    if (knob < 1638) return (knob * 4507) >> 10;                // 0.05 -> 0.22
+    if (knob < 16384) return 7209 + (((knob - 1638) * 20389) >> 15);   // 0.5 -> 0.5
+    return knob;
+}
+// Time slows the clock by up to 2^4.5 (log2, Q12, from the knob's Q15): at
+// 16 masses, a breath from 1.4 s to 32 s.
+inline i32 slowing(i32 time) { return (time * 9) >> 4; }
 
 inline u32 strength_of(u32 size, u32 m, i32 energy, i32 springs) {
     // The calibrated anchors, log-interpolated across springs' five positions...
@@ -136,14 +150,19 @@ inline u32 strength_of(u32 size, u32 m, i32 energy, i32 springs) {
     return exp2_q24(l);
 }
 
-inline void configure(Setup& s, const i32* controls) {
+// static: the engine and the screen each keep their own copy, as the
+// firmware's linker does not merge duplicate inline functions.
+static inline void configure(Setup& s, const i32* controls) {
     s.size = choice(controls[MASSES], tables::sizes);
     s.n = tables::masses[s.size];
     s.m = choice(controls[MODE], 4) + 1;
     s.seed = choice(controls[SEED], 64);
-    s.energy = amount(controls[ENERGY]);
+    s.energy = energy_of(amount(controls[ENERGY]));
     s.springs = amount(controls[SPRINGS]);
     s.dispersion = amount(controls[DISPERSION]);
+    // Dispersion 1 sets the top voiced partial 500 cents flat at any size: a
+    // fixed stretch of the chain's own law, which grows as (k / N)^2.
+    s.stretch = (s.dispersion * static_cast<i32>(tables::stretch[s.size])) >> 12;
     s.strength = strength_of(s.size, s.m, s.energy, s.springs);
     const u32 g = s.strength;
     s.alpha = ((g >> 10) * static_cast<u32>(32768 - s.springs)) >> 5;
@@ -175,10 +194,10 @@ inline void configure(Setup& s, const i32* controls) {
     s.shift = stiff <= (9u << 22) ? 1 : stiff <= (9u << 24) ? 2 : 3;
     s.dt_ticks = ticks_per_unit >> s.shift;
     // Time: the fastest the CPU allows (most_steps of dt 1/2 a block), slowed
-    // by 2^(-8 time).
+    // by 2^(-4.5 time).
     s.most_steps = tables::most_steps[s.size];
-    const i32 time = amount(controls[TIME]);
-    s.per_block = (exp2_q24(-time) >> 8) * (s.most_steps * 4);   // Q16 ticks; -time is -8 time octaves, Q12
+    const i32 time = slowing(amount(controls[TIME]));
+    s.per_block = (exp2_q24(-time) >> 8) * (s.most_steps * 4);   // Q16 ticks; -time in octaves, Q12
     // Damping: 0 is lossless, then the struck mode's T60 from 30 s down to
     // 1 s. Mode k loses more as w_k^2 grows, as a string's modes do: the top
     // voiced partial dies four times as fast as the struck mode, so a note
@@ -211,10 +230,10 @@ inline i32 period_log2(const Setup& s) {
     return lo + (((hi - lo) * sf) >> 15);
 }
 // Chain time ticks the clock runs a block, log2 Q12: time slows it by
-// 2^(-8 time) from the CPU's limit, most_steps steps of dt 1/2; at the limit
-// a smaller dt (stiff springs) slows it too.
+// 2^(-4.5 time) from the CPU's limit, most_steps steps of dt 1/2; at the
+// limit a smaller dt (stiff springs) slows it too.
 inline i32 clock_log2(const Setup& s, i32 time) {
-    const i32 asked = 2 * 4096 - time, most = static_cast<i32>(3 - s.shift) * 4096;
+    const i32 asked = 2 * 4096 - slowing(time), most = static_cast<i32>(3 - s.shift) * 4096;
     return tables::log2_most_steps[s.size] + (asked < most ? asked : most);
 }
 // The breathing period in seconds, log2 Q12.
@@ -237,29 +256,79 @@ inline u32 scramble(u32 h) {
     h ^= h >> 16; h *= 0x7feb352du; h ^= h >> 15; h *= 0x846ca68bu; h ^= h >> 16;
     return h;
 }
-// A note: all the energy in mode m, the chain at rest at its widest. The seed
-// adds a perturbation of about 3e-6 of the swing (+-32 of Q20), which a
-// recurrent chain shrugs off and a chaotic one amplifies.
-inline void init(Chain& c, const Setup& s) {
+// The seed's nudge before it is sized: modes 1 to 6 but the struck one, each
+// at a random amplitude falling as 1 / k (so each holds a like share of the
+// energy), Q14; 0 when the seed is off. Orthogonal to the struck mode, it
+// takes energy from it cleanly.
+const i32 inverse_k[6] = {32768, 16384, 10923, 8192, 6554, 5461};   // 1 / k, Q15
+inline void nudge(i32* r, const Setup& s) {
+    for (u32 j = 0; j <= s.n + 1; ++j) r[j] = 0;
+    if (!s.seed) return;
+    const u32 half = s.n / 2;
+    for (u32 k = 1; k <= 6; ++k) {
+        if (k == s.m) continue;
+        const i32 a = ((static_cast<i32>(scramble(s.seed * 0x9e3779b1u + k) >> 17) - 16384) * inverse_k[k - 1]) >> 15;   // Q14
+        const i16* row = &tables::shape[tables::shape_at[s.size] + (k - 1) * half];
+        for (u32 j = 1; j <= s.n; ++j) {
+            const bool far = j > half;
+            i32 sv = row[(far ? s.n + 1 - j : j) - 1];
+            if (far && !(k & 1)) sv = -sv;
+            r[j] += (sv * a) >> 15;
+        }
+    }
+}
+// The nudge's share of the note's energy, Q16: 0.66 x (1.5 - x / 2) for x
+// = seed / 63, rising quickly at first (a quarter of the way is 0.23 of the
+// energy, half is 0.41) to two thirds.
+inline u32 nudge_share(const Setup& s) { return (s.seed * (189 - s.seed) * 349) >> 6; }
+// The note's starting shape: mode m at its widest, and the seed's nudge
+// taking its share of the energy (nudge_share), the struck mode the rest, so the note is as
+// loud whatever the seed. At low energy the nudged modes sound beside the
+// struck one; breathing, they change its course; in chaos any nudge sends it
+// elsewhere.
+inline void shape(i32* x, const Setup& s) {
+    const u32 half = s.n / 2;
+    const i16* row = &tables::shape[tables::shape_at[s.size] + (s.m - 1) * half];
+    const i32 f = static_cast<i32>(tables::start[s.size * 4 + s.m - 1]);
+    x[0] = x[s.n + 1] = 0;
+    for (u32 j = 1; j <= s.n; ++j) {
+        const bool far = j > half;
+        i32 sv = row[(far ? s.n + 1 - j : j) - 1];
+        if (far && !(s.m & 1)) sv = -sv;
+        x[j] = (sv * f) >> 6;   // Q15 x Q11 = Q26, to Q20
+    }
+    if (!s.seed) return;
+    i32 r[most + 2];
+    nudge(r, s);
+    // The springs' energies (the bonds' squared stretches) of each shape.
+    u32 pure = 0, raw = 0;
+    for (u32 j = 1; j <= s.n + 1; ++j) {
+        const i32 a = (x[j] - x[j - 1]) >> 10, b = (r[j] - r[j - 1]) >> 4;
+        pure += static_cast<u32>(a * a);
+        raw += static_cast<u32>(b * b);
+    }
+    const u32 share = nudge_share(s);                                     // Q16
+    const u32 ratio = (pure << 6) / ((raw >> 10) | 1);                     // pure / raw, Q16
+    const i32 lift = static_cast<i32>(root(((ratio >> 4) * (share >> 4)) >> 8) << 2);   // so the nudge holds its share
+    const i32 keep = static_cast<i32>(root(65536 - share));                // and the struck mode the rest, Q8
+    for (u32 j = 1; j <= s.n; ++j) x[j] = (x[j] >> 8) * keep + ((r[j] * lift) >> 4);
+}
+// A note: the chain at rest in its starting shape (given, or made here).
+inline void init(Chain& c, const Setup& s, const i32* start) {
     c.n = s.n;
     c.m = s.m;
     c.size = s.size;
     c.ticks = 0;
     c.clock = 0;
     c.blocks = 0;
-    const u32 half = s.n / 2;
-    const i16* row = &tables::shape[tables::shape_at[s.size] + (s.m - 1) * half];
-    const i32 f = static_cast<i32>(tables::start[s.size * 4 + s.m - 1]);
-    for (u32 j = 1; j <= s.n; ++j) {
-        const bool far = j > half;
-        i32 sv = row[(far ? s.n + 1 - j : j) - 1];
-        if (far && !(s.m & 1)) sv = -sv;
-        c.x[j] = (sv * f) >> 6;   // Q15 x Q11 = Q26, to Q20
-        if (s.seed) c.x[j] += static_cast<i32>(scramble(s.seed * 0x9e3779b1u + j) >> 26) - 32;
-        c.v[j] = 0;
-    }
-    c.x[0] = c.v[0] = 0;
-    for (u32 j = s.n + 1; j < most + 2; ++j) c.x[j] = c.v[j] = 0;
+    for (u32 j = 0; j <= s.n + 1; ++j) c.x[j] = start[j];
+    for (u32 j = 0; j < most + 2; ++j) c.v[j] = 0;
+    for (u32 j = s.n + 1; j < most + 2; ++j) c.x[j] = 0;
+}
+inline void init(Chain& c, const Setup& s) {
+    i32 start[most + 2];
+    shape(start, s);
+    init(c, s, start);
 }
 
 // The spring's force on a stretch d (Q20): d + d^2 (alpha + beta d). Every

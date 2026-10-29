@@ -94,15 +94,17 @@ inline i32 below(i32 size) { return octave * static_cast<i32>(1 + choice(size, s
 // The rise at which the disk leaves the surface: the rate at the ring.
 inline i32 top(i32 size) { return below(size); }
 
-// Ring: how the disk rings once it lies flat, a T60 of 0.05 s (a dead slap)
-// to 4 s (a bell on the note), 0.05 x 80^r. As 1 - r^2 a sample (Q31), about
-// 13.8 / (T60 x 44100): 2^(23.680 - 6.3219 r).
-inline i32 after_loss(i32 ring) {
-    return static_cast<i32>(exp2_q16(1551895 - static_cast<i32>(25894u * (q16(ring) >> 4) >> 8)));
+// Ring: how the disk rings once it lies flat, a T60 of 0.12 s (a dead slap)
+// to 4 s (a bell on the note) for steel, 0.12 x 33.3^r, and by its material:
+// brass 0.6 times as long, glass 1.5 times, wood 0.35. As 1 - r^2 a sample
+// (Q31), about 13.8 / (T60 x 44100): 2^(22.419 - 5.0589 r - the material's).
+const i32 material_ring[4] = {0, -48298, 38336, -99259};   // log2 of each material's share, Q16
+inline i32 after_loss(i32 ring, u32 material) {
+    return static_cast<i32>(exp2_q16(1469227 - static_cast<i32>(20721u * (q16(ring) >> 4) >> 8) - material_ring[material]));
 }
-// That T60 in hundredths of a second, 5 to 400: 2^(2.3219 + 6.3219 r).
-inline u32 after_hundredths(i32 ring) {
-    return exp2_q16(152170 + static_cast<i32>(25894u * (q16(ring) >> 4) >> 8));
+// That T60 in hundredths of a second, 4 to 600: 2^(3.585 + 5.0589 r + the material's).
+inline u32 after_hundredths(i32 ring, u32 material) {
+    return exp2_q16(234944 + static_cast<i32>(20721u * (q16(ring) >> 4) >> 8) + material_ring[material]);
 }
 
 // The rise (Q16 octaves above the held rate) at a life (Q30), for exponent n.

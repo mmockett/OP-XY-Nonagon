@@ -40,7 +40,7 @@
     {
       "id": "strike",
       "label": "Strike",
-      "default": 0.9,
+      "default": 0.6296,
       "mapping": {
         "kind": "linear",
         "minimum": 0,
@@ -102,7 +102,7 @@
       "flux": 0.764,
       "coupling": 0.5,
       "spread": 0.75,
-      "strike": 0.9,
+      "strike": 0.6296,
       "glow": 0.844,
       "site": 0.25,
       "tilt": 0.4,
@@ -142,7 +142,7 @@
       "flux": 0.6667,
       "coupling": 0.577,
       "spread": 0.5,
-      "strike": 0.8,
+      "strike": 0.4693,
       "glow": 0.756,
       "site": 0.125,
       "tilt": 0.5,
@@ -152,7 +152,7 @@
       "flux": 0.54,
       "coupling": 0.5,
       "spread": 0.934,
-      "strike": 0.35,
+      "strike": 0.1366,
       "glow": 0.946,
       "site": 0.7,
       "tilt": 0.2,
@@ -172,7 +172,7 @@
       "flux": 0.8284,
       "coupling": 0.671,
       "spread": 0.666,
-      "strike": 0.15,
+      "strike": 0.0523,
       "glow": 0.869,
       "site": 0.3,
       "tilt": 0.6,
@@ -186,11 +186,11 @@
     "sharedBytes": 0,
     "outputPeakQ31": 1073741824,
     "display": {
-      "stateBytes": 520,
+      "stateBytes": 508,
       "stateAlignment": 4,
       "paths": 4,
       "points": 64,
-      "nodes": 58,
+      "nodes": 26,
       "texts": 16,
       "palette": 16
     }

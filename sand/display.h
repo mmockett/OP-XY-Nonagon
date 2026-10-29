@@ -13,10 +13,11 @@ const u32 grains_shown = 48, bow_parts = 4, materials = 3;
 const i32 stroke_most = 40;
 // Palette greys (0 black .. 15 white): the nodal lines; a grain at rest,
 // moving and in the air; each bow part's grey idle and while bowing; the
-// plate's edge for metal, glass and wood.
+// plate's top, the brightest line, and its edge in thickness for metal, glass
+// (bright) and wood.
 const u32 line_grey = 8, rest_grey = 11, moving_grey = 13, aloft_grey = 15;
 const u32 bow_grey[bow_parts][2] = {{9, 11}, {9, 11}, {8, 10}, {10, 13}};
-const u32 edge_grey[materials] = {9, 13, 7};
+const u32 top_grey = 13, edge_grey[materials] = {10, 12, 9};
 // The nodal lines scribed on a bare plate.
 const u32 bare_grey = 4;
 

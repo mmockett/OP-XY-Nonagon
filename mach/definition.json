@@ -59,7 +59,7 @@
       "id": "boom",
       "label": "Boom",
       "control": 0,
-      "default": 0.3,
+      "default": 0.4,
       "mapping": {
         "kind": "linear",
         "minimum": 0,
@@ -71,7 +71,7 @@
       "id": "air",
       "label": "Air",
       "control": 1,
-      "default": 0.3,
+      "default": 0.15,
       "mapping": {
         "kind": "linear",
         "minimum": 0,
@@ -110,8 +110,8 @@
       "pass": 0.301,
       "source": 0.7,
       "dur": 0.5805,
-      "boom": 0.3,
-      "air": 0.3,
+      "boom": 0.4,
+      "air": 0.15,
       "tune": 1.0,
       "echo": 0.0
     },
@@ -121,7 +121,7 @@
       "source": 0.3,
       "dur": 0.75,
       "boom": 0.0,
-      "air": 0.4,
+      "air": 0.25,
       "tune": 1.0,
       "echo": 0.25
     },
@@ -130,8 +130,8 @@
       "pass": 0.412,
       "source": 0.7,
       "dur": 0.6462,
-      "boom": 0.15,
-      "air": 0.25,
+      "boom": 0.3,
+      "air": 0.2,
       "tune": 0.0,
       "echo": 0.0
     },
@@ -141,8 +141,8 @@
       "source": 0.1,
       "dur": 0.0,
       "boom": 1.0,
-      "air": 0.3,
-      "tune": 0.5,
+      "air": 0.2,
+      "tune": 1.0,
       "echo": 0.0
     },
     "Siren Lead": {
@@ -151,7 +151,7 @@
       "source": 0.9,
       "dur": 0.5,
       "boom": 0.0,
-      "air": 0.2,
+      "air": 0.15,
       "tune": 1.0,
       "echo": 0.0
     },
@@ -161,7 +161,7 @@
       "source": 0.1,
       "dur": 1.0,
       "boom": 0.0,
-      "air": 0.55,
+      "air": 0.45,
       "tune": 0.5,
       "echo": 0.6
     },
@@ -170,8 +170,8 @@
       "pass": 0.6505,
       "source": 0.5,
       "dur": 0.8305,
-      "boom": 0.35,
-      "air": 0.4,
+      "boom": 0.48,
+      "air": 0.3,
       "tune": 1.0,
       "echo": 0.4
     },
@@ -181,23 +181,23 @@
       "source": 0.1,
       "dur": 0.3962,
       "boom": 0.0,
-      "air": 0.5,
+      "air": 0.35,
       "tune": 1.0,
       "echo": 0.0
     }
   },
   "resources": {
-    "voiceBytes": 1044,
+    "voiceBytes": 1052,
     "voiceAlignment": 4,
     "voiceCapacity": 8,
     "sharedBytes": 4,
     "outputPeakQ31": 1073741824,
     "display": {
-      "stateBytes": 412,
+      "stateBytes": 416,
       "stateAlignment": 4,
       "paths": 4,
       "points": 64,
-      "nodes": 35,
+      "nodes": 34,
       "texts": 16,
       "palette": 16
     }

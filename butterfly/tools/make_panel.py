@@ -10,20 +10,23 @@ Moth's line and greys, with its own specimen label.
 
 A wing is two zones. Its breadth, from the body out to the submarginal band
 (0.2 to 0.64 of the margin's reach), is the chain, from its middle site to
-its end: the lit band (an outline) lies at the struck site, three pigment
-bands at sites 0, 4 and 8 carry the strike's density there, and the
-eyespots, four a wing, are the localized states. The forewing's veins and
-bands are nodes of their own, so tilt can sweep the forewing back about the
-root; glow draws a tail out of the hindwing, so the silhouette has none. Outside it the margin, one
-outline of the root's two points and 62 margin points, is the spectrum, read
-from the forewing's leading edge (the top) round to the hindwing's tail (the
-bottom), each band a lobe and each gap a notch. display.cpp keeps the margin
-outside the inner zone, so the static veins and bands never cross it. Each
-wing's nodes scale together about its root (spread, wingbeat).
+its end: the lit band (an outline) lies at the struck site, and the
+eyespots, four a wing, are the localized states. The forewing's veins are a
+node of their own, so tilt can sweep the forewing back about the root; glow
+draws a tail out of the hindwing, so the silhouette has none. Outside it the
+margin, one outline of the root's two points and 62 margin points, is the
+spectrum, read from the forewing's leading edge (the top) round to the
+hindwing's tail (the bottom), each band a lobe and each gap a notch.
+display.cpp keeps the margin outside the inner zone, so the static veins
+never cross it. Each wing's nodes scale together about its root (spread,
+wingbeat).
 
-The body is static (head, thorax, a segmented abdomen, the pin
-through the thorax); the clubbed antennae are nodes. Every node is one closed
-outline of distinct points (or a circle); lines are thin closed ribbons."""
+Three weights, drawn for the screen at 1:1: the margin, white and 2 px, the
+boldest; the lit band 1 to 1.6 px, grey to near white as the strike is
+harder; the veins, eyespot rings, antennae and body a step down. The body is
+static (head, thorax, abdomen, the pin through the thorax); the clubbed
+antennae are nodes. Every node is one closed outline of distinct points (or
+a circle); lines are thin closed ribbons."""
 import json
 import math
 import pathlib
@@ -43,7 +46,6 @@ POINTS = 64
 VEINS = [5, 15, 25, 38, 47, 56]   # the margin points the veins run toward: three a half wing, one to the tail
 INNER = 0.66              # the inner zone's edge: the veins end here, and the margin never comes nearer
 SITE_NEAR, SITE_FAR = 0.2, 0.64   # the chain's middle site and its end, as shares of the margin's reach
-BAND_SITES = [0, 4, 8]   # three, far enough apart to stay apart on the screen
 EYES_A_WING = 4
 PIVOT = (-3, 0)           # each wing's root, from the butterfly's centre: its nodes scale about it
 MIDDLE = 108              # each outline's node, from the centre: its points stay within 64 px at the widest span
@@ -52,12 +54,11 @@ MIDDLE = 108              # each outline's node, from the centre: its points sta
 PATHS = 0                 # 0, 1: margins (left, right); 2, 3: lit bands
 HEADER = 4                # eight bar nodes
 VEIN = 12                 # four: each wing's veins, forewing then hindwing, each one comb-shaped outline
-BAND = 16                 # twelve: three pigment bands a half wing, forewing then hindwing, left then right
-EYE = 28                  # eight eyespots, two nodes each (ring, pupil): four a wing, left then right
-LUNULE = 44               # twelve: six lunules a wing on the lit band, forewing's first, left then right
-ANTENNA = 56              # two: left, right
+EYE = 16                  # eight eyespot rings: four a wing, left then right
+ANTENNA = 24              # two: left, right
 NODE_COUNT = ANTENNA + 2
 
+WIDTHS = [0.5] * 8 + [0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 1.0]   # each grey's line: 0.5 to 0.8 a step, the margin's 1
 GREYS = ['#000000', '#0d0d0d', '#141414', '#1c1c1c', '#262626', '#333333', '#404040', '#4d4d4d',
          '#5c5c5c', '#6e6e6e', '#808080', '#999999', '#b3b3b3', '#cccccc', '#e6e6e6', '#ffffff']
 
@@ -166,7 +167,6 @@ def nearest(x, y):
 TAIL_TIP = nearest(*P[TAIL_AT])
 JUNCTION = min(range(10, MARGIN - 10), key=lambda i: abs(WING[i][1] - 2))   # where the forewing meets the hindwing
 APEX = min(range(MARGIN), key=lambda i: WING[i][0])   # the forewing's tip
-LUNULE_AT = [5, 13, 21, 39, 47, 55]   # the margin points the lunules lie toward
 TAIL_ANGLE = 0.3          # the tail points down and out, radians from straight down
 TAIL_PROFILE = [1.0, 1.0, 0.94, 0.74, 0.44, 0.16]   # how far each point of the strap moves, by its distance from the tip
 
@@ -190,14 +190,6 @@ def comb(fore):
         r = vein_points(u)
         pts += r[:3] + r[3:]
     return pts
-
-
-def band(share, fore):
-    """A pigment band on the forewing or the hindwing: a ribbon along the
-    margin at `share` of its reach, from the root."""
-    part = WING[8:JUNCTION - 1:2] if fore else WING[JUNCTION + 2:-8:2]   # clear of the root, where bands would converge
-    line = [(PIVOT[0] + (x - PIVOT[0]) * share, PIVOT[1] + (y - PIVOT[1]) * share) for x, y in part]
-    return ribbon(line, 1.4)
 
 
 def forewing(i):
@@ -230,21 +222,21 @@ def build():
         mid = MIDDLE * (1 if side else -1)
         if p < 2:
             pts = [(-3, -13)] + [(x * 0.9, y * 0.9) for x, y in WING] + [(-3, 13)]
-        else:   # the lit band at rest: out along every other margin point at 0.42, back at 0.38
+        else:   # the lit band at rest: one line, out along every other margin point and back a hair inside
             out_at = list(range(0, MARGIN - 1, 2)) + [MARGIN - 1]
             back_at = [MARGIN - 1 - 2 * k for k in range(31)] + [0]
-            pts = [(WING[i][0] * 0.42, WING[i][1] * 0.42) for i in out_at] + [(WING[i][0] * 0.38, WING[i][1] * 0.38) for i in back_at]
+            pts = [(WING[i][0] * 0.403, WING[i][1] * 0.403) for i in out_at] + [(WING[i][0] * 0.397, WING[i][1] * 0.397) for i in back_at]
         if side:
             pts = mirror(pts)
         rel = [((x - mid) / 2, y / 2) for x, y in pts]
         d = "M" + " L".join(f"{num(x, 4)},{num(y, 4)}" for x, y in rel) + " Z"
         assert len(rel) == POINTS and len(set(rel)) == POINTS
         out.append(f'<path id="{ID}_node_{PATHS + p}" transform="matrix(1 0 0 1 {CX + mid} {CY})" d="{d}" fill="none" '
-                   f'stroke="{GREYS[11] if p < 2 else GREYS[6]}" stroke-width="0.5" stroke-linejoin="round"/>')
+                   f'stroke="{GREYS[15] if p < 2 else GREYS[9]}" stroke-width="{WIDTHS[15] if p < 2 else WIDTHS[9]}" '
+                   f'stroke-linejoin="round"/>')
 
-    # Veins and bands, from each wing's root (display.cpp scales them about
-    # it): the veins one comb-shaped outline, ending at the inner zone's edge;
-    # the three bands at sites 0, 4 and 8, shaded by display.cpp.
+    # Veins, from each wing's root (display.cpp scales them about it): one
+    # comb-shaped outline a half wing, ending at the inner zone's edge.
     statics = 0
     for side in range(2):
         sx = -1 if side else 1
@@ -252,25 +244,12 @@ def build():
         rel = lambda pts: [((x - PIVOT[0]) * sx, y - PIVOT[1]) for x, y in pts]
         for half, fore in enumerate((True, False)):
             out.append(node(VEIN + 2 * side + half, outline(rel(comb(fore))), GREYS[6], width=0.1, at=pivot))
-        for half, fore in enumerate((True, False)):
-            for b, d in enumerate(BAND_SITES):
-                share = SITE_NEAR + (SITE_FAR - SITE_NEAR) * d / 8
-                out.append(node(BAND + side * 2 * len(BAND_SITES) + half * len(BAND_SITES) + b, outline(rel(band(share, fore))),
-                                GREYS[5], width=0.1, at=pivot))
 
-    # Eyespots: a ring (a circle at scale 2, stroked) and its pupil, parked
-    # off screen until display.cpp places them.
+    # Eyespots: a ring (a circle, stroked), parked off screen until
+    # display.cpp places it.
     for e in range(2 * EYES_A_WING):
-        out.append(f'<circle id="{ID}_node_{EYE + 2 * e}" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="4" '
-                   f'fill="none" stroke="{GREYS[7]}" stroke-width="0.5"/>')
-        out.append(f'<circle id="{ID}_node_{EYE + 2 * e + 1}" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="2" '
-                   f'fill="{GREYS[5]}" stroke="{GREYS[5]}" stroke-width="0.25"/>')
-
-    # The lunules: filled scales on the lit band, parked off screen until
-    # display.cpp places them, as large and bright as the strike is hard.
-    for e in range(2 * len(LUNULE_AT)):
-        out.append(f'<circle id="{ID}_node_{LUNULE + e}" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="3" '
-                   f'fill="{GREYS[8]}" stroke="{GREYS[8]}" stroke-width="0.25"/>')
+        out.append(f'<circle id="{ID}_node_{EYE + e}" transform="matrix(1 0 0 1 640 320)" cx="0" cy="0" r="4.5" '
+                   f'fill="none" stroke="{GREYS[12]}" stroke-width="{WIDTHS[12]}"/>')
 
     # The antennae: thin, clubbed at their tips, nodes so a strike can flick them.
     for side in range(2):
@@ -284,8 +263,7 @@ def build():
         pts = shape[:half] + sorted(tip, key=lambda q: math.atan2(q[1] + 66.2, (q[0] - s * 24.2) * s)) + shape[half:]
         out.append(node(ANTENNA + side, outline(pts), GREYS[10], width=0.1, at=(CX, CY)))
 
-    # The body: head, the thorax with the pin through it, the segmented
-    # abdomen. Static.
+    # The body: head, the thorax with the pin through it, the abdomen. Static.
     body = [
         (ellipse(CX, CY - 15.5, 3.8, 3.4, 24), GREYS[9], 0.1),            # head
         (ellipse(CX, CY - 3, 5.2, 11, 32), GREYS[7], 0.1),                # thorax
@@ -297,20 +275,17 @@ def build():
     abdomen = ellipse(CX, CY + 28, 3.8, 20, 36)
     out.append(art(outline(abdomen), GREYS[6], GREYS[8], 0.25))
     statics += 1
-    for k in range(5):
-        yy = CY + 14 + k * 6.5
-        half = 3.8 * math.sqrt(max(0, 1 - ((yy - CY - 28) / 20) ** 2)) - 0.4
-        out.append(art(outline(ribbon([(CX - half, yy), (CX, yy + 0.8), (CX + half, yy)], 0.8)), GREYS[10], width=0.1))
-        statics += 1
 
     # The specimen label, in the corner where Moth's is: static artwork.
     out.append(art(outline([(374, 199), (474, 199), (474, 216), (374, 216)]), "none", GREYS[7], 0.8))
     out.append(f'<text transform="matrix(1 0 0 1 378.5 210.8)" fill="{GREYS[11]}" {FONT} font-size="9px">Papilio hofstadteri</text>')
     statics += 1
 
-    # Palette: Moth's sixteen greys, each its own fill and stroke, 0.5 px.
+    # Palette: Moth's sixteen greys, each its own fill and stroke; the
+    # brighter the grey the heavier its line, so a node lit brighter is drawn
+    # bolder (the margin and lit band are drawn at scale 2: 1 to 2 px).
     for i, grey in enumerate(GREYS):
-        out.append(f'<circle id="{ID}_palette_{i}" cx="640" cy="0" r="1" fill="{grey}" stroke="{grey}" stroke-width="0.5"/>')
+        out.append(f'<circle id="{ID}_palette_{i}" cx="640" cy="0" r="1" fill="{grey}" stroke="{grey}" stroke-width="{WIDTHS[i]}"/>')
     out.append("</g>")
     return "\n".join(out) + "\n", statics
 
@@ -329,13 +304,10 @@ def plate_h():
              "using opxy::i32;",
              "using opxy::u32;",
              "// Nodes: the four outlines (left and right margins, then lit bands), the header's bars,",
-             "// each wing's veins (forewing, hindwing; left then right), three bands a half wing",
-             "// (sites 0, 4, 8; forewing then hindwing, left then right),",
-             "// eight eyespots of two nodes (ring, pupil; four a wing, left then right), six lunules",
-             "// a wing (left then right), the antennae.",
-             f"const u32 edges = {PATHS}, header = {HEADER}, veins = {VEIN}, bands = {BAND}, bands_a_wing = {len(BAND_SITES)}, "
-             f"band_step = {BAND_SITES[1] - BAND_SITES[0]}, eyes = {EYE}, eyes_a_wing = {EYES_A_WING}, lunules = {LUNULE}, lunules_a_wing = {len(LUNULE_AT)}, antennae = {ANTENNA}, "
-             f"nodes = {NODE_COUNT};",
+             "// each wing's veins (forewing, hindwing; left then right), eight eyespot rings (four a",
+             "// wing, left then right), the antennae.",
+             f"const u32 edges = {PATHS}, header = {HEADER}, veins = {VEIN}, eyes = {EYE}, eyes_a_wing = {EYES_A_WING}, "
+             f"antennae = {ANTENNA}, nodes = {NODE_COUNT};",
              f"const i32 centre_x = {CX}, centre_y = {CY}, wing_middle = {MIDDLE}, pivot_x = {PIVOT[0]};",
              "// The wing's zones, Q15 of the margin's reach: the chain's middle site and its end, and the",
              "// inner zone's edge, which the margin never comes inside.",
@@ -348,8 +320,6 @@ def plate_h():
              "// How much each margin point turns with the forewing, and moves with the tail, Q15.",
              f"const i32 forewing[{MARGIN}] = {{{', '.join(str(round(forewing(i) * 32767)) for i in range(MARGIN))}}};",
              f"const i32 tail[{MARGIN}] = {{{', '.join(str(round(tail(i) * 32767)) for i in range(MARGIN))}}};",
-             "// The margin points the lunules lie toward, on the lit band.",
-             f"const u32 lunule_at[{len(LUNULE_AT)}] = {{{', '.join(map(str, LUNULE_AT))}}};",
              "// The tail's direction (the left wing's; the right mirrors x), Q10, and its tip.",
              f"const i32 tail_dx = {q10(-math.sin(TAIL_ANGLE))}, tail_dy = {q10(math.cos(TAIL_ANGLE))};",
              f"const u32 tail_tip = {TAIL_TIP};",

@@ -34,6 +34,9 @@ struct Voice {
     u32 wait;                    // blocks before a chord's later note taps (a strum)
     u32 started_at;              // the shared tick at its start, to find its chord
     i32 share;                   // its share of the blow when a chord strikes together, Q15
+    i32 foam;                    // the foam its stir raised, bursting away, Q15
+    i32 slosh;                   // how hard the stirred drink sloshes, dying away, Q15
+    u32 slosh_phase;             // the sloshing's phase, Q32 cycles
 };
 // The drink every voice stirs: one mug a track. The latest stir's drink, and
 // a clock (one tick a block while any voice renders) to clear it by.

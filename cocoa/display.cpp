@@ -1,25 +1,26 @@
 #include "display.h"
 #include "plate.h"
 
-// Cocoa's screen: one mug of hot chocolate in section, engraved
-// (tools/make_panel.py), greys and fine line, to scale at 1.5 px a millimetre,
-// steam rising off it.
+// Cocoa's screen: one mug of hot chocolate in section (tools/make_panel.py),
+// to scale at 1.5 px a millimetre, in four greys and three weights: the mug
+// boldest and brightest, the spoon and the drink's surface a step down, the
+// drink's detail finer.
 //
-// The wall is china, glass or enamelled tin (cup), each with its own handle
-// and marks: china's hatched section, glass's glints, tin's chipped enamel. The drink stands at its depth (fill), curling up the wall
-// in a meniscus. It is drawn in engraved lines, as many as it is dark
-// (powder: pale milk to thick chocolate), with cocoa floating on it. Foam
-// rides the surface: pops' amount, fizz's size. Unstirred (stir 0), powder
-// lies in a heap on the floor with lumps about it and clumps hanging in the
-// drink; stirred, the heap dissolves, the drink turns in a funnel of swirls
-// and its surface dips into a vortex.
+// The wall is china, glass or enamelled tin (cup): a thick wall and a C
+// handle, a tapering tumbler with a heavy base, or a thin wall with a rolled
+// rim and a strap handle. The drink stands at its depth (fill), curling up
+// the wall in a meniscus. It is drawn in lines, as many as it is dark
+// (powder: pale milk to thick chocolate). Foam rides the surface: pops'
+// amount, fizz's size. Unstirred (stir 0), powder lies in a heap on the floor
+// and clumps hang in the drink; stirred, the heap dissolves, the drink turns
+// in a funnel of swirls and its surface dips into a vortex.
 //
 // A spoon stands in the drink, its bowl on the floor (spoon): a short, fat,
 // grained wooden spoon leaning on the wall inside, to a long, slim silver one
-// leaning on the inside of the rim's lip; neither crosses a line of the cup. It rests lifted, 24 degrees for a single tap
-// to 2 for the fastest (taps), and each tap rocks it onto the floor in time
-// with the voices' taps, rippling the surface and the floor; tapping fast it
-// shakes.
+// leaning on the inside of the rim's lip; neither crosses a line of the cup.
+// It rests lifted, 24 degrees for a single tap to 2 for the fastest (taps),
+// and each tap rocks it onto the floor in time with the voices' taps,
+// rippling the surface and the floor; tapping fast it shakes.
 //
 // The drink shows its own pitch. A note's stir dips the surface further and
 // fills the drink with bubbles: five rings a class, more for more powder,
@@ -38,6 +39,9 @@ using namespace opxy::draw;
 const u32 budget = 14;          // bubbles moved a frame, at most
 const i32 release = 512;        // Q10 s the voices sound on after the last key is let go (an estimate)
 const i32 froth_void = 470;     // a void fraction (Q31) that flattens the column 3 cents
+// Four greys, each with its weight (make_panel.py): the mug, the spoon and
+// the drink's surface, the drink's detail, and what recedes.
+namespace grey { const u32 mug = 15, spoon = 13, detail = 11, quiet = 7; }
 
 inline i32 magnitude(i32 v) { return v < 0 ? -v : v; }
 // value eased toward target by `keep` (Q16: the share of the distance left).
@@ -152,9 +156,15 @@ inline void caption_fizz(char* out, i32 fizz) {
     const char t[6] = {static_cast<char>('0' + tenths_of / 10), '.', static_cast<char>('0' + tenths_of % 10), 'm', 'm', 0};
     copy(out, header_capacity, t);
 }
-// spoon as its contact time: 5.0ms (soft) to 150us (hard).
+// pops as how often a fresh stir's foam pops: "15/s", "off".
+inline void caption_pops(char* out, i32 pops) {
+    const u32 rate = (drink::q16(pops) * 30u + 32768u) >> 16;   // the engine's foam_pops, 30 a second at 100
+    if (!rate) { copy(out, header_capacity, "off"); return; }
+    caption_unit(out, rate, "/s");
+}
+// spoon as its contact time: 4.0ms (soft) to 75us (hard).
 inline void caption_spoon(char* out, i32 spoon) {
-    const i32 log2_us = 805288 - static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * drink::q16(spoon) >> 12);   // log2 5000 us, Q16
+    const i32 log2_us = tables::log2_soft_us - static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * drink::q16(spoon) >> 12);
     const u32 us = drink::exp2_int(log2_us);
     if (us < 995) { caption_unit(out, (us + 5) / 10 * 10, "us"); return; }
     const u32 tenths_of = (us + 50) / 100;
@@ -185,8 +195,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     copy(values[CUP], header_capacity, cups[cup]);
     caption_unit(values[FILL], (drink::fill_um(slots[FILL]) + 500) / 1000, "mm");
     caption_spoon(values[SPOON], slots[SPOON]);
-    header_amount(values[POPS], header_capacity, slots[POPS]);
-    header_amount(values[STIR], header_capacity, slots[STIR]);
+    caption_pops(values[POPS], slots[POPS]);
+    caption_unit(values[STIR], (static_cast<u32>(drink::restir(slots[STIR])) * 100u + 16384u) >> 15, "%");
     const opxy::u8 pages[2][4] = {{0, 1, 2, 3}, {4, 5, 6, 7}};
     page_header(state.header, input, frame, titles, values, node::header, pages);
 
@@ -240,7 +250,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const bool settled = !was_sounding;
         if (settled)
             for (u32 i = 0; i < drink::classes; ++i) state.d[i] = 0, state.s[i] = drink::clear;
-        const i32 stir = settled ? 32767 : static_cast<i32>(drink::q16(slots[STIR]) >> 1);
+        const i32 stir = settled ? 32767 : drink::restir(slots[STIR]);
         drink::stir(state.d, state.s, x0, stir);
         for (u32 i = 0; i < drink::classes; ++i) state.s0[i] = state.s[i];
         state.tap_phase = 0;
@@ -269,13 +279,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         outline(frame, node::vessel, points, state.key, true);
         state.cup = cup;
     }
-    put(frame, node::vessel, cx, scene::vessel_y * unit, 2 * unit, 14, stroke);
-    show_if(frame, node::handle_china, cup == 0, 14, stroke);
-    show_if(frame, node::handle_tin, cup == 2, 14, stroke);
-    for (u32 k = 0; k < node::glints; ++k) show_if(frame, node::glint + k, cup == 1, 11, stroke);
-    for (u32 k = 0; k < node::chips; ++k) show_if(frame, node::chip + k, cup == 2, 10, stroke);
-    for (u32 k = 0; k < node::hatches; ++k) show_if(frame, node::hatch + k, cup == 0, 5, stroke);
-    for (u32 k = 0; k < node::steams; ++k) put(frame, node::steam + k, 0, 0, unit, 8, stroke);
+    put(frame, node::vessel, cx, scene::vessel_y * unit, 2 * unit, grey::mug, stroke);
+    show_if(frame, node::handle_china, cup == 0, grey::mug, stroke);
+    show_if(frame, node::handle_tin, cup == 2, grey::mug, stroke);
 
     // ---- The drink: its surface eased to the fill, curling up at the walls;
     // the stir's vortex (a parabola that keeps the drink's volume) and each
@@ -310,7 +316,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             points[63 - i].y = (y >> 1) + 184;   // the ribbon's width, at twice
         }
         outline(frame, node::surface, points, state.key, fresh);
-        put(frame, node::surface, cx, level, 2 * unit, 13, stroke);
+        put(frame, node::surface, cx, level, 2 * unit, grey::spoon, stroke);
     }
     // The drink's lines: every fourth for pale milk (powder 0) to every one
     // for thick chocolate; each frothy while bubbles fill the drink at its
@@ -335,43 +341,32 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
                 if (lines >= 6) continue;
                 ++lines;
             }
-            show_if(frame, node::water + k, show && !frothy, 8, stroke);
-            show_if(frame, node::froth + k, show && frothy, 12, stroke);
+            show_if(frame, node::water + k, show && !frothy, grey::quiet, stroke);
+            show_if(frame, node::froth + k, show && frothy, grey::detail, stroke);
         }
     }
-    // Powder floating (powder); and unstirred, in a heap on the floor with
-    // lumps about it and clumps hanging in the drink; stirred, the drink
-    // turns in a funnel of swirls (stir).
+    // Under half stirred (stir), powder lies in a heap on the floor and clumps
+    // hang in the drink, gone by 50; stirred, the drink turns in a funnel of
+    // swirls, one more each quarter.
     {
-        const u32 flecks = (drink::q16(slots[POWDER]) * node::flecks + 32768) >> 16;
-        for (u32 k = 0; k < node::flecks; ++k) {
-            if (k >= flecks) { conceal(frame, node::fleck + k); continue; }
-            put(frame, node::fleck + k, cx + plate::fleck[k], (level - 512) / unit * unit, unit, 7, fill_and_stroke);
-        }
-        const u32 stir = drink::q16(slots[STIR]), left = 65535 - stir;
+        const u32 stir = drink::q16(slots[STIR]), left = stir < 32768 ? 65535 - 2 * stir : 0;
         const i32 heap = static_cast<i32>(left >> 6);   // Q10 scale
-        if (heap < 120) conceal(frame, node::sediment);
-        else put(frame, node::sediment, cx + scene::heap_x * unit, floor, heap / 16 * 16, 8, fill_and_stroke);
-        const i32 lump_x[7] = {-6, 22, 41, 12, 50, 31, -3};
-        const u32 lumps = (left * 7 + 32768) >> 16;
-        for (u32 k = 1; k < node::sediments; ++k) {
-            if (k > lumps) { conceal(frame, node::sediment + k); continue; }
-            put(frame, node::sediment + k, cx + lump_x[k - 1] * unit, floor, unit, 8, fill_and_stroke);
-        }
+        if (heap < 120) conceal(frame, node::heap);
+        else put(frame, node::heap, cx + scene::heap_x * unit, floor, heap / 16 * 16, grey::quiet, fill_and_stroke);
         // Clumps at shares of the drink's depth (Q10), and swirls narrowing to the floor.
-        const i32 clump_up[5] = {860, 640, 430, 260, 740}, clump_x[5] = {-30, 20, -12, 38, 46};
-        const u32 clumps = (left * 5 + 32768) >> 16;
+        const i32 clump_up[3] = {300, 520, 160}, clump_x[3] = {40, 46, 18};   // clear of the spoon's way
+        const u32 clumps = (left * 3 + 32768) >> 16;
         for (u32 k = 0; k < node::clumps; ++k) {
             const i32 y = (floor - (h >> 10) * clump_up[k]) / unit * unit;
-            if (k >= clumps || y < level + 4 * unit) { conceal(frame, node::clump + k); continue; }
-            put(frame, node::clump + k, cx + clump_x[k] * unit, y, unit, 9, fill_and_stroke);
+            if (k >= clumps || y < level + 5 * unit) { conceal(frame, node::clump + k); continue; }
+            put(frame, node::clump + k, cx + clump_x[k] * unit, y, unit, grey::quiet, fill_and_stroke);
         }
         const i32 swirl_up[4] = {800, 590, 390, 200}, swirl_size[4] = {1024, 880, 740, 600};
         const u32 swirls = (stir * 4 + 32768) >> 16;
         for (u32 k = 0; k < node::swirls; ++k) {
             const i32 y = (floor - (h >> 10) * swirl_up[k]) / unit * unit;
             if (k >= swirls || y < level + 6 * unit) { conceal(frame, node::swirl + k); continue; }
-            put(frame, node::swirl + k, cx, y, swirl_size[k], 10, stroke);
+            put(frame, node::swirl + k, cx, y, swirl_size[k], grey::detail, stroke);
         }
     }
 
@@ -420,22 +415,22 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 tip_y = pivot_y + ((ox * rock.sin + oy * rock.cos) >> 6);
         const Turn t = rotation(lean + lift);
         const i32 mid_x = tip_x + scene::handle_mid * t.cos, mid_y = tip_y + scene::handle_mid * t.sin;
-        put_turned(frame, node::bowl, tip_x, tip_y, 2 * unit, t, 15);
-        put_turned(frame, node::handle, mid_x, mid_y, 2 * unit, t, 15);
+        put_turned(frame, node::bowl, tip_x, tip_y, 2 * unit, t, grey::spoon);
+        put_turned(frame, node::handle, mid_x, mid_y, 2 * unit, t, grey::spoon);
         // Silver's bowl shines; wood is grained along its handle and in its bowl.
         const bool silver = m >= 512;
-        if (silver) put_turned(frame, node::shine, tip_x, tip_y, unit, t, 12);
+        if (silver) put_turned(frame, node::shine, tip_x, tip_y, unit, t, grey::detail);
         else conceal(frame, node::shine);
         for (u32 k = 0; k < node::grains; ++k) {
             if (silver) { conceal(frame, node::grain + k); continue; }
-            if (k < 2) put_turned(frame, node::grain + k, mid_x, mid_y, unit, t, 11);
-            else put_turned(frame, node::grain + k, tip_x, tip_y, unit, t, 11);
+            if (k == 0) put_turned(frame, node::grain, mid_x, mid_y, unit, t, grey::detail);
+            else put_turned(frame, node::grain + k, tip_x, tip_y, unit, t, grey::detail);
         }
         // Tapping fast, strokes beside the bowl: one from 1.5 taps a second, three from 8.
         const u32 tenths_hz = step ? drink::tap_tenths(slots[TAPS]) : 0;
         const u32 shakes = !tapping ? 0 : tenths_hz >= 80 ? 3 : tenths_hz >= 40 ? 2 : tenths_hz >= 15 ? 1 : 0;
         for (u32 k = 0; k < node::shakes; ++k) {
-            if (k < shakes) put_turned(frame, node::shake + k, tip_x, tip_y, unit, t, 11 - k);
+            if (k < shakes) put_turned(frame, node::shake + k, tip_x, tip_y, unit, t, grey::detail);
             else conceal(frame, node::shake + k);
         }
         // Each tap sends a ring across the floor from under the bowl, for 0.35 s.
@@ -448,7 +443,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         for (u32 k = 0; k < node::rings; ++k) {
             const i32 age = state.ring_age[k];
             if (age < 0 || age > 358 || reduced) { state.ring_age[k] = -1; conceal(frame, node::ring + k); continue; }
-            put(frame, node::ring + k, plate::tip_x + 8 * unit, floor - unit, 1024 + age * 14 / 5, static_cast<u32>(12 - age / 60), stroke);
+            put(frame, node::ring + k, plate::tip_x + 8 * unit, floor - unit, 1024 + age * 14 / 5, grey::detail, stroke);
             state.ring_age[k] = age + elapsed;
         }
     }
@@ -480,7 +475,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             if (near && !fresh) continue;
             if (moved >= budget && !fresh) continue;
             ++moved;
-            put(frame, id, cx + plate::across[b], y, r, static_cast<u32>(10 + (i >> 1)), stroke);
+            put(frame, id, cx + plate::across[b], y, r, grey::detail, stroke);
         }
         state.turn = (state.turn + 7) % node::bubbles;
     }
@@ -497,7 +492,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             const u32 row = k / 10, at = (k * 7 + row * 5) % 10;
             const i32 u = (-scene::inner + 6) * unit + static_cast<i32>(at) * ((2 * scene::inner - 12) * unit / 9) + static_cast<i32>(row) * radius;
             const i32 lift = radius * (1 + 2 * static_cast<i32>(row));   // the second row sits on the first
-            put(frame, id, cx + u, (level - lift) / unit * unit, r, static_cast<u32>(11 - row), stroke);
+            put(frame, id, cx + u, (level - lift) / unit * unit, r, grey::detail, stroke);
         }
     }
 
@@ -521,7 +516,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             if (state.pop_age[k] < 0 || reduced) { state.pop_age[k] = -1; conceal(frame, id); continue; }
             const i32 age = state.pop_age[k];
             if (age > 160) { state.pop_age[k] = -1; conceal(frame, id); continue; }
-            put(frame, id, cx + state.pop_x[k] * unit, level - 768, 683 + age * 4, static_cast<u32>(12 - age / 16), stroke);
+            put(frame, id, cx + state.pop_x[k] * unit, level - 768, 683 + age * 4, grey::detail, stroke);
             state.pop_age[k] = age + elapsed;
         }
     }

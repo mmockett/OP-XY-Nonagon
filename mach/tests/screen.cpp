@@ -85,9 +85,10 @@ static Churn run(const char* scenario, double fps, const std::vector<double>& sn
     } else if (!std::strcmp(scenario, "tour")) {
         // From the Init sound: a supersonic bell flight; then a narrower cone,
         // the organ's rifle bullet, a full crack and the plate, another flight;
-        // then a subsonic pass, the trigger wire at the pass.
+        // then a subsonic pass, its bow wave ahead, the waves wider as tune
+        // lowers the source.
         length = 13;
-        const double init[8] = {0.6667, 0.301, 0.7, 0.5805, 0.3, 0.3, 1.0, 0.0};
+        const double init[8] = {0.6667, 0.301, 0.7, 0.5805, 0.4, 0.15, 1.0, 0.0};
         for (int i = 0; i < 8; ++i) controls[i] = init[i];
         steps = {{0.8, 60, 1, -1, 0}, {3.4, 60, 0, -1, 0},
                  {3.9, 0, 0, 0, 0.875}, {4.3, 0, 0, 2, 0.1}, {4.7, 0, 0, 4, 0.95}, {5.1, 0, 0, 7, 0.6},
@@ -105,7 +106,7 @@ static Churn run(const char* scenario, double fps, const std::vector<double>& sn
         // still:<control>:<value>: the Init sound with one control set, idle
         // (the contact sheet, tools/make_contact.py).
         length = 1.5;
-        const double init[8] = {0.6667, 0.301, 0.7, 0.5805, 0.3, 0.3, 1.0, 0.0};
+        const double init[8] = {0.6667, 0.301, 0.7, 0.5805, 0.4, 0.15, 1.0, 0.0};
         for (int i = 0; i < 8; ++i) controls[i] = init[i];
         int c = 0; double v = 0;
         std::sscanf(scenario + 6, "%d:%lf", &c, &v);

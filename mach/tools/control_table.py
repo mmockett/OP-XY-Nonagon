@@ -26,10 +26,11 @@ init = definition["presets"]["Init"]
 SUBSTEP = 97391 / 67108864        # seconds of listener time a sub-step
 
 
-def play(control, value):
+def play(control, value, boom_off=False):
     values = dict(init)
     values[control] = value
-    name = f"{control}-{int(value * 100):03d}"
+    if boom_off: values["boom"] = 0.0
+    name = f"{control}-{int(value * 100):03d}" + ("-quiet" if boom_off else "")
     spec = [f"out {work / (name + '.wav')}", f"trace {work / (name + '.txt')}", "seconds 12", "release 0.3",
             "params " + " ".join(str(values[i]) for i in ids), "note 0.0 11.5 60"]
     subprocess.run([binary], input="\n".join(spec), text=True, check=True)
@@ -63,11 +64,12 @@ def pitches(trace, r=0):
     return np.percentile(st, 1), np.percentile(st, 99)
 
 
-def glide(x, trace):
+def glide(x, trace, value):
     lo, hi = pitches(trace)
     text = f"{hi:+.0f} to {lo:+.0f} st"
     back = pitches(trace, 1)
-    return text + (f"; back {back[0]:+.0f} to {back[1]:+.0f}" if back else "")
+    b = boom(x, "mach", value)
+    return text + (f"; back {back[0]:+.0f} to {back[1]:+.0f}" if back else "") + (f"; boom {b[0]:.0f} dBFS" if b else "")
 
 
 def swoop(trace):
@@ -96,14 +98,18 @@ def length(x):
     return (on[-1] - on[0] + 1) * 2205 / RATE if len(on) else 0.0
 
 
-def boom(x):
-    """The boom's peak and its spectral centroid, over its first 30 ms."""
-    start = int(first_sound(x) * RATE)
-    seg = x[start:start + 1323]
-    p = np.abs(seg).max()
-    spectrum = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 8192)) ** 2
-    f = np.fft.rfftfreq(8192, 1 / RATE)
-    return 20 * math.log10(p) if p > 0 else -120, float((f * spectrum).sum() / (spectrum.sum() + 1e-30))
+def boom(x, control, value):
+    """The boom alone (the note less the same note with boom off): its peak
+    and its spectral centroid, around its peak."""
+    quiet, _ = play(control, value, boom_off=True)
+    b = x - quiet
+    p = b.max()
+    if p < 1e-5: return None
+    at = int(np.argmax(b))
+    seg = b[max(0, at - 2000):at + 4000]
+    spectrum = np.abs(np.fft.rfft(seg * np.hanning(len(seg)), 16384)) ** 2
+    f = np.fft.rfftfreq(16384, 1 / RATE)
+    return 20 * math.log10(p), float((f * spectrum).sum() / (spectrum.sum() + 1e-30))
 
 
 def ends(trace):
@@ -116,10 +122,10 @@ def ends(trace):
 
 
 def high(x):
-    """The share of the sound above 500 Hz, dB."""
+    """The share of the sound above 400 Hz (half again C4), dB."""
     spectrum = np.abs(np.fft.rfft(x)) ** 2
     f = np.fft.rfftfreq(len(x), 1 / RATE)
-    return 10 * math.log10(spectrum[f > 500].sum() / (spectrum.sum() + 1e-30) + 1e-12)
+    return 10 * math.log10(spectrum[f > 400].sum() / (spectrum.sum() + 1e-30) + 1e-12)
 
 
 def echo_delay(trace):
@@ -133,18 +139,18 @@ def echo_delay(trace):
 
 NAMES = ["organ", "pad", "voice", "bell", "siren"]
 ROWS = [
-    ("mach", "the forward image's glide against the key (and the backward one's), 1st to 99th percentile",
-     lambda x, tr: glide(x, tr)),
+    ("mach", "the forward image's glide against the key (and the backward one's), 1st to 99th percentile, and the boom's peak",
+     lambda x, tr, v: glide(x, tr, v)),
     ("pass", "how long the glide takes, and the loudest 400 ms",
      lambda x, tr: f"{swoop(tr):.2f} s, {loudness(x)[1]:.0f} LUFS"),
     ("source", "spectral centroid",
      lambda x, tr, v=None: f"{centroid(x)[0]:.0f} Hz"),
     ("dur", "how long it sounds (within 40 dB of its loudest)",
      lambda x, tr: f"{length(x):.1f} s"),
-    ("boom", "the boom's peak and centroid (first 30 ms)",
-     lambda x, tr: "{:.0f} dBFS, {:.0f} Hz".format(*boom(x))),
-    ("air", "the sound's share above 500 Hz",
-     lambda x, tr: f"{high(x):.0f} dB"),
+    ("boom", "the boom alone: its peak and centroid",
+     lambda x, tr, v: "none" if boom(x, "boom", v) is None else "{:.0f} dBFS, {:.0f} Hz".format(*boom(x, "boom", v))),
+    ("air", "how long it sounds, and its share above 400 Hz",
+     lambda x, tr: f"{length(x):.1f} s, {high(x):.0f} dB"),
     ("tune", "the pitch each image ends on, against the key",
      lambda x, tr: ends(tr)),
     ("echo", "the ground's sound, after the direct sound's",
@@ -158,7 +164,7 @@ for control, what, measure in ROWS:
         # source: its five options at 0, 25, 50, 75 and 100
         v = min(value, 0.9) if control == "source" else value
         x, tr = play(control, v)
-        cell = measure(x, tr)
+        cell = measure(x, tr, v) if control in ("mach", "boom") else measure(x, tr)
         label = caption(ids.index(control), v)
         if label and control != "source": cell = f"`{label}` {cell}"
         if control == "source": cell = f"{NAMES[min(4, int(v * 5))]} {cell}"

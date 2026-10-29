@@ -14,6 +14,7 @@ struct Voice {
     Mode twin;            // the bowed mode's near-degenerate twin: its amplitude, and the beat's phase
     Mode harmonic;        // the bow's stick and slip, its harmonics: their amplitude (a) and last sounded (sa)
     Grain grains[kGrains];
+    i16 shapes[kGrains][kModes];  // each grain's mode shapes where it lies (Q15), shapes[i][0] kMoved once it moves
     i32 load[kModes];     // the sand's weight on each mode: the sum over grains of shape^2 (Q15)
     i32 gather[kModes];   // the same, gathered over the round of looks in progress
     i32 controls[8];      // smoothed controls, 0..32767

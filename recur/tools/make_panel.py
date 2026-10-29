@@ -9,9 +9,9 @@ a loaf for the baker's, a nautilus for gold, a silver moon for pell,
 scissors for the shear and a honeycomb for hex. The tiles are plain square
 outlines shared by every print; a print is cut on the finest grid's cells,
 one node for each piece of a stroke in a cell, and a piece rides on whichever
-tile holds its cell. Each print's main outline is drawn twice more, uncut,
-for the chord's ghosts. Every node is one closed subpath; a stroke is a thin
-closed ribbon, out along one side and back along the other.
+tile holds its cell, inside that tile's square. Every node is one closed
+subpath; a stroke is a thin closed ribbon, out along one side and back along
+the other.
 
 Drawn for the screen at 1:1 (480 x 222): no text under 8 px, no lines closer
 than 3 px, no dots, and strokes a good pixel wide."""
@@ -23,20 +23,30 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 ID = sys.argv[1] if len(sys.argv) > 1 else "recur"   # another prefix for a preview copy
 FONT = 'font-family="UniversNextPro-Light"'
 
-TRAY_X, TRAY_Y, TRAY = 168, 52, 144          # the print, 144 px square
-TIN = (60, 42, 420, 216)
-KNOB = (112, 100)                             # the map selector
-PENDULUM = (112, 192)                        # the escapement's pendulum pivot (slice)
-WEIGHTS = [12, 20, 28, 36, 44, 52]           # its weight's distance up the rod: hiss, 1/64 .. 1/4
-COMB_X, COMB_Y = 330, 52                     # the music-box comb
+TRAY_X, TRAY_Y, TRAY = 172, 54, 136          # the print, 136 px square, centred
+TIN = (60, 46, 420, 216)
+BEZEL = 3                                    # the tray's bezel, px outside the print
+PENDULUM = (114, 188)                        # the escapement's pendulum pivot (slice)
+ROD = 112                                    # its rod
+WEIGHTS = [16, 34, 52, 70, 88, 106]          # its weight's distance up the rod: hiss, 1/64 .. 1/4
+COMB_X, COMB_Y = 338, 58                     # the music-box comb
 TOOTH_NOTES = [0, 1, 3, 4, 7, 12, 19]        # its teeth: the semitones chrd's readers play
 TOOTH_PITCH = 9                              # px between teeth
-LEVER = (366, 192)                           # the rate lever's pivot
-KEY = (420, 116)                             # the winding key's arbor
-RULE_X0, RULE_X1, RULE_Y = 84, 396, 207      # the tape's slot
-HALF = 0.45                                  # a stroke's half width, px
+LEVER = (365, 188)                           # the rate lever's pivot
+RULE_X0, RULE_X1, RULE_Y = 84, 396, 205      # the tape's slot
+MAIN, PART = ("#9a9a9a", 0.8), ("#6a6a6a", 0.6)   # the two inks of the fixed artwork: the tin and tray, the instruments' parts
+HALF = 0.5                                   # a stroke's half width, px
 GAP = 1.6                                    # a small tile's inset from its cell, px
-PINS, BARS, GHOSTS = 16, 20, 1               # depth's pins, the tape's bars, a print's ghosts
+PINS, BARS = 16, 20                          # depth's pins, the tape's bars
+SMALL_STROKE, LARGE_STROKE = 0.6, 0.9        # the tile squares' strokes, px (the small ones double on the 4 grid)
+
+
+def fit(bits):
+    """How far a tile's pieces shrink about its centre to sit inside its square, Q10:
+    clear of the gutter, the square's stroke and their own, with 0.1 px to spare."""
+    half = TRAY / (1 << bits) / 2
+    inset, square_half = {1: (2 * GAP, LARGE_STROKE / 2), 2: (2 * GAP, SMALL_STROKE), 3: (GAP, SMALL_STROKE / 2)}[bits]
+    return int((half - inset - square_half - 0.35 - 0.1) / (half + 0.05) * 1024)
 MAP_NAMES = ["cat", "baker", "gold", "pell", "shear", "hex"]
 
 
@@ -145,7 +155,7 @@ def cat():
     nose = [(512, 370), (452, 440), (572, 440)]
     k = CAT_SIZE
     head, eyes = scaled(head, k), [scaled(almond(366, 10), k), scaled(almond(658, -10), k)]
-    return [head] + eyes + [scaled(nose, k)], [], [(head, True)]
+    return [head] + eyes + [scaled(nose, k)], []
 
 
 def loaf():
@@ -153,7 +163,7 @@ def loaf():
     # them, two slashes across the crown.
     crust = [(330, 250), (694, 250), (694, 470)] + arc(512, 520, 270, 230, -10, 190, 13) + [(330, 470)]
     cuts = [[(448, 570), (500, 650)], [(576, 570), (628, 650)]]
-    return [crust], cuts, [(crust, True)]
+    return [crust], cuts
 
 
 def nautilus():
@@ -166,7 +176,7 @@ def nautilus():
         return (centre[0] + r * math.cos(t + 2.6), centre[1] + r * math.sin(t + 2.6))
     spiral = [at(end_t * i / 27) for i in range(28)]
     mouth = [spiral[-1], at(end_t - 2 * math.pi)]
-    return [], [spiral, mouth], [(spiral, False)]
+    return [], [spiral, mouth]
 
 
 def moon():
@@ -190,7 +200,7 @@ def moon():
     sx, sy, r = MOON_STAR
     star = [(sx + (r if i % 2 == 0 else r * 0.42) * math.sin(math.radians(36 * i)),
              sy + (r if i % 2 == 0 else r * 0.42) * math.cos(math.radians(36 * i))) for i in range(10)]
-    return [crescent, star], [], [(crescent, True)]
+    return [crescent, star], []
 
 
 MOON_OUTER, MOON_INNER, MOON_STAR = ((448, 512), 256), ((578, 551), 220), (704, 570, 66)   # the star fills one cell, so it stays whole
@@ -198,7 +208,7 @@ def scissors():
     # Two blades crossed at the pivot, each running back to its ring.
     rings = [ring(370, 280, 80, 80, 12), ring(654, 280, 80, 80, 12)]
     blades = [[(420, 350), (770, 820)], [(604, 350), (254, 820)]]
-    return rings, blades, [(blades[0], False), (blades[1], False)]
+    return rings, blades
 
 
 def honeycomb():
@@ -210,7 +220,7 @@ def honeycomb():
     cell_ = []
     for i in range(6):
         cell_ += [at(256, i), at(316, i), at(256, i + 0.03)]
-    return [cell_], [], [([at(256, i) for i in range(6)], True)]
+    return [cell_], []
 
 
 CAT_SIZE = 0.72
@@ -308,58 +318,38 @@ for i, (x, y, ink, size) in enumerate(texts):
     out.append(f'<text id="{ID}_text_{i}" transform="matrix(1 0 0 1 {num(x)} {num(y)})" fill="{ink}" {FONT} '
                f'font-size="{size}px">-</text>')
 
-# The tin: a rounded body, rivets, and its maker's mark.
+# The tin and the tray's bezel, in the main ink; nothing else on the body.
 x0, y0, x1, y1 = TIN
-out.append(plain(rounded(x0, y0, x1, y1, 7), "#8a8a8a", 0.8))
-for rx, ry in ((x0 + 9, y0 + 9), (x1 - 9, y0 + 9), (x0 + 9, y1 - 9), (x1 - 9, y1 - 9)):
-    out.append(circle(rx, ry, 2.4, "#7a7a7a", 0.6))
-out.append(label(72, 64, "RECUR", 10, "#8a8a8a"))
-# The tray: a bezel round the print.
-out.append(plain(rect(TRAY_X - 4, TRAY_Y - 4, TRAY_X + TRAY + 4, TRAY_Y + TRAY + 4), "#8a8a8a", 0.7))
-
-# The map selector: a knob, and a mark for each of its six maps (the print
-# names the map).
-kx, ky = KNOB
-out.append(circle(kx, ky, 17, "#8a8a8a", 0.7))
-out.append(circle(kx, ky, 11, "#5a5a5a", 0.6))
-MAP_ANGLES = [-100, -60, -20, 20, 60, 100]
-for a in MAP_ANGLES:
-    r = math.radians(a)
-    out.append(plain(ribbon([(kx + math.sin(r) * 20, ky - math.cos(r) * 20), (kx + math.sin(r) * 26, ky - math.cos(r) * 26)], 0.6),
-                     "#8a8a8a", 0.5))
+out.append(plain(rounded(x0, y0, x1, y1, 7), *MAIN))
+out.append(plain(rect(TRAY_X - BEZEL, TRAY_Y - BEZEL, TRAY_X + TRAY + BEZEL, TRAY_Y + TRAY + BEZEL), *MAIN))
 
 # The escapement: a pendulum standing on its pivot, a notch for each of its
 # weight's places; the higher the weight, the longer the slice.
 px, py = PENDULUM
-out.append(plain(outline([(px - 10, py + 6), (px + 10, py + 6), (px + 4, py - 2), (px - 4, py - 2)]), "#7a7a7a", 0.6))
+out.append(plain(outline([(px - 10, py + 6), (px + 10, py + 6), (px + 4, py - 2), (px - 4, py - 2)]), *PART))
 for d in WEIGHTS:
-    out.append(plain(ribbon([(px + 8, py - d), (px + 13, py - d)], 0.5), "#7a7a7a", 0.4))
+    out.append(plain(ribbon([(px + 10, py - d), (px + 16, py - d)], 0.5), *PART))
 
 # The music-box comb's base; its teeth are nodes (chrd plucks them).
-out.append(plain(rect(COMB_X - 5, COMB_Y - 5, COMB_X + (len(TOOTH_NOTES) - 1) * TOOTH_PITCH + 5, COMB_Y), "#8a8a8a", 0.6))
+out.append(plain(rect(COMB_X - 5, COMB_Y - 5, COMB_X + (len(TOOTH_NOTES) - 1) * TOOTH_PITCH + 5, COMB_Y), *PART))
 
 # The rate lever's quadrant: an arc and eight notches from off to the fastest.
 lx, ly = LEVER
 for i in range(8):
     a = math.radians(-60 + 120 * i / 7)
-    out.append(plain(ribbon([(lx + math.sin(a) * 41, ly - math.cos(a) * 41), (lx + math.sin(a) * 47, ly - math.cos(a) * 47)], 0.5),
-                     "#8a8a8a", 0.4))
-out.append(plain(ribbon([(lx + math.sin(math.radians(a)) * 38, ly - math.cos(math.radians(a)) * 38) for a in range(-64, 65, 8)], 0.3),
-                 "#5a5a5a", 0.4))
-out.append(circle(lx, ly, 3, "#8a8a8a", 0.6))
-
-# The winding key's boss on the tin's right side.
-out.append(plain(rect(x1, KEY[1] - 4, x1 + 3, KEY[1] + 4), "#8a8a8a", 0.5))
+    out.append(plain(ribbon([(lx + math.sin(a) * 41, ly - math.cos(a) * 41), (lx + math.sin(a) * 47, ly - math.cos(a) * 47)], 0.5), *PART))
+out.append(plain(ribbon([(lx + math.sin(math.radians(a)) * 38, ly - math.cos(math.radians(a)) * 38) for a in range(-64, 65, 8)], 0.3), *PART))
+out.append(circle(lx, ly, 3, *PART))
 
 # The tape: the whole sample as a strip of peaks in a slot along the tin's foot
 # (its bars are nodes), the window that pos picks lit and held in the caliper.
-out.append(plain(rounded(RULE_X0 - 3, RULE_Y - 7, RULE_X1 + 3, RULE_Y + 7, 2.5), "#7a7a7a", 0.6))
+out.append(plain(rounded(RULE_X0 - 3, RULE_Y - 7, RULE_X1 + 3, RULE_Y + 7, 2.5), *PART))
 
 # With no sample: a cover over the stage (shown then), how to load one, and
 # a cover over that (shown once a sample is loaded). Drawn before every other
 # node, so a loaded puzzle draws over the hint's cover.
 n = 8
-hint = [label(186, 112, "load a sample", 20, "#CBCBCB"), label(204, 146, "shift +", 14, "#7D7D7D")]
+hint = [label(177, 112, "load a sample", 20, "#CBCBCB"), label(204, 146, "shift +", 14, "#7D7D7D")]
 KEY_SIZE, KEY_X, KEY_Y = 22, 254, 130
 KS = KEY_SIZE / 472
 def key_xy(x, y):
@@ -382,22 +372,26 @@ small_first = n
 cell = TRAY / 8
 for i in range(64):
     h = cell / 2 - GAP
-    tile_nodes.append(node(n, rect(-h, -h, h, h), "#cfcfcf", 0.6))
+    tile_nodes.append(node(n, rect(-h, -h, h, h), "#cfcfcf", SMALL_STROKE))
     n += 1
 large_first = n
 for i in range(4):
-    h = TRAY / 4 - 2 * GAP
-    tile_nodes.append(node(n, rect(-h, -h, h, h), "#cfcfcf", 0.9))
+    h = TRAY / 4 - 2 * GAP   # the 2 grid's gutter: the 4 grid's, as its squares are the small ones doubled
+    tile_nodes.append(node(n, rect(-h, -h, h, h), "#cfcfcf", LARGE_STROKE))
     n += 1
 # The prints, cut: a node for each piece of a stroke in a cell, relative to
-# the cell's centre.
+# the cell's centre. A stroke stops half its width short of the cell's edge,
+# so no piece reaches past its cell; display.cpp then shrinks each tile's
+# pieces about the tile's centre by the grid's fit (below), which brings
+# them inside the tile's square, its gutter and its stroke, while pieces in
+# one tile still meet.
 print_first, print_count, piece_cells = [], [], []
-for loops, lines, _ in PRINTS:
+for loops, lines in PRINTS:
     print_first.append(n)
     strokes = [([to_screen(p) for p in s], True) for s in loops] + [([to_screen(p) for p in s], False) for s in lines]
     for c in range(64):
         bx, by = TRAY_X + (c % 8) * cell, TRAY_Y + (c // 8) * cell
-        box = (bx, by, bx + cell, by + cell)
+        box = (bx + HALF, by + HALF, bx + cell - HALF, by + cell - HALF)
         centre = (bx + cell / 2, by + cell / 2)
         for pts, loop in strokes:
             for piece, closed in pieces(pts, box, loop):
@@ -405,25 +399,10 @@ for loops, lines, _ in PRINTS:
                     continue
                 shape = piece if closed else ribbon(piece)
                 rel = [(x - centre[0], y - centre[1]) for x, y in shape]
-                tile_nodes.append(node(n, outline(distinct(rel), 1), "#cfcfcf", 0.5))
+                tile_nodes.append(node(n, outline(distinct(rel), 1), "#cfcfcf", 0.6))
                 piece_cells.append(c)
                 n += 1
     print_count.append(n - print_first[-1])
-# Each print's main outline, uncut, twice: chrd's ghosts, relative to the tray's centre.
-ghost_first = n
-middle = (TRAY_X + TRAY / 2, TRAY_Y + TRAY / 2)
-ghost_counts = []
-for _, _, mains in PRINTS:
-    ghost_counts.append(len(mains))
-for copy in range(GHOSTS):
-    for _, _, mains in PRINTS:
-        for s, closed in mains:
-            pts = [to_screen(p) for p in s]
-            shape = pts if closed else ribbon(pts)
-            rel = [(x - middle[0], y - middle[1]) for x, y in shape]
-            tile_nodes.append(node(n, outline(distinct(rel), 1), "#7a7a7a", 0.5))
-            n += 1
-ghosts_a_copy = (n - ghost_first) // GHOSTS
 # Pins: depth's, a large one at the corner of each tile it holds still on the
 # 2 and 4 grids (on the 8 grid the held tiles are dark without).
 pin_first = n
@@ -436,10 +415,7 @@ bar_first = n
 for i in range(BARS):
     tile_nodes.append(node(n, outline(ribbon([(0, -5.4), (0, 5.4)], 1.5), 1), "#cfcfcf", 0.5))
     n += 1
-# The map selector's pointer and the rate lever.
-pointer = n
-tile_nodes.append(node(n, outline([(-2.2, 3), (-0.8, -3), (0, -15), (0.8, -3), (2.2, 3), (1, 4.6), (-1, 4.6)]), "#e6e6e6", 0.6, at=KNOB))
-n += 1
+# The rate lever.
 lever = n
 tile_nodes.append(node(n, outline([(-2.4, 1.5), (-1, -3), (-0.8, -33), (-2.2, -35), (0, -42), (2.2, -35), (0.8, -33), (1, -3), (2.4, 1.5), (0, 4)]),
                        "#e6e6e6", 0.6, at=LEVER))
@@ -452,20 +428,11 @@ for i in range(len(TOOTH_NOTES)):
     n += 1
 # The pendulum's rod and its sliding weight, both standing up from the pivot.
 rod = n
-tile_nodes.append(node(n, outline([(-0.7, 0), (-0.7, -58), (0, -60), (0.7, -58), (0.7, 0)]), "#cfcfcf", 0.5, at=PENDULUM))
+tile_nodes.append(node(n, outline([(-0.8, 0), (-0.8, -ROD + 2), (0, -ROD), (0.8, -ROD + 2), (0.8, 0)]), "#cfcfcf", 0.6, at=PENDULUM))
 n += 1
 weight = n
-tile_nodes.append(node(n, outline([(-6, -3), (6, -3), (4.4, 3), (-4.4, 3)]), "#e6e6e6", 0.7, at=(PENDULUM[0], PENDULUM[1] - WEIGHTS[3])))
+tile_nodes.append(node(n, outline([(-7, -3.5), (7, -3.5), (5, 3.5), (-5, 3.5)]), "#e6e6e6", 0.8, at=(PENDULUM[0], PENDULUM[1] - WEIGHTS[3])))
 n += 1
-# The winding key, seen side on, in two poses as it turns.
-key_first = n
-for pose in range(2):
-    width = (8, 2.4)[pose]
-    bow = [(14 + 2 * math.cos(math.radians(a)) + 7 + 7 * math.cos(math.radians(a)), width * math.sin(math.radians(a)))
-           for a in range(-180, 180, 20)]
-    pts = [(0, -1.2), (15, -1.2)] + [p for p in bow if p[1] < 0] + [p for p in bow if p[1] >= 0] + [(15, 1.2), (0, 1.2)]
-    tile_nodes.append(node(n, outline(pts), "#cfcfcf", 0.6, at=(KEY[0] + 3, KEY[1])))
-    n += 1
 # The caliper's jaws on the tape: the window's start and end, standing tall.
 jaw_first = n
 tile_nodes.append(node(n, outline([(0, -10), (3.5, -10), (3.5, -8.8), (1.2, -8.8), (1.2, 7), (3.5, 7), (3.5, 8.2), (0, 8.2)]), "#e6e6e6", 0.6,
@@ -495,30 +462,27 @@ if ID == "recur":
     lines = ["#pragma once", "// Generated by tools/make_panel.py; edit the generator, not this file.",
              "#include <opxy/types.hpp>", "", "namespace recur {",
              "// The screen's nodes: the header's bar (0..7), the tiles' squares, each map's",
-             "// print in pieces, the prints' ghosts, depth's pins, the tape's bars, then the moving parts.",
+             "// print in pieces, depth's pins, the tape's bars, then the moving parts.",
              f"const opxy::u32 small_first = {small_first}, large_first = {large_first};",
+             "// The share of its size a tile's print pieces take, Q10, by grid (2, 4, 8): inside its square.",
+             f"const opxy::i32 tile_fit[3] = {{{fit(1)}, {fit(2)}, {fit(3)}}};",
              f"const opxy::u32 print_first[6] = {{{row(print_first)}}}, print_count[6] = {{{row(print_count)}}};",
-             f"// The ghosts: {GHOSTS} copies of every print's main outline, a copy after another.",
-             f"const opxy::u32 ghost_first = {ghost_first}, ghost_copies = {GHOSTS}, ghosts_a_copy = {ghosts_a_copy};",
-             f"const opxy::u32 ghost_count[6] = {{{row(ghost_counts)}}};",
              f"const opxy::u32 pin_first = {pin_first}, pin_count = {PINS}, bar_first = {bar_first}, bar_count = {BARS},",
-             f"                pointer_node = {pointer}, lever_node = {lever}, teeth_first = {teeth_first}, teeth = {len(TOOTH_NOTES)},",
-             f"                rod_node = {rod}, weight_node = {weight}, key_first = {key_first}, key_poses = 2, jaw_first = {jaw_first},",
+             f"                lever_node = {lever}, teeth_first = {teeth_first}, teeth = {len(TOOTH_NOTES)},",
+             f"                rod_node = {rod}, weight_node = {weight}, jaw_first = {jaw_first},",
              f"                cover_stage = {cover_stage}, cover_hint = {cover_hint}, node_total = {node_count};",
              "// The cell (of the 8 grid) each print piece sits in, from print_first[0] on.",
              "const opxy::u8 piece_cell[" + str(len(piece_cells)) + "] = {" + row(piece_cells) + "};",
              "// The semitone each comb tooth stands for.",
              "const opxy::u8 tooth_notes[" + str(len(TOOTH_NOTES)) + "] = {" + row(TOOTH_NOTES) + "};",
-             "// Where things sit, px: the print's corner and side, the knob, the comb, the lever, the key, the rule.",
+             "// Where things sit, px: the print's corner and side, the lever, the comb, the pendulum, the rule.",
              f"const opxy::i32 tray_x = {TRAY_X}, tray_y = {TRAY_Y}, tray_side = {TRAY};",
-             f"const opxy::i32 knob_x = {KNOB[0]}, knob_y = {KNOB[1]}, lever_x = {LEVER[0]}, lever_y = {LEVER[1]};",
+             f"const opxy::i32 lever_x = {LEVER[0]}, lever_y = {LEVER[1]};",
              f"const opxy::i32 comb_x = {COMB_X}, comb_pitch = {TOOTH_PITCH}, comb_y = {COMB_Y};",
              f"const opxy::i32 pendulum_x = {PENDULUM[0]}, pendulum_y = {PENDULUM[1]};",
              "// The weight's distance up the rod for each slice, px.",
              "const opxy::i32 weight_heights[6] = {" + row(WEIGHTS) + "};",
-             f"const opxy::i32 key_x = {KEY[0] + 3}, key_y = {KEY[1]}, rule_x0 = {RULE_X0}, rule_x1 = {RULE_X1}, rule_y = {RULE_Y};",
-             "// The map selector's six positions, tenths of a degree from upright.",
-             "const opxy::i32 map_angles[6] = {" + row(a * 10 for a in MAP_ANGLES) + "};",
+             f"const opxy::i32 rule_x0 = {RULE_X0}, rule_x1 = {RULE_X1}, rule_y = {RULE_Y};",
              "}", ""]
     ROOT.joinpath("layout.h").write_text("\n".join(lines))
-print("wrote", target, "nodes", node_count, "bytes", len("\n".join(out)), "pieces", print_count, "ghost nodes", ghosts_a_copy)
+print("wrote", target, "nodes", node_count, "bytes", len("\n".join(out)), "pieces", print_count)

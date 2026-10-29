@@ -7,6 +7,7 @@
 //   - Successive taps ring progressively higher, measured in the audio.
 //   - With powder at 0 every tap rings at the key.
 //   - Stir 0 continues the drink the last note left; taps keep their rate.
+//   - Stir sets the drink sloshing, and the slosh dies away.
 //   - The output stays within the declared peak, and a single tap falls silent.
 #include "../engine.cpp"
 #include "../display.cpp"
@@ -32,10 +33,12 @@ double wood_ratio(double x) {
 
 // Controls: powder, taps, fizz, cup, fill, spoon, pops, stir.
 struct Controls { double c[8]; };
-// The long climb (Hot Chocolate, without pops): three octaves in about five seconds.
-const Controls standard = {{0.87, 0.55, 0.2, 0.1667, 0.5, 0.6, 0.0, 1.0}};
+// The long climb (Hot Chocolate, without pops): three octaves in about five
+// seconds. At stir 0 the drink does not slosh, so the pitch is the drink's
+// alone (a first note stirs afresh whatever stir is).
+const Controls standard = {{0.87, 0.55, 0.2, 0.1667, 0.5, 0.6, 0.0, 0.0}};
 // Mug Keys, the default: a scoop of about five semitones.
-const Controls keys = {{0.32, 0.0, 0.7, 0.1667, 0.65, 0.6, 0.15, 1.0}};
+const Controls keys = {{0.32, 0.0, 0.7, 0.1667, 0.65, 0.6, 0.15, 0.6}};
 
 // Voices on one shared drink.
 struct Mug {
@@ -65,6 +68,8 @@ struct Mug {
         }
     }
     double fundamental(unsigned v = 0) const { return hz_of(voice[v].liquid[0].inc); }
+    // The drink's own pitch, without its slosh.
+    double drink(unsigned v = 0) const { return hz_of(pitch[v][0]) * std::pow(2.0, -voice[v].drop / 65536.0); }
 };
 
 void rises_monotonically() {
@@ -251,13 +256,14 @@ void stir_continues() {
     Controls c = standard;
     c.c[7] = 0;
     Controls fresh = standard;
+    fresh.c[7] = 1;
     Mug mug(fresh);
     mug.note(0, 220.0);
     for (int b = 0; b < 2 * 689; ++b) mug.play();
     mug.set(c);
     mug.note(1, 220.0);
     mug.play();
-    const double a = mug.fundamental(0), b = mug.fundamental(1);
+    const double a = mug.drink(0), b = mug.drink(1);
     std::printf("stir 0: a note 2 s after a stir starts at %.2f Hz, the first note is at %.2f Hz\n", b, a);
     check(std::fabs(cents(a, b)) < 1, "stir 0 does not continue the drink");
     check(a < 200, "the first note should still be bubbly at 2 s");
@@ -289,7 +295,7 @@ void plays_as_keys() {
     int near = -1, landed = -1;
     for (int b = 1; b < 3 * 689; ++b) {
         mug.play();
-        const double e = std::fabs(cents(mug.fundamental(), 220.0));
+        const double e = std::fabs(cents(mug.drink(), 220.0));
         if (near < 0 && e < 10) near = b;
         if (landed < 0 && e < 1) landed = b;
     }
@@ -320,6 +326,38 @@ void plays_as_keys() {
     pause.play(1);
     std::printf("pause: after the drink has risen 3 s and the note ended, a stir-0 note starts at %.1f Hz\n", pause.fundamental(1));
     check(pause.fundamental(1) < 220.0 / 6, "a note after a pause does not stir afresh");
+}
+
+void sloshes() {
+    // Stir sets the drink sloshing: the pitch swings around the drink's own,
+    // at the mug's first sloshing mode (3.4 Hz at 59 mm), up to 20 cents at
+    // stir 100, and dies away; at stir 0 it does not.
+    const double stirs[2] = {1.0, 0.0};
+    for (double stir : stirs) {
+        Controls c = keys;
+        c.c[7] = stir;
+        Mug mug(c);
+        mug.note(0, 220.0);
+        double most = 0, late = 0, previous = 0;
+        int crossings = 0;
+        for (int b = 0; b < 3 * 689; ++b) {
+            mug.play();
+            const double swing = cents(mug.fundamental(), mug.drink());
+            if (b < 689) most = std::fmax(most, std::fabs(swing));
+            if (b >= 2 * 689) late = std::fmax(late, std::fabs(swing));
+            if (b > 0 && b < 689 && (swing > 0) != (previous > 0) && std::fabs(swing) > 0.05) ++crossings;
+            previous = swing;
+        }
+        std::printf("slosh: at stir %.0f the pitch swings %.1f cents, %d times across in the first second, %.2f cents after 2 s\n",
+                    stir * 100, most, crossings, late);
+        if (stir > 0) {
+            check(most > 15 && most < 20.5, "stir 100 does not swing the pitch 15 to 20 cents");
+            check(crossings >= 5 && crossings <= 8, "the slosh is not at the mug's sloshing mode");
+            check(late < 2, "the slosh does not die away");
+        } else {
+            check(most < 0.01, "stir 0 sloshes");
+        }
+    }
 }
 
 void bounded_and_silent() {
@@ -359,6 +397,7 @@ int main() {
     taps_climb();
     clear_drink_in_tune();
     stir_continues();
+    sloshes();
     plays_as_keys();
     bounded_and_silent();
     return failures ? 1 : 0;

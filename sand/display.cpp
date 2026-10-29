@@ -41,6 +41,8 @@ const i32 kSilent = 60;
 // A grain settled within this much of the figure's loudest (Q15) lies on its
 // nodal line, and is drawn with the drift of sand it stands for, along the line.
 const i32 kOnLine = 6554;
+// The highest a grain is drawn (Q10 px): the header owns y 0 to 38.
+const i32 kBelowHeader = 42 * 1024;
 // Settled grains are redrawn one frame in this many.
 const u32 kSettledTurns = 6;
 // A grain in the air is drawn this far above the plate per look it has left
@@ -104,14 +106,14 @@ inline Point2 tipped(i32 x, i32 y, Turn r) {
 }
 
 // A number as text: whole, or with two decimals (hundredths) or one (tenths),
-// and a unit.
-inline void number(char* out, u32 capacity, u32 n, u32 decimals, const char* unit_text) {
+// and a unit; bare drops a fraction's leading zero (".3mm"), to fit the header.
+inline void number(char* out, u32 capacity, u32 n, u32 decimals, const char* unit_text, bool bare = false) {
     char text[header_capacity];
     u32 at = 0;
     const u32 whole = decimals == 2 ? n / 100 : decimals == 1 ? n / 10 : n;
     if (whole >= 100) text[at++] = static_cast<char>('0' + whole / 100 % 10);
     if (whole >= 10) text[at++] = static_cast<char>('0' + whole / 10 % 10);
-    text[at++] = static_cast<char>('0' + whole % 10);
+    if (whole || !bare || !decimals) text[at++] = static_cast<char>('0' + whole % 10);
     if (decimals) {
         text[at++] = '.';
         if (decimals == 2) text[at++] = static_cast<char>('0' + n / 10 % 10);
@@ -120,10 +122,6 @@ inline void number(char* out, u32 capacity, u32 n, u32 decimals, const char* uni
     for (u32 i = 0; unit_text[i] && at + 1 < sizeof(text); ++i) text[at++] = unit_text[i];
     text[at] = 0;
     copy(out, capacity, text);
-}
-
-inline const char* grain_name(i32 grain) {
-    return grain < 8192 ? "dust" : grain < 16384 ? "sand" : grain < 24576 ? "grit" : "stone";
 }
 
 // Eases value toward target, a share dt * rate / 1024 of the way (rate in
@@ -163,19 +161,24 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     const Material mat = material(plate_index == 2 ? 32767 : static_cast<i32>(plate_index) * 16384);
 
     // The header: both pages, in the units the sound uses: the figure's mode
-    // pair, how many grains are on the plate, the grain and the material by
-    // name, the sand's friction (mu), the plate's tilt and Shake's largest
-    // jolt (in g).
+    // pair, the bow's force, how many grains are on the plate and their size,
+    // the material by name, the sand's friction (mu), the plate's tilt and
+    // Shake's largest jolt (in g).
     const char* const titles[8] = {"Figure", "Bow", "Sand", "Grain", "Plate", "Settle", "Tilt", "Shake"};
     char values[8][header_capacity];
     for (u32 i = 0; i < 8; ++i) header_amount(values[i], header_capacity, input.slots[i]);
     copy(values[0], header_capacity, kFigureName[figure]);
     number(values[2], header_capacity, static_cast<u32>(sand * static_cast<i32>(kGrains) + 16384) >> 15, 0, "");
-    copy(values[3], header_capacity, grain_name(grain));
+    // The grain's size, from 0.06 mm (fine dust) to 7.7 mm (a stone), as tenths or whole millimetres.
+    const u32 across = 6 * exp2_q16(grain * 14) >> 16;  // hundredths of a mm
+    if (across < 100) number(values[3], header_capacity, (across + 5) / 10, 1, "mm", true);
+    else number(values[3], header_capacity, (across + 50) / 100, 0, "mm");
     copy(values[4], header_capacity, plate_index == 0 ? "metal" : plate_index == 1 ? "glass" : "wood");
     number(values[5], header_capacity, static_cast<u32>(10 + (settle * 50 + 16384) / 32767), 2, "");
     number(values[6], header_capacity, static_cast<u32>((tilt * 10 + 16384) / 32767), 0, "deg");
-    number(values[7], header_capacity, static_cast<u32>(((shake * shake >> 15) * 15 + 16384) / 32767), 1, "g");
+    number(values[7], header_capacity, static_cast<u32>((shake_jolt(shake) * 10 + 2048) >> 12), 1, "g");
+    // The bow's force on the plate's edge, up to 2 newtons.
+    number(values[1], header_capacity, static_cast<u32>((bow * 20 + 16384) / 32767), 1, "N");
     page_header(state.header, input, frame, titles, values, header_first);
 
     // Notes. A note while the plate is silent pours fresh sand; one while it
@@ -249,6 +252,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             // Shake jolts the plate while it sounds, as the sound's shake does.
             const bool sounding = held || state.swing + state.ring >= kSilent;
             t.jitter = (sounding ? calm : 0) + (state.jolted ? strike * kJolt >> 15 : 0);
+            t.jolts = state.jolted ? 32767 : shake;
             state.jolted = 0;
             look_all(state, modes, t, count);
         }
@@ -266,14 +270,12 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
 
     // The plate: its edge, its thickness and marks by material, its finish
     // by Settle, its trembling edge by Shake, and the clamp.
-    part(frame, plate_top, r, edge_grey[plate_index], stroke);
+    part(frame, plate_top, r, top_grey, stroke);
     for (u32 m = 0; m < materials; ++m) {
-        if (m == plate_index) part(frame, thickness_first + m, r, plate_index == 1 ? 11 : 7, stroke);
+        if (m == plate_index) part(frame, thickness_first + m, r, edge_grey[m], stroke);
         else hide(frame, thickness_first + m);
     }
-    if (plate_index == 0) part(frame, metal_mark, r, 6, stroke);
-    else hide(frame, metal_mark);
-    for (u32 k = 0; k < 3; ++k) {
+    for (u32 k = 0; k < 2; ++k) {
         if (plate_index == 1) part(frame, glass_first + k, r, 0, keep);
         else hide(frame, glass_first + k);
     }
@@ -289,7 +291,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         if (sheen >= 3) part(frame, sheen_first + k, r, sheen, fill_and_stroke);
         else hide(frame, sheen_first + k);
     }
-    for (u32 k = 0; k < 3; ++k) {
+    for (u32 k = 0; k < 2; ++k) {
         if (matte >= 3) part(frame, matte_first + k, r, matte, fill_and_stroke);
         else hide(frame, matte_first + k);
     }
@@ -383,7 +385,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         if (moving ? !state.started || ((i ^ state.frames) & 1) == 0 : turn_now) {
             const u32 grey = g.air ? aloft_grey : moving ? moving_grey : rest_grey;
             const i32 rise = clamp(g.air * kRise, 0, kRiseMost) * unit;
-            place(frame, node, at.x, at.y - rise, g.air ? clamp(size * 5 / 4, 0, 2 * unit) : size, grey, fill_and_stroke);
+            const i32 y = at.y - rise < kBelowHeader ? kBelowHeader : at.y - rise;  // a tipped plate's grains stay clear of the header
+            place(frame, node, at.x, y, g.air ? clamp(size * 5 / 4, 0, 2 * unit) : size, grey, fill_and_stroke);
         }
         if (!turn_now) continue;  // the drift follows on the settled grains' turn
         if (moving || magnitude(shape(modes[0], g.u, g.v)) >= kOnLine) {

@@ -7,11 +7,9 @@ namespace plate {
 using opxy::i32;
 using opxy::u32;
 // Nodes: the four outlines (left and right margins, then lit bands), the header's bars,
-// each wing's veins (forewing, hindwing; left then right), three bands a half wing
-// (sites 0, 4, 8; forewing then hindwing, left then right),
-// eight eyespots of two nodes (ring, pupil; four a wing, left then right), six lunules
-// a wing (left then right), the antennae.
-const u32 edges = 0, header = 4, veins = 12, bands = 16, bands_a_wing = 3, band_step = 4, eyes = 28, eyes_a_wing = 4, lunules = 44, lunules_a_wing = 6, antennae = 56, nodes = 58;
+// each wing's veins (forewing, hindwing; left then right), eight eyespot rings (four a
+// wing, left then right), the antennae.
+const u32 edges = 0, header = 4, veins = 12, eyes = 16, eyes_a_wing = 4, antennae = 24, nodes = 26;
 const i32 centre_x = 240, centre_y = 124, wing_middle = 108, pivot_x = -3;
 // The wing's zones, Q15 of the margin's reach: the chain's middle site and its end, and the
 // inner zone's edge, which the margin never comes inside.
@@ -24,8 +22,6 @@ const i32 wing_y[62] = {-12288, -19200, -25934, -32066, -37468, -42594, -47468, 
 // How much each margin point turns with the forewing, and moves with the tail, Q15.
 const i32 forewing[62] = {32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767, 32409, 31351, 29638, 27346, 24575, 21446, 18096, 14671, 11321, 8192, 5421, 3129, 1416, 358, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 const i32 tail[62] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5243, 14417, 24248, 30801, 32767, 32767, 32767, 30801, 24248, 14417, 5243, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-// The margin points the lunules lie toward, on the lit band.
-const u32 lunule_at[6] = {5, 13, 21, 39, 47, 55};
 // The tail's direction (the left wing's; the right mirrors x), Q10, and its tip.
 const i32 tail_dx = -303, tail_dy = 978;
 const u32 tail_tip = 45;

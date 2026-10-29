@@ -24,13 +24,12 @@ struct DisplayState {
     u32 keys[4];              // the outlines' geometry keys
     i32 reach[plate::margin]; // the margin's reaches as drawn, Q12
     i32 lit_share;            // the lit band's share of the margin's reach (the struck site), Q15
-    u32 band_shade[plate::bands_a_wing];
     i32 scale;                // the wings' scale about their roots, easing to the controls', Q15
     i32 drawn_scale[2];       // each wing's scale as its nodes were last placed (0: place them)
     i32 sweep;                // the forewing's sweep back about the root (tilt), tenths of a degree, easing
     i32 tail;                 // the tail's length (glow), Q10 px, easing
-    i32 lit_width;            // the lit band's half width (strike), Q15 of the margin's reach, easing
-    i32 drawn_sweep[2], drawn_tail[2], drawn_width[2];   // as each wing's nodes were last placed
+    i32 lit_strike;           // the strike's knob as the lit band shows it, Q15, easing
+    i32 drawn_sweep[2], drawn_tail[2], drawn_strike[2];   // as each wing's nodes were last placed
     u32 dirty;                // wings whose nodes must be placed again (bit 0 left, bit 1 right)
     u32 turn;                 // which wing may move next
     u32 drawn_light;          // the light's step as drawn

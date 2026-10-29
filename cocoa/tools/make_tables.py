@@ -44,7 +44,7 @@ RADIUS_MM = 40.0
 FILL_MM = (20.0, 80.0)
 MUG_MM = 90.0                        # the mug's inner height, for the walls' loading
 STOKES = 2 * 9.81 * 1000.0 / (9 * 0.002)   # v = STOKES r^2, m/s for r in m
-TOP_SPEED = 0.25                     # m/s: a millimetre bubble's terminal speed
+TOP_SPEED = 0.40                     # m/s: a 2 mm bubble's rise in hot milk, rounded up
 FIZZ_UM = (120.0, 1200.0)            # the median radius
 CLASSES = 8
 SPREAD = 0.6                          # log-normal sigma of the radius (natural log)
@@ -63,11 +63,17 @@ LIQUID = [((0, 0), 0.0, 1, 1.0),
 # The cup's wall modes, empty: Hz, T60 (s) and level for its (2,0), (3,0) and
 # (4,0) bending modes. Liquid loads the wall and lowers them (French 1983:
 # f = f0 / sqrt(1 + 1.2 (h / H)^4)) and damps them (1 + 1.5 h / H).
-CUPS = {"china": [(1650, 0.12, 0.15), (4480, 0.08, 0.08), (8950, 0.05, 0.04)],
+CUPS = {"china": [(1650, 0.12, 0.30), (4480, 0.08, 0.18), (8950, 0.05, 0.10)],
         "glass": [(1150, 0.60, 0.20), (3200, 0.45, 0.12), (6100, 0.30, 0.06)],
         "tin": [(720, 0.70, 0.30), (1890, 0.50, 0.20), (3410, 0.35, 0.12)]}
-# The liquid's fundamental T60 once clear, by cup.
-LIQUID_T60 = {"china": 0.9, "glass": 1.5, "tin": 1.3}
+# The liquid's fundamental T60 once clear, by cup, at 59 mm. A shallower
+# drink loses more of its energy to the floor's boundary layer, for its
+# depth: the T60 goes as the depth (0.3 s at 20 mm to 1.2 s at 80 mm, china).
+LIQUID_T60 = {"china": 0.9, "glass": 1.8, "tin": 0.7}
+T60_DEPTH_MM = 59.0
+# Sloshing: the drink's first sloshing mode, sqrt(g k tanh(k h)) / 2 pi with
+# k = j'_11 / a (3.4 Hz at 59 mm), which a stir sets going.
+J11 = 1.8412
 
 Q16 = 65536
 
@@ -183,6 +189,13 @@ emit("// The drink's loading of the wall over fill (65 points): log2 of the mode
      "// fall (Q16, negative) and their damping's growth (Q16 octaves).\nconst i32 cup_lowering[65]",
      [octaves(-0.5 * math.log2(1 + 1.2 * (fill_mm(i) / MUG_MM) ** 4)) for i in range(65)])
 emit("const i32 cup_damping[65]", [octaves(math.log2(1 + 1.5 * fill_mm(i) / MUG_MM)) for i in range(65)])
+emit("// The liquid's loss over fill (65 points), log2 of its growth against 59 mm,\n"
+     "// Q16: a shallow drink rings shorter, a deep one longer.\nconst i32 liquid_depth[65]",
+     [octaves(math.log2(T60_DEPTH_MM / fill_mm(i))) for i in range(65)])
+k_slosh = J11 / (RADIUS_MM / 1000)
+emit("// The sloshing mode's phase increment a block over fill (65 points), Q32 cycles.\nconst i32 slosh_inc[65]",
+     [round(math.sqrt(9.81 * k_slosh * math.tanh(k_slosh * fill_mm(i) / 1000)) / (2 * math.pi) * BLOCK / RATE * 2 ** 32)
+      for i in range(65)])
 
 # The spoon: a contact of duration tau excites a mode at f by about
 # 1 / sqrt(1 + (f / fc)^4), fc = 0.6 / tau: 97 points over log2 (f / fc) from
@@ -190,10 +203,17 @@ emit("const i32 cup_damping[65]", [octaves(math.log2(1 + 1.5 * fill_mm(i) / MUG_
 emit("// The spoon's strike at f over its contact's corner fc, 1 / sqrt(1 + (f/fc)^4),\n"
      "// at log2(f / fc) = -6 + i / 8, Q15.\nconst i32 spoon_gain[97]",
      [round(32767 / math.sqrt(1 + 2 ** (4 * (-6 + i / 8)))) for i in range(97)])
-lines.append("// The spoon's contact: 5 ms (soft) to 0.15 ms (hard); log2 of its corner")
-lines.append("// 0.6 / tau as an increment at the softest (Q16) and the span (octaves, Q16).")
-lines.append(f"const i32 log2_soft_corner = {octaves(math.log2(0.6 / 0.005 / RATE * 2 ** 32))};")
-lines.append(f"const i32 corner_span = {octaves(math.log2(0.005 / 0.00015))};")
+emit("// 1 / spoon_gain, at most 4, Q13: a tap strikes the fundamental in full\n"
+     "// whatever the spoon, so the spoon sets the tone, not the level.\nconst i32 spoon_boost[97]",
+     [round(min(4.0, math.sqrt(1 + 2 ** (4 * (-6 + i / 8)))) * 8192) for i in range(97)])
+SOFT, HARD = 0.004, 0.000075          # the spoon's contact, s: wood to silver
+lines.append("// The spoon's contact: 4 ms (soft) to 75 us (hard); log2 of its corner")
+lines.append("// 0.6 / tau as an increment at the softest (Q16), the span (octaves, Q16),")
+lines.append("// and log2 of the softest contact in samples and in microseconds (Q16).")
+lines.append(f"const i32 log2_soft_corner = {octaves(math.log2(0.6 / SOFT / RATE * 2 ** 32))};")
+lines.append(f"const i32 corner_span = {octaves(math.log2(SOFT / HARD))};")
+lines.append(f"const i32 log2_soft_samples = {octaves(math.log2(SOFT * RATE))};")
+lines.append(f"const i32 log2_soft_us = {octaves(math.log2(SOFT * 1e6))};")
 lines += ["}", "}"]
 (ROOT / "tables.h").write_text("\n".join(lines) + "\n")
 print("wrote tables.h; K =", round(K, 1))

@@ -1,5 +1,6 @@
 // Ghost's own checks, compiled for the host and run by
 // python sdk.py test --machine <folder>.
+#include <algorithm>
 #include "analysis.h"
 #include <cstdio>
 #include <cstdlib>
@@ -126,13 +127,13 @@ int main() {
         std::printf("split 1: the fundamental %.1f dB under the lowest harmonics\n", 10 * std::log10(fundamental / next));
         check(10 * std::log10(fundamental / next) < -15, "split at full takes out the fundamental");
     }
-    {   // trade swaps the halves between the ears: at full trade a swap every 1.5 s.
+    {   // trade swaps the halves between the ears: at full a swap and back every 1.5 s.
         double v[8] = {0.6, 0.6, 0.74, 1, 0, 0, 0.5, 0};
         Rig r(220, v);
         r.run(5, left, right);
         double balance[2];
-        for (u32 w = 0; w < 2; ++w) {   // around 1.5 s (cos 0) and 3.0 s (cos pi): a half cycle apart
-            const size_t at = size_t((1.2 + 1.5 * w) * fs);
+        for (u32 w = 0; w < 2; ++w) {   // around 1.49 s (cos 0) and 2.23 s (cos pi): a half cycle apart
+            const size_t at = size_t((1.31 + 0.744 * w) * fs);
             std::vector<double> l(left.begin() + at, left.begin() + at + 16384), rr(right.begin() + at, right.begin() + at + 16384);
             Spectra s(l, rr, 4096);
             balance[w] = 10 * std::log10(sum_harmonics(s, s.left, 220, 2, 2, 4) / sum_harmonics(s, s.left, 220, 1, 2, 4));
@@ -140,7 +141,7 @@ int main() {
         std::printf("trade: the left ear's even over odd %+.1f dB, then %+.1f dB\n", balance[0], balance[1]);
         check(balance[0] * balance[1] < 0, "trade swaps the halves between the ears");
     }
-    {   // beat: the right ear sharp by beat Hz (2.94 Hz at 0.7).
+    {   // beat: the right ear sharp by beat Hz (3.57 Hz at 0.7).
         double v[8] = {0.8, 0.6, 0, 0, 0.7, 0, 0.5, 0};
         Rig r(220, v);
         r.run(8, left, right);
@@ -149,7 +150,7 @@ int main() {
         const double fl = peak_near(s, s.left, 220), fr = peak_near(s, s.right, 220);
         std::printf("beat 0.7: left %.2f Hz, right %.2f Hz: a %.2f Hz beat between the ears (asked %.2f)\n",
                     fl, fr, fr - fl, ghost::beat_mhz(ghost::level(r.parameters[ghost::kBeat])) / 1000.0);
-        check(std::fabs(fr - fl - 2.94) < 0.25, "beat detunes the right ear by beat Hz");
+        check(std::fabs(fr - fl - 3.57) < 0.25, "beat detunes the right ear by beat Hz");
     }
     {   // The head: at the right, near, the right ear is louder and brighter and
         // the left later by about 12 samples (0.27 ms).
@@ -208,6 +209,24 @@ int main() {
         without.run(3, left, right);
         const double b = rms(left);
         check(a > 0.01 && b > 0.01, "the bed plays, and without a sample breath does");
+    }
+    {   // Without a sample, bed is Ghost's own whisper: noisier, and in gusts.
+        double v[8] = {0.6, 0.6, 0.6, 0, 0, 0, 0.5, 0};
+        double noise[2], spread[2];
+        for (u32 k = 0; k < 2; ++k) {
+            v[7] = k;
+            Rig r(220, v);
+            r.run(6, left, right);
+            std::vector<double> l(left.begin() + size_t(2 * fs), left.end()), rr(right.begin() + size_t(2 * fs), right.end());
+            Spectra s(l, rr, 32768);
+            noise[k] = (s.hnr(s.left, 220, 5000) + s.hnr(s.right, 220, 5000)) / 2;
+            std::vector<double> d;   // 25 ms levels, 10th to 90th percentile
+            for (size_t at = 0; at + 1102 <= l.size(); at += 1102) d.push_back(db(rms(std::vector<double>(l.begin() + at, l.begin() + at + 1102))));
+            std::sort(d.begin(), d.end());
+            spread[k] = d[d.size() * 9 / 10] - d[d.size() / 10];
+        }
+        std::printf("bed without a sample: harmonic to noise %.1f dB, then %.1f dB at full; level spread %.1f dB, then %.1f dB\n", noise[0], noise[1], spread[0], spread[1]);
+        check(noise[1] < noise[0] - 5 && spread[1] > spread[0] + 3, "without a sample, bed whispers in gusts");
     }
     {   // Sixteen notes sound at once on every track; a seventeenth waits silent,
         // and sounds once one has ended.

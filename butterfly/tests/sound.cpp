@@ -493,8 +493,8 @@ double centroid(const std::vector<double>& x, const Model& m, double at) {
 void controls_table() {
     const double a3[1] = {220};
     const char* names[8] = {"flux", "coupling", "spread", "strike", "glow", "site", "tilt", "wingbeat"};
-    double rows[12][5];
-    const char* labels[12];
+    double rows[14][5];
+    const char* labels[14];
     u32 row = 0;
     auto with = [](u32 control, double v, double* c) {
         for (u32 i = 0; i < 8; ++i) c[i] = presets[0].c[i];
@@ -567,6 +567,22 @@ void controls_table() {
         rows[row][v] = fall;
     }
     ++row;
+    // glow: the struck hum's fade, Specimen's fall to 30 dB under its strike
+    labels[row] = "glow: Specimen's fall to -30 dB, s";
+    for (u32 v = 0; v < 5; ++v) {
+        const double value = v / 4.0;
+        const Render r = play(a3, 1, 60, [&](double, double* c) { with(GLOW, value, c); });
+        const double first = rms_db(r.out, 0, 13230);
+        double fall = 60;
+        for (size_t w = 13230; w + 4410 <= r.out.size(); w += 2205)
+            if (rms_db(r.out, w, w + 4410) < first - 30) {
+                fall = w / 44100.0;
+                break;
+            }
+        rows[row][v] = fall;
+    }
+    ok = ok && rows[row][0] < 1 && rows[row][1] < rows[row][2] && rows[row][2] < rows[row][3] && rows[row][3] < rows[row][4];
+    ++row;
     // site: the audio's centroid, and partials within 20 dB
     labels[row] = "site: centroid, x the note";
     for (u32 v = 0; v < 5; ++v) {
@@ -589,7 +605,25 @@ void controls_table() {
         rows[row][v] = n;
     }
     ++row;
-    // tilt: the centroid 1 s into a pluck, against at its strike
+    // tilt: the centroid at the strike, and 1 s into a pluck against at its strike
+    labels[row] = "tilt: upper half of the span against lower, dB";
+    for (u32 v = 0; v < 5; ++v) {
+        const double value = v / 4.0;
+        double c[8];
+        with(TILT, value, c);
+        const Render r = play(a3, 1, 0.3, [&](double, double* cc) { with(TILT, value, cc); });
+        const Model m = model(c);
+        const double middle = 220 * std::pow(2.0, std::pow(2.0, spread_log2(q31(c[SPREAD])) / 65536.0) / 2);
+        double upper = 0, lower = 0;
+        for (u32 k = 0; k < partials; ++k) {
+            if (m.hz[k] > 8000) continue;
+            const double a = magnitude_at(r.out, m.hz[k], 441, 4096);
+            (m.hz[k] > middle ? upper : lower) += a * a;
+        }
+        rows[row][v] = 10 * std::log10((upper + 1e-30) / (lower + 1e-30));
+    }
+    ok = ok && rows[row][4] < rows[row][0] - 8;
+    ++row;
     labels[row] = "tilt: centroid at 1 s against at the strike";
     for (u32 v = 0; v < 5; ++v) {
         const double value = v / 4.0;

@@ -165,13 +165,13 @@
     },
     "Drone": {
       "figure": 0.9583,
-      "bow": 0.85,
+      "bow": 0.75,
       "sand": 0.5,
       "grain": 0.1,
       "plate": 0.1667,
       "settle": 0.25,
       "tilt": 0,
-      "shake": 0.18
+      "shake": 0.06
     },
     "Hourglass": {
       "figure": 0.7083,
@@ -180,7 +180,7 @@
       "grain": 0.15,
       "plate": 0.1667,
       "settle": 0.4,
-      "tilt": 0.6,
+      "tilt": 0.45,
       "shake": 0
     },
     "Gravel": {
@@ -195,7 +195,7 @@
     }
   },
   "resources": {
-    "voiceBytes": 688,
+    "voiceBytes": 1360,
     "voiceAlignment": 4,
     "voiceCapacity": 8,
     "sharedBytes": 396,
@@ -205,7 +205,7 @@
       "stateAlignment": 4,
       "paths": 4,
       "points": 64,
-      "nodes": 136,
+      "nodes": 133,
       "texts": 16,
       "palette": 16
     }

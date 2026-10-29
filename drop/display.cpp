@@ -1,22 +1,22 @@
 #include "display.h"
 
-// Drop's screen: an engraved plate (tools/make_panel.py), greys and fine line.
-// A No. 8 cast-iron skillet seen from 30 degrees above.
+// Drop's screen: an engraved plate (tools/make_panel.py), a No. 8 cast-iron
+// skillet seen from 30 degrees above, drawn in three weights: the drops
+// brightest and boldest, the skillet's outline a step down, a few dim strokes.
 //
 // Each note lands a drop on it. The screen cannot hear the voices: it keeps
 // its own drops, stepped with the voices' own physics (leidenfrost.h) for
 // each 64 samples of time since their notes, so each drop's radius, lobes and
 // end are the sound's. A floating drop is its rim, a star of its lobes,
 // breathing in and out (16 times slower than it beats, to be seen), raised on
-// its vapour layer over its bright underside, with its reflection beneath:
-// the newest drop's is the fourth outline, the others' an engraver's strokes.
+// its vapour layer over its bright underside, its dark shadow on the iron.
 // At each lobe it gives up, the star fades and grows back with one fewer, and
 // a spark flies, as the sound clicks. Its last, round life shrinks and
 // quickens, and it is gone. Under the Leidenfrost point it is a flattened
 // puddle, spraying, gone in a moment. On the ratchet it runs round the teeth.
 //
-// Every control shows: heat in the shimmer over the rim (brighter past the
-// point) and in the drop's state; size in the water mark where the next drop
+// Every control shows: heat in the rings tempered into the iron (or frost)
+// and in the drop's state; size in the water mark where the next drop
 // lands and in the drops; liquid in their radius and how fast they breathe;
 // crackle in the spatter dried on the iron (seen with no note playing) and the
 // sparks; groove in the teeth and the drops' running; vapour in the gap
@@ -165,13 +165,15 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     figure(values[SIZE], p.size + p.lobe, "mm");
     const u32 liquid = physics::q16(input.slots[LIQUID]);
     copy(values[LIQUID], header_capacity, liquid < 16384 ? "water" : liquid < 49152 ? "ethnl" : "LN2");
-    header_amount(values[CRACKLE], header_capacity, input.slots[CRACKLE]);
-    const u32 speed = static_cast<u32>(p.groove * 9 + 16384) >> 15;
-    if (speed) {
-        digits(values[GROOVE], speed, 0);
-        append(values[GROOVE], "cm/s");
+    // Crackle: the floating drop's contacts a second, at this heat.
+    digits(values[CRACKLE], static_cast<u32>(physics::contacts(p)), 0);
+    append(values[CRACKLE], "/s");
+    // Groove: the pulses' swing, the longer of each pair's share (50% straight).
+    if (p.swing) {
+        digits(values[GROOVE], 50u + static_cast<u32>(p.swing * 100 + 32768) / 65536u, 0);
+        append(values[GROOVE], "%");
     } else {
-        copy(values[GROOVE], header_capacity, "flat");
+        copy(values[GROOVE], header_capacity, "even");
     }
     digits(values[VAPOUR], 20u + static_cast<u32>(p.vapour * 180 + 16384) / 32768u, 0);
     append(values[VAPOUR], "um");
@@ -196,7 +198,6 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         state.serial = input.note_serial;
         state.count = 0;
         state.owed = 0;
-        state.reflection_key = 0;
         state.dice = 0x2545f491u;
         for (u32 k = 0; k < scene::most; ++k) {
             state.drops[k].used = 0;
@@ -255,11 +256,6 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         if (!d.drop.lobes) d.used = 0;
     }
     const bool floating = p.floating >= 16384;
-    // The newest floating drop has the true reflection.
-    u32 newest = scene::most;
-    for (u32 k = 0; k < scene::most; ++k)
-        if (state.drops[k].used && floating && (newest == scene::most || state.drops[k].order > state.drops[newest].order))
-            newest = k;
 
     // The drops.
     const i32 vapour = 205 + (p.vapour * 9011 >> 15);                              // the gap, 0.2 to 9 mm Q10: exaggerated
@@ -269,20 +265,18 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     // How fast a drop of this size evaporates, as its steam: a tall billowing
     // plume living half a second, smaller to 15 s, none past (Q10, 0 to 1 from 0.5 to 64 s).
     const i32 slow = clamp((physics::float_life(p, p.size) + octave) / 7 >> 6, 0, unit);
-    const i32 plume = slow < 717 ? 1280 - (slow * 1340 >> 10) : 0;                // its scale, Q10: 1.25 to 0.33
+    const i32 plume = slow < 717 ? 1024 - (slow * 1000 >> 10) : 0;                // its scale, Q10: 1 to 0.3
     const i32 capillary = static_cast<i32>(physics::exp2_q16(p.lobe + 10 * octave)) * 1382 >> 10;   // l_c, mm Q10
-    Point points[64], mirrored[64];
-    bool reflected = false;
+    Point points[64];
     for (u32 k = 0; k < scene::most; ++k) {
         ScreenDrop& d = state.drops[k];
-        const u32 rim = node::rim + k, under = node::underside + k, mirror = node::mirror + k;
+        const u32 rim = node::rim + k, under = node::underside + k;
         if (!d.used) {
             rest(points);
             outline(frame, rim, points, d.key, fresh);
             conceal(frame, rim);
             conceal(frame, under);
             conceal(frame, node::steam + k);
-            conceal(frame, mirror);
             conceal(frame, node::shadow + k);
             continue;
         }
@@ -332,16 +326,14 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
                 const i32 px = r * sine(t + 900) >> 10, py = r * sine(t) >> 10;
                 points[i].x = px;
                 points[i].y = -((py * squash >> 10) + (top * scene::cos_e >> 10));
-                mirrored[i].x = px;
-                mirrored[i].y = -((py * squash >> 10) - ((top + mm_px(lift * 2)) * scene::cos_e >> 10));
             }
             outline(frame, rim, points, d.key, fresh);
-            put(frame, rim, x, y, unit, 14, stroke);
+            put(frame, rim, x, y, unit, 15, stroke);
             const i32 gap = mm_px(vapour + lift) * scene::cos_e >> 10;
             const i32 size = clamp(radius / scene::ring, 16, 2 * unit);
-            nudge(frame, under, x, y - gap, size, d.flash ? 15 : static_cast<u32>(7 + (p.vapour * 6 >> 15)));   // thick vapour shines
+            nudge(frame, under, x, y - gap, size, d.flash ? 15 : 10);   // it flashes as the vapour vents
             // Its shadow stays on the iron, a dark footprint the vapour lifts it off.
-            nudge(frame, node::shadow + k, x, y, size, 3, fill_and_stroke);
+            nudge(frame, node::shadow + k, x, y, size, 2, fill_and_stroke);
             // Its steam, from its top, swaying as it billows.
             if (plume) {
                 const i32 sway = reduced ? 0 : 40 * sine(static_cast<i32>(dr.age * 3600u / 1033u % 3600u)) >> 10;   // tenths of a degree
@@ -350,20 +342,11 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
                 const Turn tilt = {sine(sway + 900), sine(sway)};
                 if (magnitude(was.x - sx) >= 512 || magnitude(was.y - sy) >= 512 || magnitude(was.scale - plume) >= 16 ||
                     was.sin != tilt.sin || was.paint != stroke) {
-                    place(frame, node::steam + k, sx, sy, plume, static_cast<u32>(13 - (slow * 8 >> 10)), stroke);
+                    place(frame, node::steam + k, sx, sy, plume, static_cast<u32>(slow < 360 ? 12 : 9), stroke);
                     if (rotation_valid(tilt.cos, tilt.sin)) turn(frame, node::steam + k, tilt);
                 }
             } else {
                 conceal(frame, node::steam + k);
-            }
-            if (k == newest) {
-                outline(frame, node::reflection, mirrored, state.reflection_key, fresh);
-                put(frame, node::reflection, x, y, unit, static_cast<u32>(5 + (p.vapour * 8 >> 15)), stroke);   // a thick layer is a mirror
-                conceal(frame, mirror);
-                reflected = true;
-            } else {
-                nudge(frame, mirror, x, y + gap + (mm_px(height) * scene::cos_e >> 10) / 2, clamp(radius / scene::ring, 16, 2 * unit),
-                      static_cast<u32>(5 + (p.vapour * 6 >> 15)));
             }
         } else {
             // Boiling on the plate: a flattened, ragged puddle, wider than the drop.
@@ -378,35 +361,13 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
                 points[i].y = -((r * sine(t) >> 10) * scene::sin_e >> 10) - (mm_px(307) * scene::cos_e >> 10);
             }
             outline(frame, rim, points, d.key, fresh);
-            put(frame, rim, x, y, unit, 13, stroke);
+            put(frame, rim, x, y, unit, 15, stroke);
             conceal(frame, under);
             conceal(frame, node::steam + k);
-            conceal(frame, mirror);
             conceal(frame, node::shadow + k);
         }
     }
-    if (!reflected) {
-        rest(mirrored);
-        outline(frame, node::reflection, mirrored, state.reflection_key, fresh);
-        conceal(frame, node::reflection);
-    }
 
-    // Droplets round the newest floating drop, thrown by its brief contacts:
-    // up to six, as many as the crackle, where its seed puts them.
-    const u32 marks = static_cast<u32>(p.crackle * 6 + 16384) >> 15;
-    for (u32 j = 0; j < node::spatters; ++j) {
-        const u32 n = node::spatter + j;
-        if (newest == scene::most || j >= marks) { conceal(frame, n); continue; }
-        const ScreenDrop& d = state.drops[newest];
-        const i32 angle = site[newest] + (reduced ? 0 : travel_angle(d.drop.travel));
-        const i32 X = scene::track_r * sine(angle + 900), Y = scene::track_y * unit + scene::track_r * sine(angle);
-        const i32 x = scene::cx * unit + (X * scene::scale >> 10);
-        const i32 y = scene::cy * unit - ((Y * scene::sin_e >> 10) * scene::scale >> 10);
-        const u32 h = physics::hash(d.order, j);
-        const i32 a = static_cast<i32>(h % 3600u);
-        const i32 r = drop_px(physics::radius(d.drop, p)) * (1300 + static_cast<i32>((h >> 12) & 511u)) >> 10;
-        nudge(frame, n, x + (r * sine(a + 900) >> 10), y - ((r * sine(a) >> 10) * scene::sin_e >> 10), unit, 11);
-    }
 
     // Spray from the newest boiling drop: six droplets thrown from its edge
     // again every 0.12 s, rising and falling as they fly out.
@@ -493,7 +454,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         }
     }
     // The ratchet's teeth, as deep as the groove.
-    if (p.groove > 300) put(frame, node::teeth, 0, 0, unit, static_cast<u32>(6 + (p.groove * 8 >> 15)), stroke);
+    if (p.groove > 300) put(frame, node::teeth, 0, 0, unit, static_cast<u32>(5 + (p.groove * 5 >> 15)), stroke);
     else conceal(frame, node::teeth);
     // The heat: rings tempered into the iron round the burner, one more for
     // each 75 degrees over 100 C, the inner first, glowing brighter as it

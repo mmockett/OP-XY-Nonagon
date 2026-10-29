@@ -6,8 +6,10 @@
 //     the recurrence time the screen states.
 //   - At high energy the modes approach equipartition.
 //   - At very low energy the spectrum barely changes.
-//   - The partials sit at the chain's dispersion relation, or at harmonics
-//     with dispersion at 0.
+//   - The seed's nudge takes its share of the note's energy, in the low
+//     modes, and leaves the note's energy as it was.
+//   - The partials sit at the chain's dispersion relation, stretched, or at
+//     harmonics with dispersion at 0.
 //   - Level, bounds and chords.
 #include "../engine.cpp"
 #include <cmath>
@@ -25,7 +27,7 @@ opxy::u32 increment(double hz) { return static_cast<opxy::u32>(hz / rate * 42949
 double hz_of(int midi) { return 440.0 * std::pow(2.0, (midi - 69) / 12.0); }
 // Controls: energy, masses (8..32), springs, time, dispersion, mode, damping, seed.
 struct Controls {
-    double energy = 0.5, springs = 0, time = 0.22, dispersion = 1, damping = 0;
+    double energy = 0.5, springs = 0, time = 0.39, dispersion = 1, damping = 0;
     int masses = 16, mode = 1, seed = 0;
     void fill(opxy::i32* p) const {
         const int index = (masses - 8) / 4;
@@ -362,38 +364,39 @@ void settles() {
 }
 
 void seeds() {
-    // The seed's nudge (3 parts in a million) changes a chaotic run and
-    // leaves a recurrent one alone: the largest difference in any mode's share
-    // between seeds 1 and 2 over 20,000 chain units.
-    for (int r = 0; r < 2; ++r) {
-        double gap = 0;
-        Controls a, b;
-        a.energy = b.energy = r ? 1.0 : 0.5;
-        a.seed = 1;
-        b.seed = 2;
-        const fermi::chain::Setup sa = setup(a), sb = setup(b);
-        fermi::chain::Chain ca, cb;
-        fermi::chain::init(ca, sa);
-        fermi::chain::init(cb, sb);
-        double ea[33], eb[33];
-        while (ca.ticks < 8u * 20000) {
-            fermi::chain::advance(ca, sa);
-            fermi::chain::advance(cb, sb);
-            shares(ca, sa, ea);
-            shares(cb, sb, eb);
-            for (unsigned j = 1; j <= ca.n; ++j) gap = std::fabs(ea[j] - eb[j]) > gap ? std::fabs(ea[j] - eb[j]) : gap;
-        }
-        std::printf("seed: at energy %.1f, seeds 1 and 2 differ in a mode's share by at most %.4f\n", a.energy, gap);
-        if (r) check(gap > 0.1, "in chaos, the seed changes nothing");
-        else check(gap < 0.01, "in a recurrent run, the seed changes the course");
+    // At the note's start, the nudge takes its share of the energy from the
+    // struck mode, mostly into modes 2 to 6, and the note's energy (the
+    // modes' sum, against the unnudged note's) stays where it was.
+    const int seeds[4] = {0, 16, 32, 63};
+    double plain = 0;
+    for (int i = 0; i < 4; ++i) {
+        Controls k;
+        k.energy = 0;
+        k.seed = seeds[i];
+        const fermi::chain::Setup s = setup(k);
+        fermi::chain::Chain c;
+        fermi::chain::init(c, s);
+        fermi::chain::Folded f;
+        fermi::chain::fold(c, f);
+        double e[33], total = 0, low = 0;
+        for (unsigned j = 1; j <= c.n; ++j) total += e[j] = fermi::chain::energy(c, f, j, s.shift) / 16777216.0;
+        for (unsigned j = 2; j <= 6; ++j) low += e[j];
+        if (!i) plain = total;
+        const double x = seeds[i] / 63.0, wanted = 0.66 * x * (1.5 - 0.5 * x), took = 1 - e[1] / total;
+        std::printf("seed %d: the nudge takes %.3f of the energy (%.3f asked), %.2f of it in modes 2 to 6; the note's energy is %.3f of the plain note's\n",
+                    seeds[i], took, wanted, took > 0 ? low / total / took : 1.0, total / plain);
+        check(std::fabs(took - wanted) < 0.06, "the nudge does not take its share of the energy");
+        check(!i || low / total > 0.75 * took, "the nudge does not lie in the low modes");
+        check(std::fabs(total / plain - 1) < 0.12, "the nudge changes the note's energy");
     }
 }
 
 void dispersion() {
     // N = 8 is the most dispersive chain. At energy 0.65 its modes all take up
-    // energy within a second; then the clock is slowed 256 times, so each
+    // energy within a second; then the clock is slowed 22 times, so each
     // partial holds still for the analysis. The partials should sit at
-    // w_k / w_1, flat of k by up to a fourth; with dispersion at 0, on k.
+    // k + D (w_k / w_1 - k), D being dispersion 1's stretch for 8 masses
+    // (the top partial 500 cents flat); with dispersion at 0, on k.
     for (int pass = 0; pass < 2; ++pass) {
         Controls k;
         k.masses = 8;
@@ -414,7 +417,8 @@ void dispersion() {
         double worst = 0;
         std::printf("dispersion %d: partial ratios", pass ? 0 : 1);
         for (int j = 2; j <= 8; ++j) {
-            const double chain = std::sin(j * pi / 18) / std::sin(pi / 18), expected = pass ? j : chain;
+            const double stretch = fermi::tables::stretch[0] / 4096.0;
+            const double chain = j + stretch * (std::sin(j * pi / 18) / std::sin(pi / 18) - j), expected = pass ? j : chain;
             const double f = peak(x, n, f1 * expected);
             const double cents = 1200 * std::log2(f / (f1 * expected));
             std::printf(" %d: %.3f (%+.1f c%s)", j, f / f1, cents, pass ? "" : " from the chain's");

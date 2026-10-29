@@ -283,6 +283,11 @@ const u32 harmonic[68] = {
     147456, 163840, 180224, 196608, 212992, 229376, 245760, 262144,
 };
 
+// Dispersion 1's blend toward the chain's own ratios, Q12: the top voiced partial 500 cents flat.
+const u32 stretch[7] = {
+    3530, 4581, 7605, 11438, 16081, 21531, 27789,
+};
+
 // log2 of the strengths at pure, deep and thermal, Q12: anchor[((n * 4 + m - 1) * 5 + s) * 3 + i].
 const i32 anchor[420] = {
     -47459, -14907, -4117, -45150, -12597, -4117, -42840, -10287, -1807, -40530, -7977, -1807,
@@ -491,9 +496,9 @@ const u16 exp2_fraction[257] = {
     64124, 64476, 64828, 65182, 65535,
 };
 
-// The spacing of weights between hooks 404 px apart, Q10.
+// The spacing of bobs between hooks 348 px apart, Q10.
 const u32 spacing[7] = {
-    45966, 31823, 24335, 19700, 16548, 14265, 12536,
+    39595, 27412, 20962, 16969, 14254, 12288, 10799,
 };
 // 1 / i, Q16, for i = 0..64 (0 unused).
 const u32 reciprocal[65] = {

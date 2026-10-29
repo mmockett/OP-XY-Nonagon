@@ -7,7 +7,10 @@ into tests/screen.cpp's "contact" scene (a drop landed 1.5 s before, another
 0.2 s before), applied to panel.svg.fragment as the renderers do and
 rasterised with a headless Chrome.
 
-    python tools/make_contact.py --sdk ../open-xy [--chrome PATH]"""
+    python tools/make_contact.py --sdk ../open-xy [--chrome PATH] [--font UniversNextPro-Light.ttf]
+
+--font loads the device's own face for the header (the OP-XY carries it as
+content/display/UniversNextPro-Light.otf); without it Chrome falls back."""
 import argparse
 import json
 import pathlib
@@ -22,6 +25,7 @@ import frame2svg  # noqa: E402
 parser = argparse.ArgumentParser()
 parser.add_argument("--sdk", required=True)
 parser.add_argument("--chrome", default="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+parser.add_argument("--font")
 args = parser.parse_args()
 
 work = pathlib.Path(tempfile.mkdtemp(prefix="drop-contact-"))
@@ -35,10 +39,8 @@ for k, name in enumerate(names):
     for value in (0.0, 0.5, 1.0):
         line = subprocess.run([str(work / "screen"), "contact", str(k), str(value)], check=True, capture_output=True,
                               text=True).stdout.strip().splitlines()[-1]
-        svg = frame2svg.apply(json.loads(line))
-        path = work / f"c{k}-{int(value * 100)}.svg"
-        path.write_text(svg)
-        cells.append(f'<td><img src="{path.as_uri()}" width="480" height="220"></td>')
+        svg = frame2svg.apply(json.loads(line), args.font)
+        cells.append(f'<td style="width:480px;height:220px;padding:0">{svg}</td>')   # inline, so it can load the font
     rows.append(f'<tr><th>{name}</th>{"".join(cells)}</tr>')
 page = work / "sheet.html"
 page.write_text('<html><body style="margin:0;background:#111;color:#ccc;font:16px Helvetica">'
@@ -48,6 +50,6 @@ height = 30 + 226 * len(rows)
 for name, factor in (("controls-1x.png", 1), ("controls.png", 2)):
     out = ROOT / "docs" / name
     subprocess.run([args.chrome, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--allow-file-access-from-files",
-                    f"--force-device-scale-factor={factor}", f"--window-size=1560,{height}", f"--screenshot={out}",
+                    "--virtual-time-budget=1000", f"--force-device-scale-factor={factor}", f"--window-size=1560,{height}", f"--screenshot={out}",
                     page.as_uri()], check=True, capture_output=True)
     print("wrote", out)

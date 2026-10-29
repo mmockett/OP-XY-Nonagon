@@ -118,7 +118,7 @@ void remove_fundamental(Section& s, const Coefficients& c, i32 depth, i32* buffe
 // The bed into buffer (adding), at half rate: the sample at its own rate,
 // mono, looping in [begin, end), times gain (Q15).
 template <bool Stereo>
-void read_bed(Voice& v, i32* buffer, i32 gain, u32 begin, u32 end) {
+inline void read_bed(Voice& v, i32* buffer, i32 gain, u32 begin, u32 end) {
     const opxy::i16* data = v.sample.data;
     u32 frame = v.frame, fraction = v.fraction;
     const u32 step = v.step * 2;
@@ -139,11 +139,14 @@ void read_bed(Voice& v, i32* buffer, i32 gain, u32 begin, u32 end) {
 // pulse at the note) and the bed, through the vowel's two formants.
 struct Exciter {
     i32 breath, hum, bed;     // gains, Q15
+    i32 whisper;              // without a sample, the bed's white breath in gusts, Q15
     i32 f[2];                 // the formants, 2 sin(pi f / fs), Q15
     i32 vowel;                // how much of the excitation passes the formants, Q15
 };
 
 // Breath and the bed, which both ears share, into common (half rate).
+// Without a sample the bed is a whisper of Ghost's own: white breath in gusts.
+template <bool Whisper>
 void breathe(Voice& v, const Exciter& x, u32 begin, u32 end, i32* common) {
     for (u32 i = 0; i < half_frames; ++i) common[i] = 0;
     if (x.bed) {
@@ -158,7 +161,8 @@ void breathe(Voice& v, const Exciter& x, u32 begin, u32 end, i32* common) {
         // The bed, mostly whitened: its sign flipped at random, so it keeps its
         // envelope and grain but rings every harmonic of the note, not its own.
         const i32 bed = common[i];
-        common[i] = (state & 1 ? bed : -((bed * 13107) >> 15)) + ((air * x.breath) >> 15);   // +1 or -0.4: 0.3 dry, 0.7 white
+        if (Whisper) common[i] = (air * x.breath + (i32(state) >> 16) * x.whisper) >> 15;
+        else common[i] = (state & 1 ? bed : -((bed * 13107) >> 15)) + ((air * x.breath) >> 15);   // +1 or -0.4: 0.3 dry, 0.7 white
     }
     v.noise = state;
     v.air = air;
@@ -296,22 +300,24 @@ i32 shadow_cut(i32 octaves) {
 
 // Where the head puts one ear's sound: facing is +1 (Q15) when the source is
 // on its side, -1 opposite; behind is how far behind (Q15, 0 in front); near
-// 0..65535. Fills delay (Q16 samples), shadow (Q15) and gain (Q12).
-void ear_for(i32 facing, i32 behind, i32 itd, u32 near, i32* out) {
+// 0..65535, and far_drop how much darker distance makes both ears (Q16
+// octaves). Fills delay (Q16 samples), shadow (Q15) and gain (Q12).
+void ear_for(i32 facing, i32 behind, i32 itd, u32 near, i32 far_drop, i32* out) {
     out[0] = itd;
     // The far side, behind and far all darken: from 14 kHz down by octaves.
     const i32 shade = (32768 - facing) >> 1;                                   // 0 facing .. 32767 opposite
     i32 drop = ((shade >> 1) * ((163840 + i32((near * 98304u) >> 16)) >> 4)) >> 10;    // up to 2.5 to 4 octaves
     drop += (behind * (104858 >> 2)) >> 13;                                    // 1.6 octaves behind
-    drop += i32(((65535 - near) * 98304u) >> 16);                              // 1.5 octaves far away
+    drop += far_drop;
     out[1] = shadow_cut(380568 - drop);                                        // 5.8 octaves: 14 kHz
-    // Level: a little louder near, and the facing ear louder (up to 9.5 dB
-    // between them), the two ears' power kept: (1 + a f) / sqrt(1 + a^2 f^2).
-    const i32 distance = 3482 + i32((near * 1229u) >> 16);                     // Q12, 0.85 .. 1.15
-    const i32 spread = 4915 + i32((near * 11469u) >> 16);                      // Q15, 0.15 .. 0.5
-    const i32 af = (spread * facing) >> 15;                                    // Q15, |a f| <= 0.5
+    // Level: louder near (4.2 dB from 3 m to the ear, with the darkening
+    // more), and the facing ear louder (up to 12 dB between them), the two
+    // ears' power kept: (1 + a f) / sqrt(1 + a^2 f^2).
+    const i32 distance = 3277 + i32((near * 2048u) >> 16);                     // Q12, 0.8 .. 1.3
+    const i32 spread = 3277 + i32((near * 16384u) >> 16);                      // Q15, 0.1 .. 0.6
+    const i32 af = (spread * facing) >> 15;                                    // Q15, |a f| <= 0.6
     const i32 x2 = (af * af) >> 15;
-    const i32 inverse = 32768 - (x2 >> 1) + ((3 * x2 * x2) >> 18);            // 1 / sqrt(1 + x^2), to 1%
+    const i32 inverse = 32768 - (x2 >> 1) + ((3 * x2 * x2) >> 18);            // 1 / sqrt(1 + x^2), to 1.5%
     out[2] = (((distance * (32768 + af)) >> 15) * inverse) >> 15;
 }
 }
@@ -336,6 +342,8 @@ void start(Voice& voice) {
     voice.damp[0] = voice.damp[1] = 0;
     voice.slow[0] = voice.slow[1] = 0;
     voice.air = 0;
+    voice.gust = 0;
+    voice.gust_next = 1;
     voice.last_e[0] = voice.last_e[1] = 0;
     voice.cached_increment = 0;
     voice.follow = 0;
@@ -415,13 +423,29 @@ void render_sample(Voice& voice, const opxy::SampleBlock& block) {
     const i32 pulse_in = i32(lost >> 1);
     Exciter ex;
     const i32 w = position > 65535 ? 32767 : i32(position >> 1);       // how sung, Q15: 0 at breath, 1 from oo on
-    const i32 own_share = bed && voice.sample.data ? cosine(bed << 14) : 32767;
+    const i32 own_share = bed ? cosine(bed << 14) : 32767;   // bed takes over from breath and hum
     ex.breath = (((noise_in * (32767 - ((w * 22938) >> 15))) >> 15) * own_share) >> 16;   // 1 - 0.7 w, halved
     ex.hum = (((pulse_in * ((w * 27852) >> 15)) >> 15) * own_share) >> 15;             // 0.85 w
     const u32 begin = block.region.begin;
     const u32 end = block.region.end < voice.sample.frames ? block.region.end : voice.sample.frames;
-    ex.bed = 0;
-    if (bed && voice.sample.data && end >= begin + 8) {
+    ex.bed = ex.whisper = 0;
+    const bool sampled = voice.sample.data && end >= begin + 8;
+    if (bed && !sampled) {
+        // No sample: a whisper of its own, white breath in gusts, a syllable
+        // every 60 to 250 ms at its own strength, a quarter of them silent.
+        if (!(--voice.gust_next & 0xffff)) {
+            const u32 r = next(voice.random);
+            const u32 target = (r & 0x300) ? 11469 + ((r >> 16) * 21299 >> 16) : 0;   // 0.35 .. 1, or silence
+            voice.gust_next = target << 16 | (40 + (r & 127));
+        }
+        voice.gust += (i32(voice.gust_next >> 16) - voice.gust) >> 3;
+        ex.whisper = ((((sine(bed << 14) * noise_in) >> 15) * voice.gust) >> 15) * 3 >> 1;   // white is brighter than breath
+    }
+    // And the note itself comes in those gusts: up to 70% of its level rides
+    // them, made up so its average holds.
+    const i32 gusting = bed && !sampled ? i32((bed * 22938u) >> 16) : 0;     // Q15
+    const i32 gusts = 32768 - gusting + ((gusting * voice.gust) >> 15) + (gusting >> 1);   // Q15
+    if (bed && sampled) {
         const u32 volume = block.region.level >> 12;                   // Q15, unity 32768
         ex.bed = i32(((u32((sine(bed << 14) * noise_in) >> 15) * (volume < 65536 ? volume : 65535)) >> 15)) << 4;   // recordings run quieter than breath
         if (voice.frame < begin || voice.frame >= end) voice.frame = begin + (voice.frame - begin) % (end - begin);
@@ -443,8 +467,10 @@ void render_sample(Voice& voice, const opxy::SampleBlock& block) {
     const i32 behind = front < 0 ? -front : 0;
     const i32 itd = side * 24;                                         // Q16 samples: 12 at the side
     i32 left_ear[3], right_ear[3];
-    ear_for(-side, behind, itd > 0 ? itd : 0, place_now.near, left_ear);
-    ear_for(side, behind, itd < 0 ? -itd : 0, place_now.near, right_ear);
+    const u32 far = 65535 - place_now.near;
+    const i32 far_drop = i32(((((far * far) >> 16) * far) >> 16) * 4);   // far away: 4 octaves at 3 m, under 1 nearer than 1 m
+    ear_for(-side, behind, itd > 0 ? itd : 0, place_now.near, far_drop, left_ear);
+    ear_for(side, behind, itd < 0 ? -itd : 0, place_now.near, far_drop, right_ear);
     if (voice.fresh) {
         voice.fresh = false;
         voice.fresh_ears = true;
@@ -469,7 +495,8 @@ void render_sample(Voice& voice, const opxy::SampleBlock& block) {
     i32* left = left_ear_in + ear_tail;
     i32* right = right_ear_in + ear_tail;
     for (u32 i = 0; i < ear_tail; ++i) { left_ear_in[i] = own->tail[0][i]; right_ear_in[i] = own->tail[1][i]; }
-    breathe(voice, ex, begin, end, common);
+    if (ex.whisper) breathe<true>(voice, ex, begin, end, common);
+    else breathe<false>(voice, ex, begin, end, common);
     // The ear with the odd harmonics (divide's sign) is the only one with a
     // fundamental to take out: the other's half-period tap leaves none.
     const u32 odd = divide >= 0 ? 1 : 0;
@@ -508,6 +535,10 @@ void render_sample(Voice& voice, const opxy::SampleBlock& block) {
     }
     left_ear[2] = (left_ear[2] * i32(voice.follow)) >> 12;
     right_ear[2] = (right_ear[2] * i32(voice.follow)) >> 12;
+    if (gusting) {
+        left_ear[2] = (left_ear[2] * (gusts >> 3)) >> 12;
+        right_ear[2] = (right_ear[2] * (gusts >> 3)) >> 12;
+    }
     if (voice.fresh_ears) {
         voice.delay[0] = left_ear[0]; voice.cut[0] = left_ear[1]; voice.gain[0] = left_ear[2];
         voice.delay[1] = right_ear[0]; voice.cut[1] = right_ear[1]; voice.gain[1] = right_ear[2];

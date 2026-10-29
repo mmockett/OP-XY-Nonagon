@@ -1,5 +1,5 @@
-// Ghost's screen (README, "Screen"): Pepper's ghost, an engraved plate of a
-// theatre's stage. The note's apparition stands in the glass where the sound
+// Ghost's screen (README, "Screen"): Pepper's ghost, a theatre's stage in
+// a few lines. The note's apparition stands in the glass where the sound
 // is in the head: across the stage for left and right, upstage behind the
 // listener, downstage and larger when near. Every control acts on the
 // apparition or the stage.
@@ -24,7 +24,7 @@ u32 hash(u32 x) {
 struct Spot { i32 x, y, scale; u32 dim; };
 Spot spot(const Place& p) {
     const i32 side = sine(p.angle), front = cosine(p.angle);
-    i32 z = 8192 + i32(p.near >> 2) + ((front * 9830) >> 15);                   // Q15: 0 upstage .. 1 at the footlights
+    i32 z = 8192 + i32(p.near >> 2) + ((front * 9830) >> 15);                   // Q15: 0 upstage .. 1 at the apron
     z = clamp(z, 0, 32767);
     Spot s;
     s.y = (stage_back + (((stage_front - 4 - stage_back) * z) >> 15)) * unit;
@@ -40,25 +40,28 @@ const opxy::i16 mouth_rx[vowel_count] = {16, 18, 22, 29, 38, 45}, mouth_ry[vowel
 
 // The apparition and its twin: posed by voice (bowed at breath, singing at
 // ee); trembling all round by beat, the tremble running at beat's rate while
-// held; its robe frayed into the bed's own waveform as bed rises, scrolling
-// while held; its hem rippling while held.
+// held; its robe frayed as bed rises, into the sample's own waveform or,
+// without one, the whisper's ragged gusts, scrolling while held; its hem
+// rippling while held.
 void shape_figure(Frame& frame, u32 voice, u32 beat, u32 tremble, u32 bed, const SampleOverview& overview, u32 step, bool held) {
     const u32 pose = (voice + 1024) >> 11, shake = (beat + 1024) >> 11, fray = (bed + 1024) >> 11;   // 33 steps each
     const bool sampled = fray && overview.assigned && overview.loaded;
-    u32 peaks_key = 0;
+    u32 peaks_key = sampled ? 1 : 0;
     if (sampled) for (u32 i = 0; i < 64; i += 4) peaks_key = peaks_key * 31 + overview.peaks[i];
-    const u32 key = hash((pose | shake << 6 | tremble << 12 | (sampled ? fray : 0) << 16 | (held ? step : 0) << 22 | u32(held) << 30) ^ peaks_key) | 1;
+    const u32 key = hash((pose | shake << 6 | tremble << 12 | fray << 16 | (held ? step : 0) << 22 | u32(held) << 30) ^ peaks_key) | 1;
     if (frame.paths[apparition].key == key) return;
-    // The bed's peaks about their mean, scaled so the widest reaches the fray.
-    i32 mean = 0, widest = 1;
+    // The bed's peaks about their mean, scaled so the widest reaches the fray;
+    // without a sample, gusts of 0..31 about 16.
+    i32 mean = 16, widest = 16;
     if (sampled) {
+        mean = 0; widest = 1;
         for (u32 i = 0; i < 64; ++i) mean += overview.peaks[i];
         mean >>= 6;
         for (u32 i = 0; i < 64; ++i) widest = widest > i32(overview.peaks[i]) - mean ? (widest > mean - i32(overview.peaks[i]) ? widest : mean - i32(overview.peaks[i])) : i32(overview.peaks[i]) - mean;
     }
     const i32 t = i32(pose * 1024);                                            // Q15
-    const i32 shake_q10 = i32(shake) * 4 * unit / 32;                          // up to 4 px
-    const i32 fray_q10 = sampled ? i32(fray) * 8 * unit / 32 : 0;             // up to 8 px
+    const i32 shake_q10 = i32(shake) * 6 * unit / 32;                          // up to 6 px
+    const i32 fray_q10 = i32(fray) * 8 * unit / 32;                           // up to 8 px
     for (u32 i = 0; i < 64; ++i) {
         const i32 bx = figure_bowed[2 * i], by = figure_bowed[2 * i + 1];
         const i32 sx = figure_singing[2 * i], sy = figure_singing[2 * i + 1];
@@ -67,7 +70,12 @@ void shape_figure(Frame& frame, u32 voice, u32 beat, u32 tremble, u32 bed, const
         // beat: nine waves round the outline, pushing it in and out.
         x += outward * ((sine(i * 0x09000000u + tremble * 0x20000000u) * shake_q10) >> 15);
         // bed: the recording's peaks along the robe, scrolling as it plays.
-        if (sampled) x += outward * ((i32(overview.peaks[(i + step * 3) & 63]) - mean) * fray_q10 / widest);
+        if (fray) {
+            const u32 at = (i + step * 3) & 63;
+            // Without a sample, gusts: random strengths, each the mean of two.
+            const i32 peak = sampled ? i32(overview.peaks[at]) : i32((hash(at * 0x9e3779b9u + 7) >> 27) + (hash(((at + 1) & 63) * 0x9e3779b9u + 7) >> 27)) >> 1;
+            x += outward * ((peak - mean) * fray_q10 / widest);
+        }
         if (held && i < hem_points) y += sine(step * 0x20000000u + i * 0x18000000u) * 6 * 256 / 32767;
         frame.paths[apparition].points[i].x = frame.paths[twin].points[i].x = clamp(x, -63 * unit, 63 * unit);
         frame.paths[apparition].points[i].y = frame.paths[twin].points[i].y = y;
@@ -157,7 +165,7 @@ inline void display_reset(DisplayState& state) {
 inline void display(DisplayState& state, const Input& input, Frame& frame) {
     const SampleOverview& overview = *opxy_sample_overview();
     char values[8][header_capacity] = {};
-    captions::fill(input, overview.assigned != 0, values);
+    captions::fill(input, values);
     const opxy::u8 pages[2][4] = {{kRing, kVoice, kSplit, kTrade}, {kBeat, kOrbit, kNear, kBed}};
     page_header(state.header, input, frame, captions::titles, values, header_first, pages);
 
@@ -230,7 +238,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     turn(frame, apparition, rotation(lean));
     place(frame, mouth, first_x, state.y, state.scale, u32(shade), stroke);
     turn(frame, mouth, rotation(lean));
-    const i32 twin_shade = shade > 2 ? shade - 1 : 1;
+    const i32 twin_shade = shade;   // the glass's two faces give images alike
     if (twinned) {
         const Turn back = rotation(-lean);
         place(frame, twin, second_x, state.y, state.scale, u32(twin_shade), stroke);
@@ -249,9 +257,9 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     for (u32 k = 0; k < halo_count; ++k) {
         if (k >= halos) { hide(frame, halo_first + k); hide(frame, twin_halo_first + k); continue; }
         const i32 size = clamp((state.scale * (635 + 205 * i32(k) + breath)) >> 10, unit / 4, 2 * unit);
-        const i32 halo_shade = shade - 1 - i32(k), y = state.y - 34 * state.scale;   // round the upper body
+        const i32 halo_shade = shade - 3 - i32(k), y = state.y - 34 * state.scale;   // round the upper body, a step down
         place(frame, halo_first + k, first_x, y, size, u32(halo_shade < 1 ? 1 : halo_shade), stroke);
-        if (twinned) place(frame, twin_halo_first + k, second_x, y, size, u32(halo_shade < 2 ? 1 : halo_shade - 1), stroke);
+        if (twinned) place(frame, twin_halo_first + k, second_x, y, size, u32(halo_shade < 1 ? 1 : halo_shade), stroke);
         else hide(frame, twin_halo_first + k);
     }
 
@@ -266,8 +274,5 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     // The chalk path, brighter while notes are held.
     place(frame, floor_path, path_x * unit, path_y * unit, 2 * unit, held ? 8 : 6, stroke);
 
-    // bed asks for a sample and none is loaded: the hint shows in the doorway.
-    if (bed && !overview.assigned) hide(frame, hint_cover);
-    else place(frame, hint_cover, 0, 0, unit, 0, fill_and_stroke);
 }
 }

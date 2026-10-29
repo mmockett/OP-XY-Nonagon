@@ -45,7 +45,7 @@ void dump(const Frame& f, double t) {
 struct Result { double mean, peak, idle_churn; bool valid; };
 
 Result run(const char* scenario, double fps, int every, bool quiet) {
-    double controls[8] = {0.764, 0.5, 0.75, 0.9, 0.844, 0.25, 0.4, 0.15};   // Specimen
+    double controls[8] = {0.764, 0.5, 0.75, 0.6296, 0.844, 0.25, 0.4, 0.15};   // Specimen
     std::vector<Turn> turns;
     std::vector<Key> keys;
     double length = 3;
@@ -59,7 +59,7 @@ Result run(const char* scenario, double fps, int every, bool quiet) {
                  {6.5, 8.5, COUPLING, 0.4, 0.8},          // lambda 0.85 to 1.6, while a note rings
                  {9.2, 9.8, SPREAD, 0.75, 1.0},
                  {13.0, 14.5, SITE, 0.25, 0.9},           // the strike out towards the chain's end
-                 {14.6, 14.9, STRIKE, 0.9, 0.0},          // a pad
+                 {14.6, 14.9, STRIKE, 0.6296, 0.0},          // a pad
                  {15.0, 17.0, WINGBEAT, 0.15, 0.9},       // a deep wingbeat while a pad is held
                  {17.5, 19.0, FLUX, 0.9, 0.62},          // flux through fractions
                  {19.1, 19.3, GLOW, 0.844, 0.5},
@@ -74,7 +74,7 @@ Result run(const char* scenario, double fps, int every, bool quiet) {
                  {6.4, 7.2, SITE, 0.25, 0.85},           // site: the lit band moves out
                  {7.3, 8.0, GLOW, 0.844, 0.2},           // glow: the tails draw in
                  {8.6, 9.8, TILT, 0.4, 1.0},             // tilt: the forewing draws in
-                 {10.0, 10.8, STRIKE, 0.9, 0.0},         // strike: the antennae fold; a pad
+                 {10.0, 10.8, STRIKE, 0.6296, 0.0},         // strike: the antennae fold; a pad
                  {11.0, 12.2, SPREAD, 0.3, 0.75},
                  {11.0, 12.2, SITE, 0.85, 0.25},
                  {11.0, 12.2, GLOW, 0.2, 0.844},
@@ -157,7 +157,7 @@ void controls_sheet() {
     const opxy::i32 tick = static_cast<opxy::i32>(std::lround(1024 / fps));
     for (int c = 0; c < 8; ++c)
         for (int v = 0; v <= 4; ++v) {
-            double controls[8] = {0.764, 0.5, 0.75, 0.9, 0.844, 0.25, 0.4, 0.15};
+            double controls[8] = {0.764, 0.5, 0.75, 0.6296, 0.844, 0.25, 0.4, 0.15};
             controls[c] = v / 4.0;
             display_reset(state);
             opxy::draw::Input input = {};

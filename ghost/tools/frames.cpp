@@ -54,7 +54,7 @@ struct Session {
         std::memset(&state, 0, sizeof state);
         std::memset(&frame, 0, sizeof frame);
         std::memset(&input, 0, sizeof input);
-        const double defaults[8] = {0.6, 0.6, 0.6, 0.3, 0.35, 0.2, 0.4, 0};   // definition.json's defaults (Seance)
+        const double defaults[8] = {0.6, 0.6, 0.6, 0.4, 0.2, 0.2, 0.4, 0};   // definition.json's defaults (Seance)
         for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
         for (u32 i = 0; i < 4; ++i) { input.shown[i] = opxy::u8(i); input.parameters[i] = input.slots[i]; }
         input.track = 1;
@@ -106,8 +106,9 @@ struct Session {
 };
 }
 
-// The contact sheet (docs/controls.png): each control at 0, 50 and 100, the
-// others at their defaults, a note held 0.7 s; then the empty state.
+// The contact sheets (docs/controls.png, controls-1x.png): each control at 0,
+// 50 and 100, the others at their defaults, a note held 0.7 s; bed with a
+// sample, then without one.
 int sheet(const std::string& dir) {
     const char* const names[8] = {"ring", "voice", "split", "trade", "beat", "orbit", "near", "bed"};
     const double values[3] = {0, 0.5, 1};
@@ -125,7 +126,7 @@ int sheet(const std::string& dir) {
             s.run(0.7, name);
         }
     overview.assigned = overview.loaded = 0;
-    for (u32 v = 0; v < 3; ++v) {   // no sample: bed 0 plays on; bed asking for one shows the hint
+    for (u32 v = 0; v < 3; ++v) {   // no sample: bed is Ghost's own whisper
         Session s(dir, 60);
         s.input.slots[ghost::kBed] = at(values[v]);
         s.press();

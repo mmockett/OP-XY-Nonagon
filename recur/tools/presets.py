@@ -19,7 +19,7 @@ PRESETS = {
     "Riffle": (0, 4, "1/16", "baker", 0, "1 bar", 1, "off", "drums"),
     "Glitch": (0, 8, "1/64", "pell", 0, "1/8", 1, "off", "drums"),
     "Chorale": (0, 2, "1/4", "hex", 0, "1 bar", 1, "min", "phrase"),
-    "Frozen": (0, 8, "1/32", "cat", 0.5, "off", 1, "off", "drums"),
+    "Frozen": (0, 8, "1/32", "cat", 0.601, "off", 1, "off", "drums"),   # step 3 of 6
     "Shred": (0.1, 4, "hiss", "cat", 0, "1/16", 1, "off", "phrase"),
 }
 

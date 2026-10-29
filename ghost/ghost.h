@@ -38,17 +38,20 @@ inline u32 ring_ms(u32 ring) { return 150u * exp2_q16(i32(ring * 6474u >> 10)) >
 const u32 vowel_count = 6;
 inline u32 vowel_position(u32 voice) { return voice * 5; }
 // split: how far the harmonics divide between the ears (even and odd), Q16.
-// trade: how fast the halves swap ears, 0 to 0.33 cycles a second, in mHz.
-inline u32 trade_mhz(u32 trade) { return ((trade * trade) >> 16) * 330u >> 16; }
-// beat: the right ear's detune, 0 to 6 Hz, in mHz.
-inline u32 beat_mhz(u32 beat) { return ((beat * beat) >> 16) * 6000u >> 16; }
+// trade: how fast the halves swap ears and back, in mHz: still at 0, then
+// from a swap every 24 s, curved, to one every 1.5 s (12 s at 25, 5 s at 50).
+inline u32 trade_mhz(u32 trade) { return trade ? 42u + (((trade * trade) >> 16) * 630u >> 16) : 0; }
+// beat: the right ear's detune, 0 to 6 Hz, in mHz, curved between linear and
+// square: (u + u^2) / 2, so slow beats have room without the top crowding.
+inline u32 beat_mhz(u32 beat) { return (((beat * beat) >> 16) + beat) / 2 * 6000u >> 16; }
 // orbit: its first quarter spreads the notes from the front round the head;
-// the rest circles them, up to a circle every 2 s.
+// the rest circles them, curved from a circle a minute to one every 2 s
+// (14 s at 50).
 inline u32 orbit_spread(u32 orbit) { return orbit >= 16384 ? 65536u : orbit * 4; }
 inline u32 orbit_mhz(u32 orbit) {
     if (orbit <= 16384) return 0;
     const u32 x = (orbit - 16384) * 4 / 3;                    // 0..65535
-    return ((x * x) >> 16) * 500u >> 16;
+    return 17u + (((x * x) >> 16) * 483u >> 16);
 }
 // near: the apparition's distance, 3 m down to 10 cm (at the ear), in cm.
 inline u32 near_cm(u32 near) { return 300u * (exp2_q16(-i32(near * 5025u >> 10)) >> 2) >> 14; }

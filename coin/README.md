@@ -17,7 +17,8 @@ proposed that its energy goes into the thin layer of air under the disk.
 
 Spin sets how long the disk settles, size how far under its ring it starts,
 and air the curve of the rush, from rolling friction to the viscous air
-under the disk. Ring sets how long it sings once flat. A short spin is a zip
+under the disk, and how much that air breathes. Ring sets how long it sings
+once flat, and the disk's material scales it. A short spin is a zip
 and a tick, a middling one a pitched bell that settles onto its note, and a
 long one a whirr that tightens for seconds before its sudden rush. At hold
 it drones. **Many** puts up to four disks of slightly different sizes in a
@@ -50,11 +51,11 @@ how it rolls and rings.
 | --- | --- | --- | --- | --- |
 | spin | 0.2 to 30 s, exponentially, then hold | 1.6 s | seconds, `1.6s` or `hold` | How long the thrown disk takes to settle, from note-on to the moment it leaves the surface. The rate follows its law exactly, block by block, so a long spin barely rises for most of its life and then rushes. At hold (its top 4%) a hand keeps the disk re-spun at a steady, slowly wobbling rate; turning spin down lets it go from where it is. |
 | size | 1:2, 1:4, 1:8, 1:16, 1:32 | 1:4 | the ratio, `1:4` | Where the whirr starts: the held strike rate, 1 to 5 whole octaves under the disk's ring. A small coin buzzes an octave under its note, a heavy disk rattles five under. Whole octaves keep the ring on a strike harmonic, so the note is in tune; the sweep rises through each subharmonic to the note. |
-| disk | steel, brass, glass, wood | steel | the material | How its three modes (at 1, 1.73 and 2.33 times the key, a free plate's) ring and beat: steel long and bright, brass warmer and shorter, glass pure with strong upper modes, wood a short knock. |
-| base | glass, wood, stone | glass | the material | What it rolls on: the base's own resonance (glass 1.2 kHz, wood 205 Hz, stone 640 Hz) and how much it damps the disk through the contact: wood two and a half times as much as glass, stone 1.3 times. |
-| wobble | 0 to 100 | 25 | amount | Eccentricity. An off-centre weight, carried round by the disk's slow turn, swings the strikes' strength, a bounce follows each strike, and a disk kept at hold wobbles more (0.003 to 0.015 octave). In its top half the disk also slips: noise into its ring (a squeal) and a little hiss. |
-| air | rolling friction to viscous air | rolling friction | the exponent, `-.33` to `-.17` | The dissipation law, and so the rush's curve: the rate rises as (t0 − t)^(−n), n = 1/3 for rolling friction, 1/4 at 50, 1/6 for Moffatt's viscous air layer. With air the spin hangs low longer and then rushes. |
-| ring | 0.05 to 4 s, exponentially | 0.89 s | seconds, `0.89s` | How long the disk rings at its note once it lies flat (its T60), from a dead slap to a bell; its upper modes fade two and three times as fast. |
+| disk | steel, brass, glass, wood | steel | the material | How its three modes (at 1, 1.73 and 2.33 times the key, a free plate's) ring and beat, and how long it rings once flat: steel long and bright, brass warmer and 0.6 times as long, glass pure with strong upper modes and 1.5 times as long, wood a short knock, 0.35 times. |
+| base | glass, wood, stone | glass | the material | What it rolls on: the base's own resonance (glass 1.2 kHz, wood 205 Hz, stone 640 Hz), its rolling noise, and how much it damps the disk through the contact: wood two and a half times as much as glass, stone 1.3 times. |
+| wobble | 0 to 100 | 25 | amount | Eccentricity, felt early (it acts as w(2 − w)). An off-centre weight, carried round by the disk's slow turn, swings the contact rate, a warble in the whirr of up to 0.06 octave, and the strikes' strength (0.375 to 1.625 times) and the rolling noise with it; a bounce follows each strike, and a disk kept at hold wobbles more (0.003 to 0.015 octave). In its top half the disk also slips: noise into its ring (a squeal) and a little hiss. |
+| air | rolling friction to viscous air | rolling friction | the rush, `0.17s` or `24ms` | The dissipation law, and so the rush's curve: the rate rises as (t0 − t)^(−n), n = 1/3 for rolling friction, 1/4 at 50, 1/6 for Moffatt's viscous air layer. With air the spin hangs low longer and then rushes, and the air pushed from under the disk breathes, louder and brighter as it speeds up. The caption is how long the whirr's last octave onto the note takes, at the current spin and size (`-` at hold). |
+| ring | 0.12 to 4 s, exponentially | 0.89 s | seconds, `0.89s` | How long the disk rings at its note once it lies flat (its T60), from a dead slap to a bell, for steel; the other materials scale it, and the caption shows the result. Its upper modes fade two and three times as fast. |
 | many | 1 to 4 | 1 | the count | Disks in a note, detuned about it and stopping at 1, 0.86, 1.14 and 0.75 times the settle time. The detunes are centred, so the chorus stays in tune: ±3.5 cents for two; 0 and ±6 for three; ±3 and ±9 for four. |
 
 Measured at A4 with the other controls at the defaults (the Euler preset)
@@ -65,18 +66,21 @@ enumerations are measured at each option:
 | --- | --- | --- | --- | --- | --- |
 | spin: settles in | 0.20 s | 0.73 s | 2.68 s | 9.87 s | kept spinning |
 | size: the held strike rate | 220 Hz | 110 Hz | 55 Hz | 27.5 Hz | 13.7 Hz |
-| air: the rate's exponent | −0.333 | −0.292 | −0.250 | −0.208 | −0.167 |
-| wobble: a held note's level swing | 0.2 dB | 0.6 dB | 1.2 dB | 2.9 dB | 3.2 dB |
-| ring: the after-ring's T60 | 0.12 s | 0.14 s | 0.40 s | 1.01 s | 3.6 s |
+| wobble: the whirr's warble | 2 cents | 23 cents | 40 cents | 79 cents | 134 cents |
+| air: the last octave onto the note | 183 ms | 125 ms | 100 ms | 51 ms | 22 ms |
+| air: the breath, above 2 kHz against below, late in the spin | −44.1 dB | −44.0 dB | −46.5 dB | −44.7 dB | −40.4 dB |
+| ring: the after-ring's T60 | 0.12 s | 0.28 s | 0.66 s | 1.18 s | 3.4 s |
 | many: disks, and the spread of their stops | 1 | 2, 0.22 s | 3, 0.44 s | 3, 0.44 s | 4, 0.62 s |
 
 | Option | Measure |
 | --- | --- |
-| disk: upper modes against the ring, held | steel −21 dB, brass −25 dB, glass −11 dB, wood −25 dB |
-| base: a held note's level | glass −24.3 dB, wood −29.8 dB, stone −25.7 dB |
+| disk: the after-ring's T60 | steel 0.82 s, brass 0.50 s, glass 1.10 s, wood 0.26 s |
+| disk: upper modes against the ring, held | steel −17 dB, brass −19 dB, glass −17 dB, wood −23 dB |
+| base: the spin's level, and its low (100–330 Hz) against its high (0.9–1.5 kHz) | glass −28.5 dB, −6.3 dB; wood −32.3 dB, +2.9 dB; stone −29.6 dB, −2.3 dB |
 
-Ring's shortest settings measure at the base's own ring (0.1 s), and its
-longest a little under the caption, as the upper modes fade first.
+Wobble's top half adds slip's jitter to the warble. Ring's shortest setting
+measures at the base's own ring (0.1 s), and the after-rings a little under
+the caption, as the upper modes fade first.
 
 ## Presets
 
@@ -86,14 +90,14 @@ four notes and 0.47 to 0.87 for eight.
 
 | Preset | Sound | 4 notes, 8 notes |
 | --- | --- | --- |
-| Euler | The toy: a steel disk on the glass at 1:4, a 1.6 s spin that sweeps up through its subharmonics onto the note and rings 0.9 s, beating slowly. The init sound | 0.41, 0.66 |
-| Tick | A brass coin on stone at 1:2, spun 0.25 s: a zip and a dry tick, for rhythm | 0.29, 0.56 |
-| Knock | A wooden disk on a wooden base, 0.45 s: a marimba-like knock with a short whirr in front | 0.51, 0.93 |
-| Bell | A glass disk at 1:2, spun 0.7 s with some air, then a 2.8 s ring | 0.32, 0.65 |
+| Euler | The toy: a steel disk on the glass at 1:4, a 1.6 s spin that sweeps up through its subharmonics onto the note and rings 0.9 s, beating slowly. The init sound | 0.45, 0.70 |
+| Tick | A brass coin on stone at 1:2, spun 0.25 s: a zip and a dry tick, for rhythm | 0.31, 0.56 |
+| Knock | A wooden disk on a wooden base, 0.45 s: a marimba-like knock with a short whirr in front | 0.45, 0.83 |
+| Bell | A glass disk at 1:2, spun 0.7 s with some air, then a 2.8 s ring | 0.33, 0.65 |
 | Chorus | Four brass disks, 3.5 s: a whirring chorus in tune that stops disk by disk and rings 1.2 s | 0.34, 0.73 |
-| Thrum | A steel disk at 1:2, 2.4 s: a low flutter at half the note rising onto it, then a 1.6 s ring. For bass | 0.46, 0.66 |
-| Drone | Two glass disks kept spinning at hold. Give the amp envelope a release of about 2 s so notes end | 0.32, 0.66 |
-| Settle | A 10 s spin in viscous air: it hangs for seconds, then rushes onto the note and rings 2.2 s | 0.62, 0.99 |
+| Thrum | A steel disk at 1:2, 2.4 s: a low, warbling flutter at half the note rising onto it, then a 1.6 s ring. For bass | 0.54, 0.75 |
+| Drone | Two glass disks kept spinning at hold. Give the amp envelope a release of about 2 s so notes end | 0.35, 0.66 |
+| Settle | A 10 s spin in viscous air: it hangs for seconds, breathing, then rushes onto the note and rings 2.2 s | 0.46, 0.79 |
 
 ## How it works
 
@@ -117,27 +121,33 @@ and 32-bit arithmetic.
   second and third modes are the voice's, struck by all its disks. A lone
   disk's ring has a partner 0.45 to 1.6 Hz away (by material), and as the
   disk turns, its strikes move between the two: the beating. Once flat, the
-  modes ring by ring's time.
+  modes ring by ring's time, scaled by the material.
+- **Wobble.** The off-centre weight turns with the disk. Each block, its
+  angle swings the contact rate (the warble), the strikes' strength and the
+  rolling noise; half a turn after each strike it bounces.
 - **The base.** One resonance, at a quarter of the mix, struck by the
   strikes and the rolling noise (which rises as 2^(L/2)); it damps the
   rolling disk by its material.
+- **Air.** Besides the exponent, the air under the disk breathes: noise that
+  rises as 2^L, through a low-pass that opens with air, joins the rolling
+  noise.
 - **Output.** A DC blocker, then a soft knee from 0.375 up to half scale.
 
 ## Level
 
-Single notes, each preset at its role's pitch, play at −27 to −34 dBFS RMS
-with peaks of 0.09 to 0.19 and crest factors of 7 to 15 dB; Hexagon's Moth,
+Single notes, each preset at its role's pitch, play at −27 to −35 dBFS RMS
+with peaks of 0.10 to 0.20 and crest factors of 7 to 15 dB; Hexagon's Moth,
 Orbit, Hollow and Wane play at −24 to −31 dBFS with peaks of 0.13 to 0.20.
 Measured on those notes, with three Hexagon presets for comparison:
 
 | Sound | RMS | Crest | Tonal/noise | Beating | Roughness | Pitch of the after-ring |
 | --- | --- | --- | --- | --- | --- | --- |
-| Coin Euler | −29.9 dB | 12.8 dB | 31 dB | 6.3 dB | 20% | +0.3 cents |
-| Coin Bell | −34.1 | 14.8 | 48 | 2.4 | 7% | −0.2 |
-| Coin Drone | −27.6 | 7.4 | 34 | 2.2 | 8% | +4.1 (the chorus) |
-| Coin Thrum (A1) | −29.8 | 11.5 | 25 | 2.7 | 67% (its flutter) | −0.9 |
-| Coin Chorus | −30.1 | 11.9 | 16 | 2.6 | 28% | +4.7 (the chorus) |
-| Coin Tick (C6) | −32.9 | 12.1 | 20 | – | – | +0.2 |
+| Coin Euler | −29.0 dB | 14.2 dB | 30 dB | 6.6 dB | 24% | +2.6 cents |
+| Coin Bell | −34.6 | 15.4 | 47 | 1.9 | 7% | −0.2 |
+| Coin Drone | −26.6 | 7.5 | 32 | 2.4 | 6% | +4.0 (the chorus) |
+| Coin Thrum (A1) | −28.8 | 12.1 | 25 | 3.1 | 59% (its flutter) | −1.8 |
+| Coin Chorus | −30.6 | 13.1 | 16 | 2.7 | 28% | −4.7 (the chorus) |
+| Coin Tick (C6) | −31.9 | 11.5 | 22 | – | – | +0.1 |
 | Moth Bell | −30.9 | 13.3 | 44 | 0.2 | 4% | −1.9 |
 | Orbit Dusk Pad | −23.8 | 8.1 | 66 | 3.6 | 4% | +7.6 |
 | Hollow Choir | −25.9 | 10.6 | 23 | 2.1 | 10% | −0.3 |
@@ -155,16 +165,16 @@ The presets' phrases (`tests/scenes.cpp`) have no clicks. DC is at most
 
 ![Coin's screen](docs/coin.gif)
 
-The whole screen is the Euler's Disk toy, engraved in greys and line: a
-heavy chrome disk spinning on its concave mirror, seen low (16°) in mild
-perspective, with its reflection. The base, a ring round the mirror with a
-knurled side, sits whole below the header.
+The whole screen is the Euler's Disk toy: a heavy chrome disk spinning on
+its concave mirror, seen low (16°) in mild perspective, with its reflection,
+centred below the header on a plain base with its side.
 
-It is drawn for the screen's own 480 × 222 pixels: lines about a pixel wide,
-parts at least 4 px across, lines at least 4 px apart, and no grey dimmer
-than a quarter of white standing for a difference. Fine detail that would blur
-at that size is left out: there is no maker's label, bevel ring or knurling
-ticks on the ring's top, and the rose's star is plain.
+It is drawn for the screen's own 480 × 222 pixels in four greys and few line
+weights, used alike throughout: the disk's rim brightest and boldest; its
+edge, its face, the base's top, the weight and the companions a step down;
+the effects (motion lines, ripples, air, the ghost, wood's grain, stone's
+specks) a step further; the reflection last. There are no labels, ticks or
+decorative marks, and every part reads at 1:1.
 
 The note's first disk is the four reshaping outlines, projected each frame:
 its face's rim, its edge (the side facing the camera), its reflection (the
@@ -190,10 +200,10 @@ is the same at the screen's own size):
 | spin | The lean the disk stands at, ready to throw: 4° for the shortest spin to 28° at hold |
 | size | The disk: a thin coin (radius 44 px, 0.16 of it thick) to a heavy disk (88 px, 0.38 thick) |
 | disk | Its face: steel's large engraved rose, brass's coarse milled ring, glass's underside seen through it, wood's grain; and its greys |
-| base | The base: glass shows the reflection and streaks of light, wood a flat-sawn grain across its top, stone specks and veins |
-| wobble | A dashed ghost of the rim where the off-centre weight throws it, hopped up and rocked over: none at 0, 6 px and 5° at 50, 12 px and 10° at 100, and brighter; a lead balance weight clamped to the rim, growing from 0.7 to 2 times its size; and scuff marks across the path, up to eight |
+| base | The base: glass shows the disk's reflection, wood a flat-sawn grain across its top, stone four specks and two veins |
+| wobble | A dashed ghost of the rim where the off-centre weight throws it, hopped up and rocked over: none at 0, 6 px and 5° at 50, 12 px and 10° at 100; and a lead balance weight clamped to the rim, growing from 0.7 to 2 times its size |
 | air | Streaks of air fanning from under the low edge: none at rolling friction, five long ones in viscous air |
-| ring | Ripples across the mirror in front of the disk, from just beyond its rim outward: none for a dead slap, four reaching halfway across the glass at 50, eight reaching its edge for a 4 s bell, brighter as ring grows |
+| ring | Ripples across the mirror in front of the disk, from just beyond its rim outward: none for a dead slap, four reaching halfway across the glass at 50, eight reaching its edge for a 4 s bell |
 | many | One to four disks on the mirror |
 
 Between notes, turning a control stands the disks up at their throw, still,
@@ -204,8 +214,8 @@ screen keeps time. Motion eases on the frame's time. Reduced motion stops
 the turning, blur and drift; a reset snaps everything into place.
 
 Churn at 30 fps, over a 13 s scene of spins with three disks, size, disk and
-base changes and a held note: a mean of 9.0 nodes a frame and a peak of 22
-(13.2 while the disks roll, the ghost moving a third of its dashes a frame);
+base changes and a held note: a mean of 8.7 nodes a frame and a peak of 21
+(12.8 while the disks roll, the ghost moving a third of its dashes a frame);
 with reduced motion, 4.6 and 22. A still screen changes nothing.
 
 ## CPU
@@ -220,17 +230,17 @@ the firmware build), at the heaviest setting, four disks rolling:
 - **The two shared upper modes** take 15 a sample each, 1,900 a block.
 - **The base, rolling noise, DC blocker and knee** take 38 a sample, 2,400 a
   block.
-- **Planning,** once a block (each disk's law, increments and a few
-  divisions), is about 1,900.
+- **Planning,** once a block (each disk's law, increments, the weight's
+  swing, the breath and a few divisions), is about 2,150.
 
-That is **about 14,400 instructions a block**. The resonances use Q31
+That is **about 14,650 instructions a block**. The resonances use Q31
 multiplies, one instruction each on the Blackfin.
 
-The host estimate in `sdk.py test` reads higher, 17,700 to 18,400 over three
-runs, because the host's portable Q31 multiply takes about ten instructions
+The host estimate in `sdk.py test` reads higher (17,700 to 18,400 on a quiet
+host), because the host's portable Q31 multiply takes about ten instructions
 where the Blackfin takes one: the loops that are cheapest on the Blackfin
 are the ones the host times as dearest. The firmware compile
-(`sdk.py test --firmware`) passes, and Coin takes 47.3 KiB of module memory.
+(`sdk.py test --firmware`) passes, and Coin takes 47.1 KiB of module memory.
 
 ## Files
 

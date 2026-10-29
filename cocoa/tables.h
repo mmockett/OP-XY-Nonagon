@@ -382,7 +382,7 @@ const i32 class_radius[8] = {
 // Stokes: log2 of 2 g drho / (9 mu) and of the top speed (m/s), Q16;
 // log2 of the median radius at fizz 0 (m), Q16, and the span (octaves).
 const i32 log2_stokes = 1314383;
-const i32 log2_top_speed = -131072;
+const i32 log2_top_speed = -86634;
 const i32 log2_radius = -853585;
 const i32 radius_span = 217706;
 // log2 of 2^30 x a block's seconds (a clearing rate's numerator), Q16.
@@ -408,7 +408,7 @@ const i32 liquid_level[6] = {
 };
 // The liquid's fundamental decay once clear, by cup, octaves a block, Q16.
 const i32 liquid_decay[3] = {
-    1053, 632, 729,
+    1053, 527, 1354,
 };
 // The cup's modes, empty: log2 of their phase increments (Q16), decays
 // (octaves a block, Q16) and strikes (Q15).
@@ -423,7 +423,7 @@ const i32 cup_decay[3][3] = {
     {1354, 1896, 2708},
 };
 const i32 cup_level[3][3] = {
-    {4915, 2621, 1311},
+    {9830, 5898, 3277},
     {6553, 3932, 1966},
     {9830, 6553, 3932},
 };
@@ -445,6 +445,25 @@ const i32 cup_damping[65] = {
     69396, 70102, 70803, 71499, 72190, 72876, 73557, 74234, 74905, 75572, 76233, 76891,
     77544, 78192, 78836, 79475, 80111,
 };
+// The liquid's loss over fill (65 points), log2 of its growth against 59 mm,
+// Q16: a shallow drink rings shorter, a deep one longer.
+const i32 liquid_depth[65] = {
+    102283, 97952, 93810, 89843, 86035, 82374, 78850, 75453, 72174, 69004, 65937, 62967,
+    60087, 57293, 54578, 51939, 49372, 46873, 44438, 42064, 39749, 37489, 35281, 33124,
+    31015, 28952, 26933, 24956, 23020, 21123, 19263, 17439, 15649, 13893, 12168, 10475,
+    8811, 7176, 5569, 3989, 2435, 906, -599, -2080, -3539, -4975, -6390, -7783,
+    -9157, -10511, -11846, -13162, -14460, -15741, -17004, -18251, -19482, -20696, -21896, -23080,
+    -24250, -25405, -26547, -27674, -28789,
+};
+// The sloshing mode's phase increment a block over fill (65 points), Q32 cycles.
+const i32 slosh_inc[65] = {
+    17963826, 18206654, 18431440, 18639419, 18831754, 19009535, 19173784, 19325461, 19465468, 19594646, 19713786, 19823625,
+    19924854, 20018116, 20104010, 20183095, 20255890, 20322878, 20384508, 20441195, 20493325, 20541255, 20585314, 20625810,
+    20663025, 20697219, 20728633, 20757491, 20783996, 20808339, 20830694, 20851220, 20870067, 20887370, 20903255, 20917836,
+    20931221, 20943507, 20954782, 20965131, 20974629, 20983345, 20991343, 20998683, 21005418, 21011598, 21017268, 21022472,
+    21027246, 21031626, 21035644, 21039332, 21042714, 21045818, 21048665, 21051278, 21053674, 21055873, 21057890, 21059740,
+    21061438, 21062995, 21064424, 21065735, 21066937,
+};
 // The spoon's strike at f over its contact's corner fc, 1 / sqrt(1 + (f/fc)^4),
 // at log2(f / fc) = -6 + i / 8, Q15.
 const i32 spoon_gain[97] = {
@@ -458,9 +477,25 @@ const i32 spoon_gain[97] = {
     64, 54, 45, 38, 32, 27, 23, 19, 16, 13, 11, 10,
     8,
 };
-// The spoon's contact: 5 ms (soft) to 0.15 ms (hard); log2 of its corner
-// 0.6 / tau as an increment at the softest (Q16) and the span (octaves, Q16).
-const i32 log2_soft_corner = 1538680;
-const i32 corner_span = 331540;
+// 1 / spoon_gain, at most 4, Q13: a tap strikes the fundamental in full
+// whatever the spoon, so the spoon sets the tone, not the level.
+const i32 spoon_boost[97] = {
+    8192, 8192, 8192, 8192, 8192, 8192, 8192, 8192, 8192, 8192, 8192, 8192,
+    8192, 8192, 8192, 8192, 8192, 8192, 8192, 8192, 8192, 8192, 8192, 8193,
+    8193, 8193, 8194, 8195, 8196, 8198, 8200, 8203, 8208, 8215, 8224, 8237,
+    8256, 8282, 8319, 8371, 8444, 8546, 8689, 8887, 9159, 9531, 10033, 10703,
+    11585, 12729, 14189, 16029, 18318, 21136, 24576, 28746, 32768, 32768, 32768, 32768,
+    32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768,
+    32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768,
+    32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768,
+    32768,
+};
+// The spoon's contact: 4 ms (soft) to 75 us (hard); log2 of its corner
+// 0.6 / tau as an increment at the softest (Q16), the span (octaves, Q16),
+// and log2 of the softest contact in samples and in microseconds (Q16).
+const i32 log2_soft_corner = 1559778;
+const i32 corner_span = 375978;
+const i32 log2_soft_samples = 489076;
+const i32 log2_soft_us = 784190;
 }
 }

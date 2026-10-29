@@ -165,7 +165,11 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     const i32 fast = clamp((rate - 2 * physics::octave) / 2, 0, physics::octave);                // Q16
     const i32 crowd = ((physics::log2_q16(lobes ? lobes : 1) - 4 * physics::octave) >> 4) * (fast >> 4) >> 8;   // log2 of the share, <= 0
     const i32 vent_log = physics::log2_q16(inc ? inc : 1) + physics::log2_q16(lobes ? lobes : 1) - crowd;
-    const u32 vent_inc = alive ? physics::exp2_q16(vent_log) : 0;
+    // The ratchet swings them: the gap after the beat and every other vent
+    // lasts 1 + swing of the spacing, the others 1 - swing.
+    const u32 long_inc = alive ? physics::exp2_q16(vent_log + 15 * physics::octave - physics::log2_q16(static_cast<u32>(32768 + p.swing))) : 0;
+    const u32 short_inc = alive ? physics::exp2_q16(vent_log + 15 * physics::octave - physics::log2_q16(static_cast<u32>(32768 - p.swing))) : 0;
+    const u32 top = lobes ? lobes - 1 : 0;
     // Each pulse dies in a third of its spacing at slow beats (so they can be
     // counted) and in 2.7 at fast ones (the long, breathy beats of a star).
     const i32 decay = alive ? clamp(static_cast<i32>(physics::exp2_q16(vent_log - 17 * physics::octave + 104858 - (fast * 197 >> 6))), 1, 12000)
@@ -190,7 +194,9 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     i32 per_second = alive ? (contacts * p.floating >> 15) + bubbles : 0;
     if (voice.splash) { --voice.splash; per_second += 2500; }
     const u32 chance = static_cast<u32>(per_second) * 97391u;   // a sample, Q32
-    const i32 loudness = ((crackle_level * p.floating >> 15) + (boil_level * (boil * sinking >> 15) >> 15));
+    // The contacts grow louder as well as denser with crackle: half as loud at a quarter.
+    const i32 contact_level = crackle_level * (12000 + (p.crackle * 20767 >> 15)) >> 15;
+    const i32 loudness = ((contact_level * p.floating >> 15) + (boil_level * (boil * sinking >> 15) >> 15));
     const i32 frying = (boil_hiss * (boil * sinking >> 15) >> 15) +
                        (alive ? vapour_hiss * (p.vapour * p.floating >> 15) >> 15 : 0);
 
@@ -293,7 +299,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
             }
         } else if (vents) {
             const u32 was = vent;
-            vent += vent_inc;
+            vent += (top - vents) & 1u ? short_inc : long_inc;
             if (vent < was) {
                 --vents;
                 const i32 a = puff * 26000 >> 15;   // 0.8 of the first, which leads the beat
@@ -309,7 +315,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         // Crackle: a burst of noise at random moments, mostly small, now and then loud.
         if (r2 < chance) {
             const i32 u = static_cast<i32>(lcg(dice) >> 17);
-            const i32 a = ((u * u >> 15) * u >> 15) * loudness >> 15;
+            const i32 a = (u * u >> 15) * loudness >> 15;
             if (a << 15 > spark) spark = a << 15;
         }
         spark -= spark >> 6;   // each burst rings about 1.5 ms
@@ -357,7 +363,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         // The crackle's clicks, through a difference, softened twice over 3 kHz.
         soft_crack += ((crack - crack_last) - soft_crack) * 11000 >> 15;
         softer_crack += (soft_crack - softer_crack) * 11000 >> 15;
-        const i32 mixed = (gated * tone_gain >> 12) + (softer_crack * crackle_heard >> 14) + hiss + (blow * breath_heard >> 15);
+        const i32 mixed = (gated * tone_gain >> 12) + (softer_crack * crackle_heard >> 13) + hiss + (blow * breath_heard >> 15);
         crack_last = crack;
         dc_out += (mixed - dc_in) * 1024 - (dc_out >> 10);   // DC blocker, 7 Hz, its state Q25
         dc_in = mixed;

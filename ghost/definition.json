@@ -39,24 +39,24 @@
     {
       "id": "trade",
       "label": "trade",
-      "default": 0.3,
+      "default": 0.4,
       "mapping": {
-        "kind": "power",
-        "maximum": 0.33,
-        "exponent": 2
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
       },
-      "display": "ratio"
+      "display": "percent"
     },
     {
       "id": "beat",
       "label": "beat",
-      "default": 0.35,
+      "default": 0.2,
       "mapping": {
-        "kind": "power",
-        "maximum": 6,
-        "exponent": 2
+        "kind": "linear",
+        "minimum": 0,
+        "maximum": 1
       },
-      "display": "ratio"
+      "display": "percent"
     },
     {
       "id": "orbit",
@@ -97,8 +97,8 @@
       "ring": 0.6,
       "voice": 0.6,
       "split": 0.6,
-      "trade": 0.3,
-      "beat": 0.35,
+      "trade": 0.4,
+      "beat": 0.2,
       "orbit": 0.2,
       "near": 0.4,
       "bed": 0
@@ -107,7 +107,7 @@
       "ring": 0.25,
       "voice": 0.0,
       "split": 0.4,
-      "trade": 0.2,
+      "trade": 0.1,
       "beat": 0.0,
       "orbit": 0.22,
       "near": 0.95,
@@ -117,8 +117,8 @@
       "ring": 0.75,
       "voice": 0.42,
       "split": 0.8,
-      "trade": 0.15,
-      "beat": 0.25,
+      "trade": 0.1,
+      "beat": 0.11,
       "orbit": 0.5,
       "near": 0.3,
       "bed": 0
@@ -127,8 +127,8 @@
       "ring": 0.95,
       "voice": 0.2,
       "split": 0.5,
-      "trade": 0.1,
-      "beat": 0.6,
+      "trade": 0.05,
+      "beat": 0.49,
       "orbit": 0.0,
       "near": 0.5,
       "bed": 0
@@ -138,7 +138,7 @@
       "voice": 0.1,
       "split": 0.3,
       "trade": 0.0,
-      "beat": 0.2,
+      "beat": 0.07,
       "orbit": 0.85,
       "near": 0.6,
       "bed": 0
@@ -147,7 +147,7 @@
       "ring": 0.7,
       "voice": 0.8,
       "split": 1.0,
-      "trade": 0.6,
+      "trade": 0.35,
       "beat": 0.0,
       "orbit": 0.0,
       "near": 0.5,
@@ -157,8 +157,8 @@
       "ring": 0.9,
       "voice": 1.0,
       "split": 0.5,
-      "trade": 0.2,
-      "beat": 0.3,
+      "trade": 0.1,
+      "beat": 0.16,
       "orbit": 0.15,
       "near": 0.5,
       "bed": 0
@@ -167,10 +167,10 @@
       "ring": 0.7,
       "voice": 0.5,
       "split": 0.7,
-      "trade": 0.25,
-      "beat": 0.3,
+      "trade": 0.2,
+      "beat": 0.16,
       "orbit": 0.4,
-      "near": 0.4,
+      "near": 0.5,
       "bed": 1.0
     }
   },
@@ -182,7 +182,7 @@
       "stateAlignment": 4,
       "paths": 4,
       "points": 64,
-      "nodes": 24,
+      "nodes": 23,
       "texts": 16,
       "palette": 16
     }

@@ -18,8 +18,6 @@ struct DisplayState {
     opxy::u32 fresh;      // nothing drawn since reset: place everything at once
     opxy::u32 held_ms;    // ms the held note has played
     opxy::u32 bits;       // the grid whose tiles are shown
-    opxy::u32 iteration;  // the iteration last drawn
-    opxy::u32 turns;      // the key's ratchet: an iteration a click
     opxy::u32 hiss_key;   // what the tiles' inks were worked out for
     opxy::i32 swing;      // the pendulum's angle, tenths of a degree
     opxy::u32 sweep;      // where in the tray this frame's changes begin

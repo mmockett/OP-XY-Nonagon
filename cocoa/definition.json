@@ -91,7 +91,7 @@
       "id": "stir",
       "label": "Stir",
       "control": 3,
-      "default": 1.0,
+      "default": 0.6,
       "mapping": {
         "kind": "linear",
         "minimum": 0,
@@ -109,7 +109,7 @@
       "fill": 0.65,
       "spoon": 0.6,
       "pops": 0.15,
-      "stir": 1.0
+      "stir": 0.6
     },
     "Glass Bells": {
       "powder": 0.22,
@@ -119,7 +119,7 @@
       "fill": 0.25,
       "spoon": 0.8,
       "pops": 0.05,
-      "stir": 1.0
+      "stir": 0.8
     },
     "Tin Percussion": {
       "powder": 0.45,
@@ -139,7 +139,7 @@
       "fill": 0.8,
       "spoon": 0.35,
       "pops": 0.0,
-      "stir": 1.0
+      "stir": 0.3
     },
     "Hot Chocolate": {
       "powder": 0.87,
@@ -173,7 +173,7 @@
     }
   },
   "resources": {
-    "voiceBytes": 292,
+    "voiceBytes": 304,
     "voiceAlignment": 4,
     "voiceCapacity": 8,
     "sharedBytes": 96,
@@ -183,7 +183,7 @@
       "stateAlignment": 4,
       "paths": 4,
       "points": 64,
-      "nodes": 168,
+      "nodes": 135,
       "texts": 16,
       "palette": 16
     }

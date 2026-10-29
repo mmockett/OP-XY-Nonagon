@@ -40,7 +40,7 @@ inline void percent(char (&value)[header_capacity], u32 level16) {
     append(value, "%");
 }
 
-inline void fill(const Input& input, bool has_sample, char (&values)[8][header_capacity]) {
+inline void fill(const Input& input, char (&values)[8][header_capacity]) {
     const u32 ring = ring_ms(level(input.slots[kRing]));
     if (ring < 1000) { put(values[kRing], ring / 10 * 10); append(values[kRing], "ms"); }
     else { decimal(values[kRing], (ring + 50) / 100, 1); append(values[kRing], "s"); }
@@ -62,8 +62,8 @@ inline void fill(const Input& input, bool has_sample, char (&values)[8][header_c
     const u32 cm = near_cm(level(input.slots[kNear]));
     if (cm >= 100) { decimal(values[kNear], (cm + 5) / 10, 1); append(values[kNear], "m"); }
     else { put(values[kNear], cm); append(values[kNear], "cm"); }
-    if (!has_sample) copy(values[kBed], header_capacity, "none");
-    else percent(values[kBed], level(input.slots[kBed]));
+    // bed: the sample's share, or without one the whisper's.
+    percent(values[kBed], level(input.slots[kBed]));
 }
 }
 }

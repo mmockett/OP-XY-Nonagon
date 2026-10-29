@@ -20,14 +20,16 @@ enum Source { ORGAN, PAD, VOICE, BELL, SIREN, SOURCES };
 namespace flight {
 const i32 one = 65536;                 // Q16
 const i32 lead = 1638;                 // Q16 seconds of silence before a cone arrives (25 ms)
-const i32 margin = 1311;               // the cone must leave the object 20 ms inside its flight
+const i32 slack = 66;                  // a cone counts if it leaves the object at most 1 ms before its flight
 
 // A normalized Q31 control as Q16, 0..65536.
 inline i32 q16(i32 p) { return p <= 0 ? 0 : (p >> 15) + ((p >> 14) & 1); }
 
-// 2^x for x in [0, 14), Q16 in, Q16 out.
+// 2^x for x in [0, 14), Q16 in, Q16 out. (The table has internal linkage:
+// the firmware links the voice and the screen, each with its own copy.)
+static const opxy::u16 exp2_table[17] = {16384, 17109, 17867, 18658, 19484, 20347, 21247, 22188, 23170, 24196, 25268, 26386, 27554, 28774, 30048, 31379, 32768};
 inline i32 exp2_q16(i32 x) {
-    static const opxy::u16 table[17] = {16384, 17109, 17867, 18658, 19484, 20347, 21247, 22188, 23170, 24196, 25268, 26386, 27554, 28774, 30048, 31379, 32768};
+    const opxy::u16* table = exp2_table;
     if (x < 0) x = 0;
     const i32 whole = x >> 16, at = (x >> 12) & 15, frac = x & 4095;
     const i32 m = table[at] + (((table[at + 1] - table[at]) * frac) >> 12);   // Q14
@@ -53,6 +55,15 @@ inline i32 log2_q16(u32 x) {
     const i32 top = 31 - static_cast<i32>(clz(x));
     const u32 mantissa = top >= 16 ? x >> (top - 16) : x << (16 - top);   // 1.0 .. 2.0 in Q16
     return (top << 16) + static_cast<i32>(mantissa - 65536);
+}
+
+// log2 of a positive integer, Q16, within 0.006 octave: the mantissa's
+// fraction f through f (1.3466 - 0.3466 f).
+inline i32 log2_smooth(u32 x) {
+    if (!x) return 0;
+    const i32 top = 31 - static_cast<i32>(clz(x));
+    const i32 f = static_cast<i32>((top >= 16 ? x >> (top - 16) : x << (16 - top)) - 65536);   // Q16
+    return (top << 16) + (((f >> 4) * (88252 - ((f * 22715) >> 16))) >> 12);
 }
 
 // Integer square root.
@@ -90,8 +101,9 @@ inline u32 source(i32 p) {
 }
 // dur: the flight's own time, 0.5 .. 8 s (exponential), Q16 seconds.
 inline i32 dur(i32 p) { return exp2_q16(q16(p) << 2) >> 1; }
-// tune: where in the flight the glide sounds exactly the key: -1 its start,
-// 0 the closest pass, 1 its end (Q16, -65536 .. 65536).
+// tune: the source's pitch, from -1, where the flight's start sounds exactly
+// the key, to 1, where its end does (Q16, -65536 .. 65536); between them the
+// source moves evenly in pitch (see heard() and landing()).
 inline i32 tune(i32 p) { return (q16(p) - 32768) * 2; }
 // echo: the listener's height over the reflecting ground, 1.5 .. 63 m, metres Q16 ...
 inline i32 height_metres(i32 p) { return (3 * exp2_q16((q16(p) * 5530) >> 10)) >> 1; }   // 2^5.4
@@ -99,6 +111,17 @@ inline i32 height_metres(i32 p) { return (3 * exp2_q16((q16(p) * 5530) >> 10)) >
 inline i32 echo_level(i32 p) { const i32 v = q16(p); return v >= 21845 ? 26214 : (v * 26214) / 21845; }
 // boom and air: amounts, Q15.
 inline i32 amount(i32 p) { return q16(p) >> 1; }
+// air: the corner of the low-pass heard at a 12 m pass, 200 Hz * 2^(5.5 (1 - air))
+// (9 kHz to 200 Hz), as w = 2 pi f / 44100, Q16; -1 with air off. It falls
+// as the fourth root of the closest distance, and through a flight as
+// 1 / sqrt(r), as air's absorption (a f^2 r) does.
+inline i32 air_w(i32 a) { return a <= 0 ? -1 : static_cast<i32>((static_cast<u32>(exp2_q16((32768 - a) * 11)) >> 4) * 1868u >> 12); }
+// ... in Hz at a closest distance of `metres` (Q16), for the header.
+inline i32 air_hertz(i32 a, i32 metres) {
+    if (a <= 0) return 1 << 30;
+    const i32 octaves = (log2_smooth(786432u) - log2_smooth(static_cast<u32>(metres))) >> 2;   // log2 (12 m / d)^1/4
+    return static_cast<i32>((static_cast<u32>(exp2_q16((32768 - a) * 11 + octaves + (3 << 16))) >> 9) * 200u >> 10);
+}
 
 // The boom's N-wave lasts about 7 ms at 20 m and Mach 1.4, longer further
 // away (d^1/4) and nearer Mach 1 ((M^2 - 1)^-3/8): 3 .. 50 ms, Q16 seconds.
@@ -113,6 +136,26 @@ inline i32 nwave(i32 m, i32 d) {
     const i32 x = e + (6 << 16);
     const i32 t = x <= 0 ? 0 : static_cast<i32>((static_cast<u32>(exp2_q16(x < (13 << 16) ? x : 13 << 16)) >> 6) * 459u >> 16);
     return t < 197 ? 197 : t > 3277 ? 3277 : t;
+}
+
+// log2 of the rate the flight is heard at for its emission at x = M sigma
+// along the line from the pass (Q16 sound-seconds, |x| under 8),
+// r / |r + M x|, held within 2.5 octaves: Q16 octaves.
+inline i32 heard(i32 m, i32 d, i32 x) {
+    const i32 x12 = x >> 4, d12 = d >> 4;
+    const i32 r = static_cast<i32>(isqrt(static_cast<u32>(x12 * x12) + static_cast<u32>(d12 * d12))) << 4;
+    const i32 den = r + mul16(m, x);
+    const i32 o = log2_smooth(static_cast<u32>(r)) - log2_smooth(static_cast<u32>(den < 0 ? -den : den > 0 ? den : 1));
+    return o < -(5 << 15) ? -(5 << 15) : o > (5 << 15) ? 5 << 15 : o;
+}
+// tune's reach: how far the source moves (Q16 octaves) from tune -1, where
+// the flight's start sounds the key, to 1, where its end does (each landing
+// at most 0.5 s or four closest distances' flight from the pass, as the
+// engine's). before: the approach, Q16 seconds.
+inline i32 tune_span(i32 m, i32 d, i32 length, i32 before) {
+    const i32 four = div16(4 * d, m), most = four > 32768 ? four : 32768;
+    const i32 after = length - before;
+    return heard(m, d, mul16(m, -(before < most ? before : most))) - heard(m, d, mul16(m, after < most ? after : most));
 }
 
 // When the listener hears the flight, relative to its closest pass.
@@ -149,7 +192,7 @@ inline Timeline timeline(i32 m, i32 d, i32 length, i32 before) {
         const i32 root = static_cast<i32>(isqrt(static_cast<u32>(k) << 12)) << 2;
         const i32 reach = mul16(m, root);
         const i32 sigma = reach > 0 ? div16(d, reach) : 1 << 24;
-        if (sigma < before - margin) {
+        if (sigma < before + slack) {
             t.has_cone = 1;
             t.sigma = -sigma;
             t.start = div16(mul16(d, root), m) - lead;

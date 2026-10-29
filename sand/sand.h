@@ -167,10 +167,13 @@ struct Grain { u16 u, v; u8 air, height, rest, weight; };
 // it slides toward the low edge (plate units), the shake's largest random jolt
 // (Q12 g), the chance a hop toward a louder place is refused (Q15), and how
 // long a throw keeps the grain aloft (Q8 of a look per half g of excess); a
-// tilted plate also pulls every grain downhill (slope, Q12 g).
+// tilted plate also pulls every grain downhill (slope, Q12 g), and while it
+// sounds its resting sand creeps downhill (the chance a look that a resting
+// grain slips a step, Q15). Shake jolts a grain at a look with the chance
+// jolts (Q15), as hard as up to jitter.
 struct Throw {
     i32 weight[kModes];
-    i32 threshold, reach, tilt, slope, jitter, bias, flight;
+    i32 threshold, reach, tilt, slope, jitter, jolts, bias, flight, creep;
 };
 
 // A mode of amplitude mag (0..4095) at ratio (Q16) over the note accelerates
@@ -189,32 +192,50 @@ inline i32 lift(i32 mag, u32 ratio) {
 // liberty: in a real plate they are simply much quieter.)
 inline i32 lift_other(i32 mag, u32 ratio) { return lift(mag, ratio) >> 2; }
 
+// Shake's largest jolt (Q12 g): none at 0, then from 1.15 g, about what lifts
+// the lightest grain off a still line at the default Settle, to 2.4 g.
+inline i32 shake_jolt(i32 shake) { return shake <= 0 ? 0 : 4710 + (shake * 5120 >> 15); }
+
 // The throw's sand-facing controls. Settle is friction: slippery sand (0)
 // skitters at random wherever it is thrown and is lifted by the least swing,
 // and bounces high, so it wanders a long time before it finds the narrow quiet
 // lines; sticky sand (1) needs more to lift it, so the quiet lines are wider,
-// lands dead and refuses louder ground, so it settles fast. Tilt slides each hop toward the
-// low edge (the far edge from the bow, v = 65535); Shake jolts every grain at random.
+// lands dead and refuses louder ground, so it settles fast. Tilt slides each
+// hop toward the low edge (the far edge from the bow, v = 65535) and makes
+// resting sand creep that way; Shake jolts every grain at random, from just
+// enough to lift the lightest grain off a still line up to 2.4 g.
 inline void plan_throw(Throw& t, i32 settle, i32 tilt, i32 shake) {
     t.threshold = 4096 + (settle * 3072 >> 15);          // 1 g to 1.75 g
     t.reach = 1700 - (settle * 600 >> 15);               // 2.6% to 1.7% of the plate per g
     t.bias = settle * 31130 >> 15;                       // 0 to 0.95
     t.flight = 640 - (settle * 512 >> 15);               // Q8: 2.5 to 0.5 times as long aloft
-    t.tilt = tilt * 3000 >> 15;                          // up to 4.6% of the plate a hop
-    t.slope = (tilt * tilt >> 15) * 4096 >> 15;          // the pull downhill: up to 1 g, by Tilt squared
-    t.jitter = (shake * shake >> 15) * 6144 >> 15;       // up to 1.5 g
+    const i32 steep = (tilt * tilt >> 15) * (tilt * tilt >> 15) >> 15;  // Tilt to the fourth: a gentle tilt barely runs
+    t.tilt = steep * 3600 >> 15;                         // up to 5.5% of the plate a hop
+    t.slope = steep * 4096 >> 15;                        // the pull downhill: up to 1 g
+    // Resting sand creeps a step at a look with a chance from 1 in 4096 at the
+    // gentlest tilt to 1 in 2 at the steepest, an octave per eleventh of Tilt.
+    t.creep = tilt > 0 ? static_cast<i32>(exp2_q16(tilt * 22 - (12 << 16)) >> 1) : 0;
+    t.jitter = shake_jolt(shake);
+    t.jolts = shake * shake >> 15;                       // more Shake jolts more often as well as harder
 }
 
-// A grain's acceleration at (u, v) from the throw's modes (Q12 g), with each
-// shape there written to shapes (Q15) when it is not null.
-inline i32 acceleration(const Throw& t, const PlateMode* modes, u32 u, u32 v, i32* shapes) {
+// A grain's acceleration at (u, v) from the throw's modes (Q12 g).
+inline i32 acceleration(const Throw& t, const PlateMode* modes, u32 u, u32 v) {
     i32 a = 0;
-    for (u32 k = 0; k < kModes; ++k) {
-        if (!t.weight[k] && !shapes) continue;
-        const i32 s = shape(modes[k], u, v);
-        if (shapes) shapes[k] = s;
-        a += t.weight[k] * (magnitude(s) >> 3) >> 12;
-    }
+    for (u32 k = 0; k < kModes; ++k)
+        if (t.weight[k]) a += t.weight[k] * (magnitude(shape(modes[k], u, v)) >> 3) >> 12;
+    return a;
+}
+
+// Every mode's shape at (u, v), kept with a grain while it lies there; kMoved
+// marks a grain that has moved since.
+const i16 kMoved = -32768;
+inline void shapes_at(const PlateMode* modes, u32 u, u32 v, i16* shapes) {
+    for (u32 k = 0; k < kModes; ++k) shapes[k] = static_cast<i16>(shape(modes[k], u, v));
+}
+inline i32 acceleration(const Throw& t, const i16* shapes) {
+    i32 a = 0;
+    for (u32 k = 0; k < kModes; ++k) a += t.weight[k] * (magnitude(shapes[k]) >> 3) >> 12;
     return a;
 }
 
@@ -227,11 +248,22 @@ inline bool on_clamp(i32 u, i32 v) {
 }
 
 // A hop that would leave the plate bounces off its rim, except at the low
-// edge of a tilted plate, where sand piles against the rim instead.
-inline i32 rebound(i32 x, i32 tilt) {
+// edge of a tilted plate, where the sand runs off.
+inline i32 rebound(i32 x) {
     if (x < 0) x = -x;
-    if (x > static_cast<i32>(kFull)) x = tilt ? static_cast<i32>(kFull) : 2 * static_cast<i32>(kFull) - x;
+    if (x > static_cast<i32>(kFull)) x = 2 * static_cast<i32>(kFull) - x;
     return clamp(x, 0, kFull);
+}
+
+// Sand that runs off a tilted plate's low edge is fed back at its high edge,
+// as an hourglass is turned: it falls onto the moving ground by the bow and
+// lands with a click, the harder the steeper the plate, so a tilted plate
+// trickles as steadily as it is tipped.
+inline void run_off(Grain& g, const Throw& t, u32& seed) {
+    g.v = static_cast<u16>((noise15(seed) + 32768) >> 5);  // within 1/32 of the high edge
+    g.air = 3;
+    g.height = static_cast<u8>(t.creep >> 6 > 230 ? 255 : 24 + (t.creep >> 6));  // 24 to 255
+    g.rest = 0;
 }
 
 // One look at a grain, five or six milliseconds apart. A grain in the air
@@ -240,24 +272,34 @@ inline i32 rebound(i32 x, i32 tilt) {
 // does, onto a random spot nearby, though a spot the plate shakes harder is
 // often refused, so sand drifts to the quiet nodal lines and stays. Returns
 // the landing's height (0 for none), plus on_plate when the grain was on the
-// plate this look, in which case shapes (when not null) holds each mode's
-// shape where it sits.
+// plate this look. The sound keeps each grain's mode shapes (shapes, kMoved
+// once it has moved), so a grain lying still costs no table reads; the screen
+// passes none.
 const u32 on_plate = 256;
-inline u32 look(Grain& g, const Throw& t, const PlateMode* modes, u32& seed, i32* shapes) {
+const i32 kCreepStep = 640;  // plate units: a resting grain's slip downhill
+inline u32 look(Grain& g, const Throw& t, const PlateMode* modes, u32& seed, i16* shapes) {
     u32 landed = 0;
     if (g.air) {
         if (--g.air) return 0;
         landed = g.height;
         g.height = 0;
     }
-    i32 a = acceleration(t, modes, g.u, g.v, shapes);
-    if (t.jitter) a += (noise15(seed) + 32768) * t.jitter >> 16;
+    if (shapes && shapes[0] == kMoved) shapes_at(modes, g.u, g.v, shapes);
+    i32 a = shapes ? acceleration(t, shapes) : acceleration(t, modes, g.u, g.v);
+    if (t.jitter && noise15(seed) + 32768 < t.jolts * 2) a += (noise15(seed) + 32768) * t.jitter >> 16;
     a += t.slope;  // on a steep plate even resting sand slips downhill
     // Static friction: a grain must beat its weight by a quarter of a g to be
     // thrown, so one at the edge of a quiet line does not twitch forever.
     i32 excess = a - (t.threshold * (179 + (g.weight * 154 >> 8)) >> 8) - 1024;
     if (excess <= 0) {
         if (g.rest < 255) ++g.rest;
+        // A sounding plate's vibration lets resting sand creep down a tilt.
+        if (t.creep && t.weight[0] && noise15(seed) + 32768 < t.creep * 2) {
+            const i32 v = static_cast<i32>(g.v) + kCreepStep;
+            if (v > static_cast<i32>(kFull)) run_off(g, t, seed);
+            else g.v = static_cast<u16>(v);
+            if (shapes) shapes[0] = kMoved;
+        }
         return landed | on_plate;
     }
     g.rest = 0;
@@ -265,11 +307,17 @@ inline u32 look(Grain& g, const Throw& t, const PlateMode* modes, u32& seed, i32
     g.air = static_cast<u8>(2 + ((excess >> 11) * t.flight >> 8));  // 2..22 looks aloft
     g.height = static_cast<u8>(excess >> 6 > 254 ? 255 : 1 + (excess >> 6));
     const i32 span = t.reach * excess >> 12;
-    const i32 u = rebound(static_cast<i32>(g.u) + (noise15(seed) * span >> 15), 0);
-    const i32 v = rebound(static_cast<i32>(g.v) + (noise15(seed) * span >> 15) + t.tilt, t.tilt);
+    const i32 u = rebound(static_cast<i32>(g.u) + (noise15(seed) * span >> 15));
+    const i32 off = static_cast<i32>(g.v) + (noise15(seed) * span >> 15) + t.tilt;
+    if (t.tilt && off > static_cast<i32>(kFull)) {  // over the low edge
+        run_off(g, t, seed);
+        if (shapes) shapes[0] = kMoved;
+        return landed | on_plate;
+    }
+    const i32 v = rebound(off);
     // The landing spot is judged by the figure's mode alone, which rules the throw.
     const i32 there = t.weight[0] * (magnitude(shape(modes[0], static_cast<u32>(u), static_cast<u32>(v))) >> 3) >> 12;
-    const i32 here = t.weight[0] * (magnitude(shape(modes[0], g.u, g.v)) >> 3) >> 12;
+    const i32 here = t.weight[0] * (magnitude(shapes ? shapes[0] : shape(modes[0], g.u, g.v)) >> 3) >> 12;
     if (there > here && noise15(seed) + 32768 < t.bias * 2)
         return landed | on_plate;  // refused: it falls back where it was
     // A hop onto the clamp lands against its washer instead, where the plate
@@ -279,6 +327,7 @@ inline u32 look(Grain& g, const Throw& t, const PlateMode* modes, u32& seed, i32
     const i32 rim = kClampReach + (kClampReach >> 3);
     g.u = static_cast<u16>(against && magnitude(du) >= magnitude(dv) ? 32768 + (du < 0 ? -rim : rim) : u);
     g.v = static_cast<u16>(against && magnitude(du) < magnitude(dv) ? 32768 + (dv < 0 ? -rim : rim) : v);
+    if (shapes) shapes_at(modes, g.u, g.v, shapes);  // where it will land
     return landed | on_plate;
 }
 

@@ -177,7 +177,7 @@ fade and seed nudges a single mass.
 **Page 2:** disperse, mode, damping, seed
 
 The screen is the chain on a laboratory stand, drawn back as far as energy
-sets, with a damping lever, a timing pendulum and a maker's plaque. *Shown:
+sets, with a damping lever and a timing pendulum. *Shown:
 Breath, three notes, then energy turned up.* [More about Fermi](fermi/README.md)
 
 </td>
@@ -282,9 +282,10 @@ course after the key is released, under the OP-XY's amp envelope.
 Ghost is made for headphones: its pitches exist only between the ears. As a
 sample engine it plays in stereo, which the SDK's synth voices can't.
 
-Ghost and Recur need a sample on the sampler page. With none loaded, Recur's
-screen asks for one ("load a sample · shift + sample"); Ghost plays without
-one, and asks only when bed is turned up.
+Ghost and Recur sit on the sampler page. Recur needs a sample: with none
+loaded, its screen asks for one ("load a sample · shift + sample"). Ghost
+plays without one; its bed is then a gusty breath of its own, and a loaded
+sample takes its place.
 
 ## CPU
 
@@ -296,15 +297,15 @@ scale, it puts 2op FM at about 14,000 and Macro Osc at about 9,000.
 
 | Machine | Heaviest setting | How |
 | --- | ---: | --- |
-| Sand | ~10,000–16,000 | counted; the high end while the sand rattles hardest |
-| Cocoa | ~14,300 | counted (about 9,400 for a held note on the default) |
+| Sand | ~13,000 | counted, a full plate of sand rattling (about 10,500 settled) |
+| Cocoa | ~14,700 | counted (about 9,400 for a held note on the default) |
 | Ghost | ~14,900 | counted (about 13,000 on the default) |
-| Coin | ~14,400 | counted, four disks; the host estimate reads higher, ~18,000 |
-| Recur | ~9,500 | host estimate |
+| Coin | ~14,650 | counted, four disks; the host estimate reads higher, ~18,000 |
+| Recur | ~9,800 | host estimate, hiss with a chord (about 2,500 on the default) |
 | Fermi | ~14,300 | counted |
 | Mach | ~13,400 | counted |
-| Butterfly | ~11,000 | counted |
-| Drop | ~10,100–11,200 | host estimate, best of many runs |
+| Butterfly | ~11,400 | counted |
+| Drop | ~11,100 | host estimate, best of many runs |
 
 Hexagon's synths, measured on the device, cost 2.4–6.2% of the audio block a
 voice; most of these will cost more. A full chord on one track should be

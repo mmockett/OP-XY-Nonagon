@@ -3,10 +3,11 @@
 // in and 30 ms fade out standing in for the OP-XY's envelope. Keep the results
 // out of git.
 //   clang++ -std=c++11 -O2 -I<open-xy>/sdk/include tools/render.cpp -o <folder>/render
-//   <folder>/render <folder of sources> <out folder> [sweep]
+//   <folder>/render <folder of sources> <out folder> [sweep [steps]]
 #include "../sample.cpp"
 #include "presets.h"
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -97,16 +98,18 @@ std::vector<opxy::i16> render(const Take& take) {
 int main(int argc, char** argv) {
     if (argc < 3) { std::fprintf(stderr, "usage: render <folder of sources> <out folder> [sweep]\n"); return 1; }
     if (argc > 3 && std::string(argv[3]) == "sweep") {
-        // Each control at 0, 0.25, 0.5, 0.75 and 1 over Recur's preset, on the drums: tools/sweep.py measures them.
+        // Each control in steps of 5% (or 25%, with "sweep 4") over Recur's preset, on the
+        // drums, as sweep-<control>-<percent>.wav: tools/sweep.py measures them.
         if (!load((std::string(argv[1]) + "/source-drums.wav").c_str())) return 1;
+        const u32 steps = argc > 4 ? u32(std::atoi(argv[4])) : 20;
         for (u32 c = 0; c < 8; ++c)
-            for (u32 v = 0; v <= 4; ++v) {
+            for (u32 v = 0; v <= steps; ++v) {
                 static Preset p;
                 p = presets[0];
-                p.values[c] = v * 0.25;
+                p.values[c] = double(v) / steps;
                 const Take take = {"", &p, 8.2, {0, 0, 0}, 1};
                 char name[64];
-                std::snprintf(name, sizeof name, "/sweep-%u-%u.wav", c, v * 25);
+                std::snprintf(name, sizeof name, "/sweep-%u-%u.wav", c, v * 100 / steps);
                 save(std::string(argv[2]) + name, render(take));
             }
         return 0;

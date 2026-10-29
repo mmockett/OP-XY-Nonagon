@@ -41,37 +41,38 @@ sits under it, one alternate per encoder.
 | Control | Default | Caption | What it does |
 | --- | --- | --- | --- |
 | figure | 2:3+ | the mode pair, e.g. `2:3+` | The Chladni figure the plate rings in, one of twelve from a single diagonal (1:2+) to a flower (4:6−). The note sounds at its pitch, and six of the plate's higher modes ring above it, each at least 10% above the last: low figures sound like a bell, high ones like a dense gong. |
-| bow | 60 | amount | From a strike to a full bow. At 0 a felt mallet strikes the plate on each note and it rings like a bell, decaying at its material's pace. As bow rises the bow takes over: it sustains the tone, damps the strike, adds the note's 2nd to 4th harmonics (−6, −10 and −15 dB at 100) and throws the sand harder, into thinner lines. |
-| sand | 29 | grains, e.g. `29` | How much sand is poured, 0 to 48 grains. At 0 the plate is bare. |
-| grain | sand | `dust`, `sand`, `grit`, `stone` | The grains' size, and the sound of a landing: from a soft tick of dust to the ringing knock of a stone. Heavier grains knock the plate harder and weigh more on it. |
+| bow | 1.2N | the bow's force, e.g. `1.2N` | From a strike to a full bow. At 0 a felt mallet strikes the plate on each note and it rings like a bell, decaying at its material's pace. As bow rises the bow takes over: it sustains the tone, damps the strike and throws the sand harder, into thinner lines, and pressing harder brightens it, the note's 2nd to 4th harmonics rising as bow squared, from −28 dB at 25 to −3, −7 and −12 dB at 100. |
+| sand | 29 | grains, e.g. `29` | How much sand is poured, 0 to 48 grains. A bare plate rings with all its upper modes. More sand rattles longer at each note, and once it settles on the figure's lines it lies on the upper modes' moving ground and damps them, so the tone grows purer and darker. |
+| grain | .3mm | the grains' size, e.g. `.3mm` | From fine dust (0.06 mm) to stones (7.7 mm): the sound of a landing, from a soft tick of dust to the ringing knock of a stone. Heavier grains knock the plate harder and weigh more on it, so they darken the tone further. |
 | plate | metal | `metal`, `glass`, `wood` | What the plate is made of: how long it rings, how its upper modes fade, how fast it beats and how many harmonics the bow draws from it. |
-| settle | 0.35 | friction, e.g. `0.35` | How sticky the sand is. Slippery sand bounces far and wanders before it finds the narrow quiet lines; sticky sand needs more to lift it, lands dead and settles fast. |
-| tilt | 0deg | degrees, e.g. `5deg` | Tips the plate on its column, its far edge down, up to 10 degrees. Hops slide downhill, a steep plate pulls even resting sand down, and the sand piles against the low rim, where the plate moves, so it keeps trickling. |
-| shake | 0.0g | the largest jolt, e.g. `0.4g` | Noise into every mode of the plate and random jolts to every grain, up to 1.5 times gravity. The figure blurs and the sand never settles. |
+| settle | 0.35 | friction, e.g. `0.35` | How sticky the sand is. Slippery sand lands hard, bounces with a second click and wanders before it finds the narrow quiet lines; sticky sand needs more to lift it, lands dead and settles fast. |
+| tilt | 0deg | degrees, e.g. `5deg` | Tips the plate on its column, its far edge down, up to 10 degrees. While the plate sounds, its resting sand creeps downhill, more readily the steeper it is, and hops slide that way; sand that runs off the low edge comes back at the high edge by the bow, as an hourglass is turned, so the plate trickles as steadily as it is tipped. |
+| shake | 0.0g | the largest jolt, e.g. `1.8g` | Random jolts to every grain while the plate sounds, from 1.2 g, just enough to lift the lightest grain off a still line, to 2.4 g, more often as well as harder, and noise into every mode. The figure blurs and the sand never settles. |
 
 Measured on a held A3, each control at 0, 25, 50, 75 and 100 with the others
 at their defaults (the median of five seeds). Level is the tone's RMS from
-2.5 to 4.5 s; the rattle is the output above 2.5 kHz, at its peak in the
-first half second and from 3 to 4.5 s; "settles" is when the rattle stays
-20 dB below its start.
+2.5 to 4.5 s; the partials are the figure's six upper modes, their mean level
+against the note's; the rattle is the output above 2.5 kHz, at its peak in
+the first half second ("onset") and from 3 to 4.5 s ("later"); "settles" is
+when the rattle stays 20 dB below its start.
 
 | Control | 0 | 25 | 50 | 75 | 100 |
 | --- | --- | --- | --- | --- | --- |
-| figure | 1:2+, overtones to 3.8×, settles 2.2 s | 1:4+, to 2.4×, 1.0 s | 2:5+, to 2.0×, 0.9 s | 1:6−, to 2.0×, 0.7 s | 4:6−, to 1.9×, 0.9 s |
-| bow | struck: −57 dB by 2.5 s (it rings down), rattle −37 dB | −30 dB, rattle −43 dB | −27 dB, −41 dB | −25 dB, −40 dB | −23 dB, −41 dB |
-| sand | 0 grains: no rattle (−78 dB) | 12: −44 dB, settles 1.5 s | 24: −42 dB, 1.3 s | 36: −39 dB, 1.5 s | 48: −38 dB, 1.6 s |
-| grain | dust: clicks at 5.5 kHz | sand: 3.3 kHz | grit: 2.0 kHz | stone: 1.2 kHz | stone: 0.7 kHz, ringing (Q 4) |
+| figure | 1:2+: partials −26 dB, settles 2.5 s | 1:4+: −36 dB, 1.0 s | 2:5+: −36 dB, 0.8 s | 1:6−: −33 dB, 1.1 s | 4:6−: −44 dB, 0.9 s |
+| bow | struck: −56 dB by 2.5 s (it rings down) | 2nd harmonic −28 dB, level −31 dB | −15 dB, −27 dB | −8 dB, −25 dB | −3 dB, −22 dB |
+| sand | 0 grains: no rattle, partials −21 dB | 12: onset −43 dB, partials −28 dB | 24: −41 dB, −32 dB | 36: −39 dB, −34 dB | 48: −38 dB, −36 dB |
+| grain | 0.06 mm: clicks at 5.5 kHz, partials −28 dB | 0.2 mm: 3.3 kHz, −32 dB | 0.7 mm: 2.0 kHz, −34 dB | 2.3 mm: 1.2 kHz, −35 dB | 7.7 mm: 0.7 kHz, ringing, −36 dB |
 | plate | metal: rings 6 s | metal | glass: 3 s, purest | wood: 0.6 s, roughest | wood |
-| settle | μ 0.10: settles 2.8 s | 0.23: 2.1 s | 0.35: 2.0 s | 0.48: 0.8 s | 0.60: 0.9 s |
-| tilt | 0 deg: rattle after 3 s −77 dB | 3 deg: −54 dB | 5 deg: −76 dB | 8 deg: −50 dB | 10 deg: −41 dB (a steady trickle) |
-| shake | 0.0 g: −77 dB after 3 s | 0.1 g: −74 dB | 0.4 g: −48 dB | 0.8 g: −40 dB, +2 dB level | 1.5 g: −37 dB, +4.5 dB level |
+| settle | μ 0.10: onset −37 dB, settles 2.7 s | 0.23: −38 dB, 1.6 s | 0.35: −40 dB, 1.7 s | 0.48: −42 dB, 1.0 s | 0.60: −45 dB, 0.6 s |
+| tilt | 0 deg: later −78 dB | 3 deg: −64 dB | 5 deg: −45 dB | 8 deg: −39 dB, partials −23 dB | 10 deg: −37 dB, −21 dB |
+| shake | 0.0 g: later −78 dB, partials −32 dB | 1.5 g: −51 dB, −25 dB | 1.8 g: −41 dB, −18 dB | 2.1 g: −37 dB, −14 dB | 2.4 g: −37 dB, −11 dB, +4 dB level |
 
-Tilt and shake colour the sound, so they default to off. A little tilt can
-leave a few grains rattling against the rim (25 above), a little more often
-pours them clear of it (50); from about 75 the plate trickles steadily.
-Every grain is a little different (each needs 0.7 to 1.3 times the plate's
-lift to leave it, as in real sand), so the grains settle one by one and the
-rattle fades rather than stopping.
+Tilt and shake colour the sound, so they default to off. Past about 75 on
+either, all the sand is already moving, so the rattle grows little more;
+tilt runs the sand off faster (from 10 grains a second at 75 to 23 at 100)
+and shake stirs the modes harder. Every grain is a little different (each
+needs 0.7 to 1.3 times the plate's lift to leave it, as in real sand), so the
+grains settle one by one and the rattle fades rather than stopping.
 
 **Playing it.** Sand's notes share one plate's sand, across tracks too. A
 note started while another is still sounding takes over its sand, so a bowed
@@ -91,7 +92,7 @@ chorus or reverb.
 | Bell Keys | keys | Struck metal in 1:2+, ringing like a bell, with a sprinkle of dust thrown by each strike. |
 | Sand Shaker | percussion | A struck wooden box of grit: each note is a knock and a burst of rattle that settles quickly, like a shaker. |
 | Drone | drone | A heavily bowed metal plate in 4:6−, lightly shaken, so a little dust keeps hissing over a dense, slowly beating chord. |
-| Hourglass | texture | Fine sand on a tilted plate in 3:5+: it runs downhill and keeps trickling at the low edge. |
+| Hourglass | texture | Fine sand on a tilted plate in 3:5+: it runs downhill off the low edge and back in at the high one, a steady trickle over the tone. |
 | Gravel | characterful | Stones on metal in 1:4+: a long, knocking rattle, and the note clears as the stones find the lines. |
 
 ## How it works
@@ -103,8 +104,9 @@ m² + n², the + and − pair split a little. Its modes are damped resonators in
 phasor form, as in Hexagon's Hollow. Once a block, each mode's complex
 amplitude decays by the plate's ring time, moves toward the bow's level (as
 fast as it is bowed), and is pushed by a strike, shake, the bow's rosin and
-any grain that lands. A sine table then sounds it, ramped across the block,
-the upper modes two at a time. The bowed mode has a near-degenerate twin a
+any grain that lands. A sine table then sounds it, its amplitude ramped
+across the block in eight steps of eight samples. The bow reaches the upper
+modes faintly, enough that a bare plate shimmers with them. The bowed mode has a near-degenerate twin a
 fraction of a hertz above it (0.4 to 1.1 Hz on metal, by figure), as a real
 plate's paired modes split, so the tone beats gently. Over a block the twin
 barely turns against it, so it is sounded as part of the bowed mode, a slowly
@@ -115,25 +117,35 @@ harmonics, one waveform read at the bowed mode's phase.
 **The sand.** Twelve grains are looked at each block, so each of the 48 is
 looked at every 5.8 ms. A grain on the plate feels the plate's acceleration
 where it sits: each mode's amplitude times its frequency times its shape
-there, plus a steep plate's pull downhill. Where that beats the grain's
+there, plus a steep plate's pull downhill and any of Shake's jolts (which
+come at a look with a chance of Shake squared). Where that beats the grain's
 weight by more than static friction allows, it is thrown: higher, longer and
 further the more the plate beats it. It lands at a random spot nearby, but a
 spot where the figure's mode shakes harder is often refused (more often with
 more settle), so the sand drifts to the nodal lines and stays; a hop onto the
-clamp lands against its washer. The plate's upper modes and the bow's
+clamp lands against its washer. On a tilted plate a resting grain slips a
+step downhill at a look with a chance from 1 in 4096 at the gentlest tilt to
+1 in 2 at the steepest, so it creeps off the line and is thrown; a grain that
+runs off the low edge comes back at the high edge, by the bow, and lands with
+a click. Each grain keeps the plate's mode shapes where it lies, so a grain
+lying still costs no table reads. The plate's upper modes and the bow's
 harmonics throw sand at a quarter of their strength: in a real bowed plate
 they are much quieter than the bowed mode, and at full strength they would
 keep the sand from ever forming a figure.
 
 **The rattle.** Each landing is an impulse at a random point in the block,
-as loud as the grain fell, through one two-pole band-pass set by grain. A
+as loud as the grain fell and as hard as its friction lets it (slippery sand
+half again as hard, sticky sand half as hard), through one two-pole band-pass
+set by grain. Slippery sand bounces: a second, softer impulse 0.7 ms later. A
 landing also knocks every mode of the plate by its shape where it lands, so
 the rattle rings the plate's own partials. Once the rattle has rung out, the
 output skips it.
 
 **The weight.** Every round of looks, the sand on the plate (not in the air)
 is weighed against each mode's shape. That flattens the mode (by up to 2%),
-adds to its loss and, for the bowed mode, quietens it.
+adds to its loss and, for the bowed mode, quietens it. Settled on the
+figure's lines, the sand lies where the upper modes move, so it damps them
+most: from a bare plate to a full one the upper partials fall by about 15 dB.
 
 **The shared sand.** `Shared` holds one copy of the plate's sand and the
 note it belongs to, refreshed every fourth round of looks. A note that starts
@@ -143,7 +155,7 @@ while that note still renders copies its sand; `destroy` lets it go.
 
 Sand's levels match the Hexagon Suite's synths. A held middle C at the
 defaults sits within 2 dB of Hollow's Choir (−26.5 dBFS RMS), and an
-eight-note chord peaks between 0.50 and 0.75 of full scale on every preset.
+eight-note chord peaks between 0.5 and 0.8 of full scale on every preset.
 Each voice's rattle is held within a tenth of full scale, so stones landing
 together on many notes keep that headroom. Pitch is within 2 cents of the
 note from C2 to C6 on every preset but Sand Shaker (struck, heavily loaded
@@ -151,18 +163,21 @@ wood, up to 5 cents flat at C2).
 
 ## Screen
 
-![Sand's screen, an engraved Chladni plate on its stand: sand dances on the plate as two notes are bowed, gathers on the nodal lines and dims; the figure changes and the sand dances again before forming a cross; then the plate turns to glass and tips on its column, the sand running to its low edge](docs/sand.gif)
+![Sand's screen, an engraved Chladni plate on its stand: sand dances on the plate as a note is bowed and gathers in drifts along the nodal lines; more sand heaps the figure; a shaken plate shows a double image as its sand leaps; a tipped plate's sand runs downhill and back in at the top](docs/sand.gif)
 
 The apparatus, as an engraving of Chladni's *Entdeckungen* would draw it,
 seen from the front and a little to the left: the most recent note's plate.
+It is drawn in three weights: the plate's top edge brightest and boldest, the
+rest of the apparatus a step down, and the marks on the plate a step below
+that.
 
-- **The plate** is held at its centre by the stand's knurled clamp nut, as
-  Chladni held his, so every figure, and every mode that rings with it, is
-  still at the centre, and no sand lies on the clamp. Its top carries the
-  figure's nodal lines.
-- **The stand** is a turned column on a round base with three levelling
-  screws. **Tilt** tips the whole plate on the column, up to 10 degrees, and
-  the sand runs downhill across it.
+- **The plate** is held at its centre by the stand's clamp nut, as Chladni
+  held his, so every figure, and every mode that rings with it, is still at
+  the centre, and no sand lies on the clamp. Its top carries the figure's
+  nodal lines.
+- **The stand** is a turned column on a round base. **Tilt** tips the whole
+  plate on the column, up to 10 degrees, and while it sounds the sand runs
+  downhill across it, off the low edge and back in at the top.
 - **The sand** is up to 48 grains, as many as the sound throws, by the
   same physics. Grains in the air are white, larger and drawn above the
   plate; moving grains are bright; settled grains dim and stop. A grain
@@ -176,23 +191,23 @@ seen from the front and a little to the left: the most recent note's plate.
   are held it brightens and draws slowly across. Below 15 it lifts clear of
   the edge, and below 50 a felt mallet comes in, striking the plate on each
   note and rising to hover.
-- **Plate** changes the plate itself: brass with a ruled border, thin glass
-  with a bright edge and glints, or a thick wooden board showing its grain.
-  **Settle** changes its finish: polished below 35, with a sheen across it;
-  matte above 65, with a rosined tooth. **Shake** draws the whole plate
-  twice more, aside by 3 to 11 pixels, as an engraver draws a thing that
-  trembles; while it sounds, the jolts throw its sand into the air and break
-  up the drifts.
+- **Plate** changes the plate itself: plain metal, thin glass with a bright
+  edge and two glints, or a thick wooden board showing its grain. **Settle**
+  changes its finish: polished below 35, with a sheen across it; matte above
+  65, with a rosined tooth. **Shake** draws the whole plate twice more, aside
+  by 3 to 11 pixels, as an engraver draws a thing that trembles; while it
+  sounds, the jolts throw its sand into the air and break up the drifts.
 
 *Shown: Chladni, a note gathering its sand into drifts; a second note as
-Sand rises to full, heaping the figure; then a note with Shake turned up.*
+Sand rises to full, heaping the figure; a note with Shake turned up; then a
+note on a tipped plate.*
 
 ![Each control at 0, 50 and 100, the others at their defaults](docs/controls.png)
 
 The same sheet at the screen's own size, 480 by 222, is
 [docs/controls-1x.png](docs/controls-1x.png). The drawing is made for that
 size: no line is finer than about a pixel, no grain is smaller than 2.6
-pixels across, the metal plate's ruled border sits 8 pixels in from its edge,
+pixels across, nothing doubled sits closer than the plate's own thickness,
 and a sticky plate's tooth is a zigzag a few pixels tall rather than a fine
 hatch.
 
@@ -204,11 +219,11 @@ sound's grains, but they move as they do.
 A settled plate redraws nothing. Only part of the sand is redrawn each
 frame, moving grains on alternate frames and settled ones every sixth, so
 the sand follows a tipping plate within a fifth of a second and never
-redraws all at once. Of the screen's 136 nodes, 4 to 6 change a frame on
-average at the default Sand (at 60 and 30 frames a second), 8 to 10 at full
-Sand and 11 to 14 at full Shake with a note held; at most 30 when a note
-pours fresh sand, and up to 40 on the frames a turning tilt moves the plate
-by half a degree.
+redraws all at once. Of the screen's 133 nodes, 2 to 4 change a frame on
+average while notes are bowed at the defaults (at 60 and 30 frames a
+second), 13 to 15 at full Shake, and 8 to 15 with Tilt turned up, when the
+sand keeps running; at most 30 when a note pours fresh sand, and up to 41 on
+the frames a turning tilt moves the plate by half a degree.
 
 ## Files
 
@@ -234,12 +249,15 @@ by half a degree.
 
 ## CPU
 
-Not yet measured on an OP-XY. The SDK's host estimate (`sdk.py test`) is
-about 7,400 to 10,300 Blackfin instructions per voice block at the heaviest
-setting (the best of several runs; the host's timing varies with its load).
-Counted from the compiled code, the sample loops alone take about 10,000
-instructions a block (three pairs of plate modes at 42 instructions a
-sample, the bowed mode at 30), and about 13,400 with the rattle's output;
-with the sand's looks and the modes' block maths, a block of heavy rattle
-comes to around 16,000, and a settled one to around 12,500. Compiled for the
-device, Sand takes 66.6 KiB of the shared module memory.
+Not yet measured on an OP-XY. Counted from the compiled code, a block at the
+heaviest setting, a full plate of resting sand with the rattle ringing, comes
+to about 13,000 Blackfin instructions per voice: the six upper modes about
+900 each (12 instructions a sample, one at a time), the bowed mode with its
+twin and harmonics about 1,250, the rattle's output about 2,000 (about 450
+once it has rung out), the twelve looks at the sand about 2,500 (a grain lying
+still about 200, a throw and its landing about 420 more) and the modes' block
+maths about 1,300. A settled note at the defaults comes to about 10,500. In
+heavy rattle most looks find a grain in the air, which costs little, so a
+shaken plate comes to about 11,000. The SDK's host estimate (`sdk.py test`)
+is lower, about 6,600 to 6,900. Compiled for the device, Sand takes 80.8 KiB
+of the shared module memory.

@@ -99,9 +99,13 @@ struct Plate {
     i32 size;          // log2 of the lobe count a new drop's radius makes, Q16 (1.2 to 8.4)
     i32 float_life;    // log2 of an eight-lobe drop's floating life, s Q16
     i32 sizzle_life;   // log2 of an eight-lobe drop's life boiling on the plate, s Q16
-    i32 crackle, groove, vapour;   // Q15
+    i32 crackle, groove, vapour;   // Q15: vapour the layer as it is, with the heat's and the liquid's share
+    i32 swing;         // Q15: how far the pulses swing, a share of their spacing (to 0.44)
     u32 seed;          // the hops' pattern: fixed, so every drop of a size skips alike
 };
+
+// The vapour each liquid adds to the layer, Q15: water, ethanol, liquid nitrogen.
+const i32 liquid_vapour[3] = {0, -4000, 8000};
 
 inline Plate plate(const i32* controls) {
     Plate p;
@@ -137,18 +141,27 @@ inline Plate plate(const i32* controls) {
     p.sizzle_life = tables::sizzle_life + under * 131;
     p.crackle = q15(controls[CRACKLE]);
     p.groove = q15(controls[GROOVE]);
-    p.vapour = q15(controls[VAPOUR]);
+    // The vapour layer: thicker over a hotter plate (0.15 of the range less at
+    // the point, 0.46 more at 200 degrees over it), thinner under
+    // ethanol and thicker under liquid nitrogen, an airy whisper.
+    const i32 hotter = (clamp(p.superheat, 0, 2000) - 500) * 10;
+    const i32 airy = lerp(liquid_vapour[part], liquid_vapour[part + 1], t);
+    p.vapour = clamp(q15(controls[VAPOUR]) + hotter + airy, 0, full);
+    // The ratchet's teeth swing the pulses: long, short, long, short.
+    p.swing = p.groove * 14418 >> 15;
     p.seed = 42;
     return p;
 }
 
 // A floating drop's brief contacts, a second: sparse far over the point and
-// densest near it, an octave fewer every 12 degrees, as crackle squared:
-// 24 a second far over the point to 324 at it, at full crackle.
+// densest near it, an octave fewer every 12 degrees, as crackle to the 1.5:
+// 60 a second far over the point to 360 at it, at full crackle; 21 and 7.5
+// far over it at half and a quarter.
 inline i32 contacts(const Plate& p) {
-    const i32 c2 = p.crackle * p.crackle >> 15;
+    if (p.crackle <= 0) return 0;
+    const i32 c = static_cast<i32>(exp2_q16((log2_q16(static_cast<u32>(p.crackle)) - 15 * octave) * 3 / 2 + 15 * octave));
     const i32 near = p.superheat <= 0 ? full : static_cast<i32>(exp2_q16(15 * octave - p.superheat * 546));
-    return (24 + (300 * near >> 15)) * c2 >> 15;
+    return (60 + (300 * near >> 15)) * c >> 15;
 }
 
 // The life a drop of `nu0` lobes has, log2 s Q16: larger drops live longer,

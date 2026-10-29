@@ -331,7 +331,7 @@ void screen_follows() {
 
 // ---- The README's table: each control's effect, measured. ----
 // Euler's defaults, in control order.
-const double euler[8] = {0.3984, 0.3, 0.125, 0.1667, 0.25, 0.0, 0.6596, 0.125};
+const double euler[8] = {0.3984, 0.3, 0.125, 0.1667, 0.25, 0.0, 0.5746, 0.125};
 
 // Energy (Hann-windowed DFT) of x in [lo, hi) Hz, at `step` Hz.
 double band_energy(const float* x, int n, double lo, double hi, double step = 10) {
@@ -369,26 +369,59 @@ void play_into(int k, double v, float* x, int blocks, double spin = -1, double m
         for (int i = 0; i < 64; ++i) x[b * 64 + i] = static_cast<float>(p.out[i] / 2147483648.0);
     }
 }
-// The level's swing either side of its trend: dB rms of 23 ms levels less their 0.4 s average.
-double swing_of(const float* x, int n) {
-    const int hop = 1024, k = 17;
-    double db[1024];
-    int m = 0;
-    for (int i = 0; i + hop <= n && m < 1024; i += hop, ++m) {
-        double e = 0;
-        for (int j = 0; j < hop; ++j) e += x[i + j] * x[i + j];
-        db[m] = 10 * std::log10(e / hop + 1e-20);
+// Plays A4 with control k at v, recording the output and disk 0's contact rate
+// a block (Hz) until it stops (or `blocks`); returns the block it stopped in.
+int spin_into(int k, double v, float* x, double* rates, int blocks) {
+    double c[8];
+    for (int j = 0; j < 8; ++j) c[j] = euler[j];
+    c[k] = v;
+    Player p(c, 440.0);
+    double last = p.cycles(0);
+    for (int b = 0; b < blocks; ++b) {
+        p.play();
+        for (int i = 0; i < 64; ++i) x[b * 64 + i] = static_cast<float>(p.out[i] / 2147483648.0);
+        const double now = p.cycles(0);
+        rates[b] = (now - last) * rate / block;
+        last = now;
+        if (!p.voice.disk[0].rolling) return b;
     }
+    return blocks;
+}
+// The contact rate's swing either side of its 0.2 s trend, cents rms, over
+// the first 80% of a spin of `n` blocks.
+double warble_of(const double* rates, int n) {
+    const int k = 69, end = n * 8 / 10;
     double sum = 0;
-    int count = 0;
-    for (int i = k / 2; i < m - k / 2; ++i) {
-        double mean = 0;
-        for (int j = -k / 2; j <= k / 2; ++j) mean += db[i + j];
-        mean /= k;
-        sum += (db[i] - mean) * (db[i] - mean);
-        ++count;
+    int m = 0;
+    for (int b = k + 1; b < end - k; ++b) {
+        double trend = 0;
+        for (int j = -k; j <= k; ++j) trend += std::log2(rates[b + j]);
+        trend /= 2 * k + 1;
+        const double c = 1200 * (std::log2(rates[b]) - trend);
+        sum += c * c;
+        ++m;
     }
-    return count ? std::sqrt(sum / count) : 0;
+    return m ? std::sqrt(sum / m) : 0;
+}
+// An after-ring's T60 (s) from 20 ms after the stop to 60 dB under it.
+double after_ring(const double (&c)[8]) {
+    static float x[44100 * 8];
+    Player p(c, 440.0);
+    int stop = -1, n = 0;
+    for (int b = 0; b < 689 * 8; ++b) {
+        p.play();
+        if (stop < 0 && b > 0 && !p.voice.disk[0].rolling) stop = (b + 1) * 64 + 441;
+        for (int i = 0; i < 64; ++i) x[n++] = static_cast<float>(p.out[i] / 2147483648.0);
+    }
+    double e0 = 0;
+    for (int j = 0; j < 441; ++j) e0 += x[stop + j] * x[stop + j];
+    int end = stop + 882;
+    for (; end + 441 < n && end < stop + 44100 * 5; end += 441) {
+        double e = 0;
+        for (int j = 0; j < 441; ++j) e += x[end + j] * x[end + j];
+        if (e < e0 * 1e-6) break;
+    }
+    return decay_time(x, stop + 882, end, 441);
 }
 
 void report() {
@@ -431,23 +464,43 @@ void report() {
         const double upper = band_energy(x + 44100, 22050, 700, 1100);
         std::printf(" | %+.0f dB", 10 * std::log10(upper / ring));
     }
-    // base: a held note's level: wood damps the disk through the contact.
-    std::printf("\nbase (glass, wood, stone): held note's level");
+    // disk: its after-ring, a short spin, at Euler's ring.
+    std::printf("\ndisk (steel, brass, glass, wood): after-ring T60");
+    for (double v : disks) {
+        double c[8];
+        for (int j = 0; j < 8; ++j) c[j] = euler[j];
+        c[0] = 0.15;
+        c[2] = v;
+        std::printf(" | %.2f s", after_ring(c));
+    }
+    // base: the spin's level, and its low (100-330 Hz) against its high
+    // (0.9-1.5 kHz) over the spin's second half.
+    static double rates[689 * 8];
+    std::printf("\nbase (glass, wood, stone): the spin's level, low against high");
     for (double v : bases) {
-        play_into(3, v, x, 689 * 2, 1.0);
+        const int n = spin_into(3, v, x, rates, 689 * 4) * 64, a = n / 2;
         double e = 0;
-        for (int i = 44100; i < 88200; ++i) e += x[i] * x[i];
-        std::printf(" | %.1f dB", 10 * std::log10(e / 44100));
+        for (int i = 0; i < n; ++i) e += x[i] * x[i];
+        std::printf(" | %.1f dB, %+.1f dB", 10 * std::log10(e / n),
+                    10 * std::log10(band_energy(x + a, n - a, 100, 330) / band_energy(x + a, n - a, 900, 1500)));
     }
-    // wobble: the level's swing in a held note.
-    std::printf("\nwobble: held note's level swing");
+    // wobble: the whirr's warble, the contact rate's swing (the top half adds slip's jitter).
+    std::printf("\nwobble: the whirr's warble");
     for (double v : at) {
-        play_into(4, v, x, 689 * 4, 1.0);
-        std::printf(" | %.1f dB", swing_of(x + 44100, 44100 * 3));
+        const int n = spin_into(4, v, x, rates, 689 * 4);
+        std::printf(" | %.0f cents", warble_of(rates, n));
     }
-    // air: the fitted exponent.
-    std::printf("\nair: the rate's exponent");
-    for (double v : at) std::printf(" | %.3f", fitted_exponent(v));
+    // air: the last octave onto the note, and the breath: the spin's last 40%
+    // above 2 kHz against below.
+    std::printf("\nair: the last octave's time, the breath");
+    for (double v : at) {
+        const int stop = spin_into(5, v, x, rates, 689 * 4);
+        int b = stop;
+        while (b > 0 && rates[b - 1] > 220) --b;
+        const int n = stop * 64, a = n * 6 / 10;
+        std::printf(" | %.0f ms, %.1f dB", (stop - b) * block / rate * 1000,
+                    10 * std::log10(band_energy(x + a, n - a, 2000, 8000, 50) / band_energy(x + a, n - a, 100, 2000)));
+    }
     // ring: the after-ring's T60 once the disk lies flat.
     std::printf("\nring: after-ring T60");
     for (double v : at) {
@@ -455,23 +508,7 @@ void report() {
         for (int j = 0; j < 8; ++j) c[j] = euler[j];
         c[0] = 0.15;
         c[6] = v;
-        Player p(c, 440.0);
-        int stop = -1, n = 0;
-        for (int b = 0; b < 689 * 7; ++b) {
-            p.play();
-            if (stop < 0 && b > 0 && !p.voice.disk[0].rolling) stop = (b + 1) * 64 + 441;
-            for (int i = 0; i < 64; ++i) x[n++] = static_cast<float>(p.out[i] / 2147483648.0);
-        }
-        // From 20 ms after the stop to 60 dB under it (at most 3 s).
-        double e0 = 0;
-        for (int j = 0; j < 441; ++j) e0 += x[stop + j] * x[stop + j];
-        int end = stop + 882;
-        for (; end + 441 < n && end < stop + 44100 * 3; end += 441) {
-            double e = 0;
-            for (int j = 0; j < 441; ++j) e += x[end + j] * x[end + j];
-            if (e < e0 * 1e-6) break;
-        }
-        std::printf(" | %.2f s", decay_time(x, stop + 882, end, 441));
+        std::printf(" | %.2f s", after_ring(c));
     }
     // many: the disks and how far apart they stop.
     std::printf("\nmany: disks, and the spread of their stops");

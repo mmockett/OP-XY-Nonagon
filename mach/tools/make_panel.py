@@ -4,22 +4,26 @@ geometry display.cpp draws from: run it after changing a shape here, and
 commit all three.
 
 The whole screen is one object: a photograph after Ernst Mach and Peter
-Salcher's 1887 schlieren images of a bullet in flight, its round field (a
-200 px circle, so its arcs frame the left and right while its middle fills
-the screen) mounted on a card. Drawn for the screen at 1:1 (480 x 222): no
-lines closer than about 3 px, nothing finer than a pixel, no small text. In the field, under the SDK's
-two-page header:
+Salcher's 1887 schlieren images of a bullet in flight, its round field a
+200 px circle, so its edge frames the left and right as two arcs while its
+middle fills the screen. Drawn for the screen at 1:1 (480 x 222), in three
+greys and few weights: the projectile (solid) and a crack's shocks
+brightest and boldest (grey 15), the field's edge, the listener and the
+plate (solid) and a thump's shocks a step down (grey 9 to 10), the wake and
+the sound waves dimmer still. No
+lines closer than about 3 px, nothing finer than a pixel, no small text. In
+the field, under the SDK's two-page header:
   - the projectile, one of five a 19th-century range might fire (one for
     each source): a rifle bullet, a round-nose bullet, a Minie ball, a
     musket ball and a spitzer, each with its own shock stand-off;
-  - its bow and tail shocks (the Mach cone) and its turbulent wake;
+  - its bow and tail shocks (the Mach cone) and its turbulent wake, the
+    four reshaping outlines (which the device draws unfilled: a shock is a
+    ribbon thin enough to read as one line);
   - the sound waves it has sent out, thin rings;
-  - a listening wire hung up into the field, its tip where the listener is;
-  - a trigger wire across the line of flight, where the flight sounds the key;
-  - with echo, a polished plate under the wire and the shock it reflects;
+  - an ear trumpet on a post hung up into the field: the listener;
+  - with echo, a polished plate under the listener and the shock it reflects;
   - two marks on the line of flight: where the sound heard now left.
-Every node is one closed outline of distinct points, drawn as stroked line
-(no fills). Node numbers are display.h's."""
+Node numbers are display.h's."""
 import math
 import pathlib
 import sys
@@ -30,23 +34,23 @@ FONT = 'font-family="UniversNextPro-Light"'
 GREYS = ['#000000', '#0d0d0d', '#141414', '#1c1c1c', '#262626', '#333333', '#404040', '#4d4d4d',
          '#5c5c5c', '#6e6e6e', '#808080', '#999999', '#b3b3b3', '#cccccc', '#e6e6e6', '#ffffff']
 G = lambda i: GREYS[i]
-LINE = 0.35
+LINE = 0.5
 
 # Nodes (display.h names the same numbers).
 BOW, TAIL, REFLECTED, WAKE = 0, 1, 2, 3            # the reshaping outlines
 HEADER = 4                                        # eight bar steps
 RING, RINGS = 12, 12
 PROJECTILE, PROJECTILES = 24, 5                   # organ, pad, voice, bell, siren
-WIRE, GLOW, TRIGGER, PLATE = 29, 30, 31, 32
-HEARD, HEARDS = 33, 2
-NODES = HEARD + HEARDS                            # 35
+WIRE, GLOW, PLATE = 29, 30, 31
+HEARD, HEARDS = 32, 2
+NODES = HEARD + HEARDS                            # 34
 POINTS = 64
 
 # The photograph (display.cpp's plate namespace).
 CENTRE, RADIUS = (240, 129), 200                  # the schlieren field's circle
-BAND = (44, 216)                                  # the card's window, top and bottom
+BAND = (44, 216)                                  # the field's window, top and bottom
 LINE_Y = 108                                      # the line of flight
-RING_RADIUS = 30                                  # authored; drawn at up to twice
+RING_RADIUS = 10                                  # wave k is authored at 10 (k + 1) px, drawn at up to twice
 GLOW_RADIUS = 10
 
 
@@ -79,9 +83,11 @@ def ring_points(r, n, phase=0.0, wobble=0.0):
              r * math.sin(2 * math.pi * (k + phase) / n) * (1 + wobble * math.sin(5 * k))) for k in range(n)]
 
 
-def node(i, d, grey, at, width=LINE):
+def node(i, d, grey, at, width=LINE, solid=False):
+    """A bound outline. Solid ones are authored with a fill, so fill-and-stroke
+    paint can change it on the device; the reshaping outlines may not be."""
     return (f'<path id="{ID}_node_{i}" transform="matrix(1 0 0 1 {num(at[0])} {num(at[1])})" d="{d}" '
-            f'fill="none" stroke="{G(grey)}" stroke-width="{num(width)}"/>')
+            f'fill="{G(grey) if solid else "none"}" stroke="{G(grey)}" stroke-width="{num(width)}"/>')
 
 
 def line(points, grey, w=0.2, width=0.3):
@@ -188,53 +194,44 @@ for i, (x, y, ink, size) in enumerate(texts):
     out.append(f'<text id="{ID}_text_{i}" transform="matrix(1 0 0 1 {num(x)} {num(y)})" fill="{ink}" {FONT} '
                f'font-size="{size}px">-</text>')
 
-# The card: one rule. Drawn for the screen at 1:1 (480 x 222): no lines closer
-# than 3 px, nothing finer than a pixel, no text under 8 px.
-out.append(f'<path d="M4,41 L476,41 L476,219 L4,219 Z" fill="none" stroke="{G(7)}" stroke-width="0.8"/>')
-# The photograph's round field: its arcs, where they fall on the card, the
-# print's edge (a 1.5 px band) and its mount's, 6 px out.
+# The photograph's round field: its edge where it shows, a solid 2 px band
+# on either side, tapering to a point at each end.
 cx, cy = CENTRE
-for r, grey, w in ((RADIUS, 10, 1.5), (RADIUS + 7, 6, 0.6)):
-    for side in (-1, 1):
-        arc = []
-        for k in range(41):
-            y = BAND[0] + (BAND[1] - BAND[0]) * k / 40
-            arc.append((cx + side * math.sqrt(r * r - (y - cy) ** 2), y))
-        fill = G(grey) if w > 1 else "none"
-        out.append(f'<path d="{outline(ribbon(arc, w), 2)}" fill="{fill}" stroke="{G(grey)}" stroke-width="0.5"/>')
+for side in (-1, 1):
+    left, right = [], []
+    for k in range(41):
+        y = BAND[0] - 4 + (BAND[1] - BAND[0] + 8) * k / 40
+        x = cx + side * math.sqrt(RADIUS ** 2 - (y - cy) ** 2)
+        w = 1.0 * math.sin(math.pi * k / 40) ** 0.35        # half the band's width
+        left.append((x - side * w, y))
+        right.append((x + side * w, y))
+    out.append(f'<path d="{outline(left + right[::-1][1:-1], 2)}" fill="{G(10)}" stroke="{G(10)}" stroke-width="0.4"/>')
 
 # --- the nodes ---------------------------------------------------------------
-out.append(node(BOW, outline(placeholder(POINTS)), 12, HIDDEN))
-out.append(node(TAIL, outline(placeholder(POINTS)), 9, HIDDEN))
-out.append(node(REFLECTED, outline(placeholder(POINTS)), 8, HIDDEN))
-out.append(node(WAKE, outline(placeholder(POINTS)), 8, HIDDEN))
+out.append(node(BOW, outline(placeholder(POINTS)), 15, HIDDEN))
+out.append(node(TAIL, outline(placeholder(POINTS)), 12, HIDDEN))
+out.append(node(REFLECTED, outline(placeholder(POINTS)), 10, HIDDEN))
+out.append(node(WAKE, outline(placeholder(POINTS)), 7, HIDDEN))
 for i in range(RINGS):
     out.append(f'<circle id="{ID}_node_{RING + i}" transform="matrix(1 0 0 1 {HIDDEN[0]} {HIDDEN[1]})" cx="0" cy="0" '
-               f'r="{RING_RADIUS}" fill="none" stroke="{G(10)}" stroke-width="{num(LINE)}"/>')
+               f'r="{RING_RADIUS * (i + 1)}" fill="none" stroke="{G(10)}" stroke-width="{num(LINE)}"/>')
 for i, shape in enumerate(SHAPES):
-    out.append(node(PROJECTILE + i, outline(shape), 15, (CENTRE[0], LINE_Y) if i == 0 else HIDDEN))
+    out.append(node(PROJECTILE + i, outline(shape), 15, (CENTRE[0], LINE_Y) if i == 0 else HIDDEN, solid=True))
 # The listener: an ear trumpet on a post, hung up into the field from below
 # the card; its mouth (the origin) is where the listener is. The post runs
 # 112 px, past the screen's edge from any height.
 mouth = [(-5.5 + 11 * k / 6, -0.6 * math.sin(math.pi * k / 6)) for k in range(7)]
 horn = [(5.5, 0.0), (4.2, 1.6), (2.4, 3.6), (1.2, 5.8), (0.75, 7.5), (0.75, 112.0),
         (-0.75, 112.0), (-0.75, 7.5), (-1.2, 5.8), (-2.4, 3.6), (-4.2, 1.6)]
-out.append(node(WIRE, outline(mouth[:-1] + horn), 12, (CENTRE[0], LINE_Y + 40)))
+out.append(node(WIRE, outline(mouth[:-1] + horn), 10, (CENTRE[0], LINE_Y + 40), solid=True))
 out.append(f'<circle id="{ID}_node_{GLOW}" transform="matrix(1 0 0 1 {HIDDEN[0]} {HIDDEN[1]})" cx="0" cy="0" '
            f'r="{GLOW_RADIUS}" fill="none" stroke="{G(14)}" stroke-width="{num(LINE)}"/>')
-# The trigger: a wire stretched across the line of flight between two posts,
-# each with a foot, 56 px tall.
-post = [(0.5, -13.0), (1.3, -13.0), (1.3, -25.0), (3.5, -25.0), (3.5, -28.0)]
-right = list(reversed(post)) + [(x, -y) for x, y in post]
-trig = right + [(-x, y) for x, y in reversed(right)]
-out.append(node(TRIGGER, outline(trig), 11, (CENTRE[0], LINE_Y)))
 # The plate: a polished bar seen edge on, 300 px and 4 thick, bevelled.
 plate = [(-150, -2.0), (150, -2.0), (152, 0.0), (150, 2.0), (-150, 2.0), (-152, 0.0)]
-out.append(node(PLATE, outline(plate), 10, HIDDEN))
+out.append(node(PLATE, outline(plate), 10, HIDDEN, solid=True))
 heard = ring_points(4.0, 24)
-heard = heard[:6] + [(0.6, 4.0), (0.6, 9.0), (-0.6, 9.0), (-0.6, 4.0)] + heard[7:]
 for i in range(HEARDS):
-    out.append(node(HEARD + i, outline(heard), 14, HIDDEN))
+    out.append(node(HEARD + i, outline(heard), 13, HIDDEN))
 
 for i, grey in enumerate(GREYS):
     out.append(f'<circle id="{ID}_palette_{i}" cx="640" cy="0" r="1" fill="{grey}" stroke="{grey}" '
@@ -251,7 +248,7 @@ plate_h = ["// Written by tools/make_panel.py: do not edit.",
            "// The photograph's round field (pixels) and the card's window it shows through.",
            f"const opxy::i32 centre_x = {CENTRE[0]}, centre_y = {CENTRE[1]}, radius = {RADIUS};",
            f"const opxy::i32 top = {BAND[0]}, bottom = {BAND[1]};",
-           "// The line of flight; the rings' and glow's authored radii.",
+           "// The line of flight; the rings' authored radii (wave k's is (k + 1) times it) and the glow's.",
            f"const opxy::i32 line_y = {LINE_Y}, ring_radius = {RING_RADIUS}, glow_radius = {GLOW_RADIUS};",
            "// Each projectile's nose and tail (Q10 pixels ahead of its middle) and its bow shock's stand-off.",
            "const opxy::i32 nose[5] = {" + ", ".join(str(round(v * 1024)) for v in NOSE) + "};",

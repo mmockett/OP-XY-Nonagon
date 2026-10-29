@@ -26,7 +26,7 @@ using opxy::q31::multiply;
 const i32 strike = 60000000;           // a strike at A4 and size 1:8 (55 Hz held), Q31 (0.028)
 const i32 reference = 1464918;         // log2 of A4 as an increment, less 3 octaves, Q16
 // Each disk material's strikes, Q15 x 4, so a short-ringing disk is as loud
-// (wood's ring also has twice steel's level, tools/make_tables.py).
+// (wood's ring also has 1.75 times steel's level, tools/make_tables.py).
 const i32 material_level[4] = {32768, 44564, 35389, 60000};
 // One strike rings the disk at the same level at any key, so the throw and the
 // slap that ends the whirr are fixed in size, not compensated as the whirr is.
@@ -39,10 +39,15 @@ const u32 sway_step = 4362812;         // the hand's wobble, 0.7 Hz, Q32 cycles 
 const i32 share[spin::most] = {32767, 23593, 19661, 17039};   // each disk's level for the count, Q15
 // The bases: the rolling noise's low-pass and its level (Q31).
 const i32 rough_pole[3] = {322122547, 171798692, 536870912};
-const i32 rough_level[3] = {3000000, 7500000, 5500000};
+const i32 rough_level[3] = {12000000, 30000000, 22000000};   // of 2^(L/2) / 64 a disk
 // How much each base damps a rolling disk through the contact, Q4: glass
 // little, wood two and a half times as much, stone 1.3 times.
 const i32 base_damping[3] = {16, 40, 21};
+// Air: the breath pushed out from under the disk, its level (Q31, of 2^L / 256
+// a disk) and the low-pass it opens the rolling noise to.
+const i32 breath_level = 288000000;
+const i32 breath_pole = 751619276;     // 0.35
+const i32 warble_most = 3932;          // wobble's swing of the contact rate, at most 0.06 octave, Q16
 const u32 eighth_most = 241591910u;    // 0.45 of the sample rate, as an eighth of an increment
 
 // sin(pi x) for x = position / 2^31 in [0, 0.5], Q31.
@@ -314,10 +319,14 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
     const i32 below = spin::below(parameters[SIZE]);
     const i32 cut = spin::top(parameters[SIZE]);
     const i32 cut_life = spin::life_at_cut(cut, n);
-    const i32 after = spin::after_loss(parameters[RING]);
     const u32 material = spin::choice(parameters[DISK], 4);
+    const i32 after = spin::after_loss(parameters[RING], material);
     const u32 ground = spin::choice(parameters[BASE], 3);
     const i32 wobble = parameters[WOBBLE] < 0 ? 0 : parameters[WOBBLE];
+    // How eccentric the disk is, felt early: w (2 - w), Q15.
+    const i32 w15 = wobble >> 16;
+    const i32 eccentric = clamp((w15 * (65536 - w15)) >> 15, 0, 32767);
+    const u32 airy = spin::q16(parameters[AIR]);
     // Wobble's top half also slips: the eccentric disk skids as it rolls.
     const i32 skid = wobble > 0x40000000 ? (wobble - 0x40000000) * 2 : 0;
     const i32 skid2 = multiply(skid, skid);
@@ -424,12 +433,12 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
     // Kept spinning, the strikes fall in step with the ring and it swells, so
     // the hand strikes 5 dB softer.
     loudness -= multiply(loudness, voice.hand * 28000);
-    if (loudness > 1 << 28) loudness = 1 << 28;   // a strike (with its swing) stays under 0.19,
+    if (loudness > 1 << 28) loudness = 1 << 28;   // a strike (with its swing) stays under 0.21,
                                                   // so four disks' strikes and carries fit
 
     i32 sum[block_frames], struck[block_frames];
     for (unsigned i = 0; i < block_frames; ++i) sum[i] = struck[i] = 0;
-    i32 rolling_noise = 0, slipping = 0;
+    i32 rolling_noise = 0, slipping = 0, breath = 0;
     u32 sounding = 0, rolling = 0;
 
     Lane lanes[spin::most];
@@ -468,10 +477,14 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
             }
             d.life = cut_at < block_frames ? 0 : next;
 
+            // The eccentric weight, carried round by the disk's turn, swings
+            // the contact rate (a warble) and the strikes' strength.
+            const i32 swing = wave(d.turn + 0x40000000u);  // cos of the weight's angle, Q15
+            const i32 warble = ((eccentric * swing) >> 15) * warble_most >> 15;
             // Slip jitters the strikes' timing a little, a block at a time.
-            const i32 start_inc = scale(ring, from - below);
+            const i32 start_inc = scale(ring, from + warble - below);
             inc = start_inc + multiply(multiply(start_inc, skid >> 3), noise[k]);
-            const i32 end = scale(ring, to - below);
+            const i32 end = scale(ring, to + warble - below);
             glide = span == block_frames ? (end - start_inc) / static_cast<i32>(block_frames)
                                          : (end - start_inc) / static_cast<i32>(span);
 
@@ -483,13 +496,14 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
             reciprocal = 0x7fffffffu / ((mean << shift) >> 15);
 
             // The strikes: softer as the rate rises (2^(-L/4)), and with
-            // wobble, an eccentric weight swings them and a bounce follows.
+            // wobble, the weight swings them (up to 0.375 to 1.625 times) and
+            // a bounce follows.
             const i32 rise = from < 0 ? 0 : from;
             const i32 soft = scale(1u << 30, -rise / 4);   // 2^(-L/4) / 2, Q31
-            const i32 swing = wave(d.turn + 0x40000000u);  // cos of the weight's angle, Q15
             const i32 base_hit = multiply(loudness, soft) << 1;
-            hit = base_hit + ((multiply(base_hit, wobble) >> 15) * swing >> 1);
-            bounce = ((multiply(base_hit, wobble) >> 15) * (swing + 32768) >> 16) * 3 / 4;
+            const i32 felt = (base_hit >> 15) * eccentric >> 15;   // base_hit x eccentric, Q31 / 2^15
+            hit = base_hit + ((felt * swing) >> 15) * 20480;
+            bounce = (felt * ((swing + 32768) >> 1) >> 15) * 24576;
             // The disk's own turn: the contact rate x tilt^2 / 2, the tilt
             // falling as 2^(-2L) from 0.4 rad: 5.12 x 2^(-4L) a block.
             d.turn += static_cast<u32>(scale(static_cast<u32>(start_inc), 154400 - 4 * rise));
@@ -499,7 +513,11 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
             const i32 grow = 4915 + (27852 * (near * near >> 15) >> 15);   // 0.15 to 1, Q15
             slip = (multiply(skid2, 30000000) >> 15) * grow;
             slipping += slip >> 3;
-            rolling_noise += scale(1u << 27, rise / 2);   // 2^(L/2) / 16, Q31
+            // The rolling noise, 2^(L/2) / 64, swung by the weight's pressing
+            // (0.1 to 1.9 times): it chuffs as the disk turns.
+            const i32 rumble = scale(1u << 25, rise / 2);
+            rolling_noise += rumble + ((rumble >> 15) * ((eccentric * swing) >> 15) >> 15) * 29491;
+            breath += scale(1u << 23, rise);              // 2^L / 256, Q31
             ++rolling;
         }
 
@@ -542,8 +560,11 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
     one(voice.upper[0], struck, sum);
     one(voice.upper[1], struck, sum);
     if (count == 1) one(voice.partner, struck, sum);   // several disks beat among themselves
-    const i32 loudest = ring_out(voice, sum, struck, noise, output, multiply(rough_level[ground], rolling_noise),
-                                 rough_pole[ground], slipping);
+    // Air pushed from under the disk breathes, louder and brighter as air rises.
+    const i32 roll = multiply(rough_level[ground], rolling_noise)
+                   + multiply(static_cast<i32>((breath_level >> 16) * airy), breath);
+    const i32 pole = rough_pole[ground] + static_cast<i32>(((breath_pole - rough_pole[ground]) >> 16) * airy);
+    const i32 loudest = ring_out(voice, sum, struck, noise, output, roll, pole, slipping);
     if (!sounding && loudest < rung_out) {   // rung out: clear what is left, under -84 dB
         voice.quiet = 1;
         for (u32 m = 0; m < 2; ++m) voice.upper[m].y1 = voice.upper[m].y2 = 0;

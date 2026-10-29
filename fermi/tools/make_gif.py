@@ -17,7 +17,7 @@ parser.add_argument("--sdk", required=True)
 parser.add_argument("--fps", type=int, default=10)
 parser.add_argument("--chrome", default="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 parser.add_argument("--png", action="append", default=[], help="also save frame N as a 3x PNG: N:path")
-parser.add_argument("--contact", action="store_true", help="also write docs/controls.png: each control at 0, 50 and 100, at 1:1")
+parser.add_argument("--contact", action="store_true", help="also write docs/controls-1x.png (1:1) and docs/controls.png (2x): each control at 0, 50 and 100")
 parser.add_argument("--no-gif", action="store_true", help="only the contact sheet and stills")
 parser.add_argument("--font", default=os.environ.get("XY_FONT"),
                     help="the device's face, UniversNextPro-Light.ttf, loaded in place (never copied into the "
@@ -89,10 +89,12 @@ if args.contact:
     height = 30 + 8 * ch
     html = f"{S}/contact.html"
     open(html, "w").write('<html><head>' + FACE + '</head><body style="margin:0;background:#000">' + "".join(cells) + "</body></html>")
-    out_png = str(ROOT / "docs/controls.png")
-    subprocess.run(CHROME + [f"--window-size={label + 3 * cw},{height}",
-                    "--force-device-scale-factor=1", f"--screenshot={out_png}", f"file://{html}"], check=True, capture_output=True)
-    print("wrote", out_png)
+    # At 1:1, each cell the screen's own pixels, and at 2x for reading.
+    for name, factor in (("controls-1x.png", 1), ("controls.png", 2)):
+        out_png = str(ROOT / "docs" / name)
+        subprocess.run(CHROME + [f"--window-size={label + 3 * cw},{height}",
+                        f"--force-device-scale-factor={factor}", f"--screenshot={out_png}", f"file://{html}"], check=True, capture_output=True)
+        print("wrote", out_png)
 
 for spec in args.png:
     n, path = spec.split(":", 1)

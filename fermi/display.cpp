@@ -1,15 +1,14 @@
 #include "display.h"
 
 // Fermi's screen: the chain as a laboratory apparatus (tools/make_panel.py).
-// Brass weights on coil springs between two stands, an index board behind
-// them, a stroboscope on the base clocked by a regulator pendulum, a felt
-// damper on a lever.
+// Brass bobs on coil springs between two stands, a stroboscope on the
+// plank clocked by a regulator pendulum, a felt damper on a lever.
 //
 // The screen cannot hear the voices. It runs its own copy of the latest
 // note's chain with the voices' code (chain.h), a block of time at a time,
 // so with the controls held still it is the same chain, step for step.
 //
-// The weights swing far too fast to see, so the stroboscope lights them once
+// The bobs swing far too fast to see, so the stroboscope lights them once
 // a period of the struck mode, at the peak of that mode's own swing; the
 // struck mode then stands still and only the energy's flow moves the shape.
 // While the chain breathes, the arch ripples into higher modes and comes back
@@ -17,15 +16,14 @@
 // shivers. A faint ghost holds the swing's recent extremes, a long exposure.
 //
 // Every control acts on a part. Energy is how far the chain is drawn, masses
-// the number of weights, springs the coils (conical for the quadratic law,
-// straight and close-wound for the cubic), time the regulator's bob (up the
-// rod fast, down it slow; while a note runs the pendulum swings once a
-// breath), dispersion the weights themselves (beads on a near-continuous
-// spring sound harmonic; lumped into heavy bobs, the lattice disperses, and
-// the pointers on the harmonic index fall short), mode the arch's humps,
-// damping the felt pad's long lever, the seed a flagged pin pressing down the
-// bob it nudges hardest, lifting off when the note lets the chain go.
-// The pointers also brighten with their partials' energy.
+// the number of bobs, springs the coils (conical for the quadratic law,
+// straight and tall for the cubic), time the regulator's bob (up the rod
+// fast, down it slow; while a note runs the pendulum swings once a breath),
+// dispersion the bobs themselves (beads on a near-continuous spring sound
+// harmonic; lumped into heavy bobs, the lattice disperses), mode the arch's
+// humps, damping the felt pad's long lever, and the seed the starting shape
+// itself: the arch drawn with its nudge (three times over), and a flagged pin
+// on the bob it moves most, lifting off when the note lets the chain go.
 namespace fermi {
 namespace screen {
 using namespace opxy::draw;
@@ -135,7 +133,7 @@ inline void captions(char (&values)[8][header_capacity], const chain::Setup& s, 
         const u32 count = s.n < chain::voiced ? s.n : chain::voiced;
         const i32 h = static_cast<i32>(tables::harmonic[(s.m - 1) * 17 + count]);
         const i32 r = static_cast<i32>(tables::ratio[(s.size * 4 + s.m - 1) * 17 + count]);
-        const i32 blend = h + ((((r - h) >> 4) * s.dispersion) >> 11);
+        const i32 blend = h + ((((r - h) >> 4) * s.stretch) >> 11);
         const i32 cents = ((chain::log2_q12(static_cast<u32>(blend)) - chain::log2_q12(static_cast<u32>(h))) * 1200) >> 12;
         char t[8];
         u32 at = 0;
@@ -159,10 +157,12 @@ inline void captions(char (&values)[8][header_capacity], const chain::Setup& s, 
         if (!d) copy(values[chain::DAMPING], header_capacity, "off");
         else put_number(values[chain::DAMPING], hundredths_of(20098 - ((20098 * d) >> 15)), "s");
     }
+    // Seed: the share of the note's energy its nudge takes.
     if (!s.seed) copy(values[chain::SEED], header_capacity, "off");
     else {
-        char t[4] = {'#', static_cast<char>(s.seed >= 10 ? '0' + s.seed / 10 : '0' + s.seed),
-                     static_cast<char>(s.seed >= 10 ? '0' + s.seed % 10 : 0), 0};
+        const u32 percent = (chain::nudge_share(s) * 100 + 32768) >> 16;
+        char t[5] = {static_cast<char>(percent >= 10 ? '0' + percent / 10 : '0' + percent),
+                     static_cast<char>(percent >= 10 ? '0' + percent % 10 : '%'), static_cast<char>(percent >= 10 ? '%' : 0), 0, 0};
         copy(values[chain::SEED], header_capacity, t);
     }
 }
@@ -180,16 +180,6 @@ inline u32 put_angle(Frame& frame, u32 n, i32 x, i32 y, i32 scale, i32 tenths, u
 // A mass's strain-scaled displacement, Q12: x_j d0, so the struck mode's
 // arch is 1 at its widest.
 inline i32 strain(i32 x, i32 d0) { return ((x >> 10) * (d0 >> 5)) >> 8; }
-// The chain drawn back, ready for the next note: the struck mode at full strain.
-inline i32 cocked(const chain::Setup& s, u32 j) {
-    const u32 half = s.n / 2;
-    const i16* row = &tables::shape[tables::shape_at[s.size] + (s.m - 1) * half];
-    const bool far = j > half;
-    i32 sv = row[(far ? s.n + 1 - j : j) - 1];
-    if (far && !(s.m & 1)) sv = -sv;
-    return strain((sv * static_cast<i32>(tables::start[s.size * 4 + s.m - 1])) >> 6,
-                  static_cast<i32>(tables::strain[s.size * 4 + s.m - 1]));
-}
 // The row at a strobe.
 inline void strobe(DisplayState& st, const chain::Setup& s) {
     const i32 d0 = static_cast<i32>(tables::strain[s.size * 4 + s.m - 1]);
@@ -232,11 +222,6 @@ inline void block(DisplayState& st, const chain::Setup& s) {
     chain::damp(c, s);
     chain::guard(c, s);
 }
-// A mode's amplitude now, Q12 (1 is all the energy).
-inline u32 level(const chain::Chain& c, const chain::Folded& f, u32 k, u32 shift) {
-    return chain::root(chain::energy(c, f, k, shift));
-}
-
 // The ghost: each quarter of the chain's swing, out along its highs and back
 // along its lows, as one outline about the quarter's middle.
 inline u32 ghost(DisplayState& st, Frame& frame, i32 spacing, bool shown) {
@@ -254,7 +239,7 @@ inline u32 ghost(DisplayState& st, Frame& frame, i32 spacing, bool shown) {
         const i32 centre = plate::hook_left * unit + quarter * static_cast<i32>(q) + quarter / 2;
         Point pts[64];
         for (u32 i = 0; i < 32; ++i) {
-            const i32 off = -50 * unit + static_cast<i32>(i) * 3303;
+            const i32 off = -44 * unit + static_cast<i32>(i) * 2907;
             const u32 rel = static_cast<u32>(centre + off - plate::hook_left * unit);
             const u32 p = ((rel >> 4) * inverse) >> 16;   // Q10 masses along the chain
             const u32 at = p >> 10, frac = p & 1023;
@@ -305,7 +290,7 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
         // The ghost's outlines start flat (and hidden), each point distinct.
         for (u32 r = 0; r < 4; ++r) {
             for (u32 i = 0; i < 32; ++i) {
-                frame.paths[r].points[i].x = frame.paths[r].points[63 - i].x = -50 * unit + static_cast<i32>(i) * 3303;
+                frame.paths[r].points[i].x = frame.paths[r].points[63 - i].x = -44 * unit + static_cast<i32>(i) * 2907;
                 frame.paths[r].points[i].y = -307;
                 frame.paths[r].points[63 - i].y = 307;
             }
@@ -372,20 +357,32 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
     const u32 slow = snap ? 0 : opxy::draw::page_header_detail::remaining(static_cast<u32>(dt) / 8);
     st.reach = ease(st.reach, 1024 + ((7680 * s.energy) >> 15), left);
     const u32 n = st.chain.n;
-    // The bob the seed nudges hardest (0: none), pressed down by its pin
-    // until a note lets the chain go.
-    u32 most = 0;
-    {
-        i32 hardest = 0;
-        for (u32 j = 1; j <= n && s.seed; ++j) {
-            const i32 d = magnitude(static_cast<i32>(chain::scramble(s.seed * 0x9e3779b1u + j) >> 26) - 32);
-            if (d > hardest) { hardest = d; most = j; }
+    // Between notes the chain is drawn back in the next note's starting
+    // shape, the seed's nudge drawn three times its size so it reads; the pin
+    // marks the bob the nudge moves most (0: none).
+    i32 start[chain::most + 2];
+    if (!st.running) {
+        chain::shape(start, s);
+        if (s.seed) {
+            chain::Setup plain = s;
+            plain.seed = 0;
+            i32 struck[chain::most + 2];
+            chain::shape(struck, plain);
+            const i32 keep = static_cast<i32>(chain::root(65536 - chain::nudge_share(s)));   // Q8
+            for (u32 j = 1; j <= n; ++j) start[j] += 2 * (start[j] - (struck[j] >> 8) * keep);
         }
     }
+    u32 most = 0;
+    if (s.seed) {
+        i32 r[chain::most + 2], hardest = 0;
+        chain::nudge(r, s);
+        for (u32 j = 1; j <= n; ++j)
+            if (magnitude(r[j]) > hardest) { hardest = magnitude(r[j]); most = j; }
+    }
+    const i32 d0 = static_cast<i32>(tables::strain[s.size * 4 + s.m - 1]);
     for (u32 j = 0; j < n; ++j) {
-        const i32 target_strain = st.running ? st.shape[j] : cocked(s, j + 1);
+        const i32 target_strain = st.running ? st.shape[j] : strain(start[j + 1], d0);
         i32 target = (target_strain * st.reach) >> 12;   // px Q8
-        if (j + 1 == most) target -= (plate::dent * (1024 - st.lift)) >> 10;
         target = clamp(target, -8704, 8704);
         st.drawn[j] = ease(st.drawn[j], target, left);
         if (st.running) {
@@ -397,7 +394,7 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
     // The parts the other controls turn, eased.
     st.slide = ease(st.slide, (plate::fast << 8) + (((plate::slow - plate::fast) * chain::amount(input.slots[chain::TIME])) >> 7), left);
     st.swing = ease(st.swing, st.running && !input.reduced_motion ? 30 << 8 : 0, left);
-    st.damper = ease(st.damper, 70 - ((150 * chain::amount(input.slots[chain::DAMPING])) >> 15), left);
+    st.damper = ease(st.damper, 70 - ((plate::lowered * chain::amount(input.slots[chain::DAMPING])) >> 15), left);
     st.lump = ease(st.lump, s.dispersion, left);
     st.lift = ease(st.lift, st.running ? 1024 : 0, left);
     u32 spent = 0;
@@ -408,7 +405,7 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
         const i32 along = st.slide << 2;   // Q10 px
         spent += put_turned(frame, node::rod, plate::pendulum_x * unit, plate::pendulum_y * unit, unit, t.cos, t.sin, shade::rod, stroke);
         spent += put_turned(frame, node::regulator, plate::pendulum_x * unit - ((t.sin * along) >> 10),
-                            plate::pendulum_y * unit + ((t.cos * along) >> 10), unit, t.cos, t.sin, shade::mass, fill_and_stroke);
+                            plate::pendulum_y * unit + ((t.cos * along) >> 10), unit, t.cos, t.sin, shade::regulator, fill_and_stroke);
     }
     spent += put_angle(frame, node::damper, plate::pivot_x * unit, plate::pivot_y * unit, unit, st.damper, shade::damper, stroke);
     spent += put(frame, node::flash, plate::lamp_x * unit, plate::lamp_y * unit, unit,
@@ -418,10 +415,10 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
     spent += ghost(st, frame, spacing, st.running && !input.reduced_motion);
     u32 room = fresh ? 0xffffu : budget > spent ? budget - spent : 0;
 
-    // The chain: a weight moves (half a pixel or more) with both its coils,
+    // The chain: a bob moves (half a pixel or more) with both its coils,
     // three nodes at a time, as many as the budget allows, resuming where the
-    // last frame stopped; the coils always span the weights as they stand.
-    // A weight's radius is a share of the spacing that grows with dispersion,
+    // last frame stopped; the coils always span the bobs as they stand.
+    // A bob's radius is a share of the spacing that grows with dispersion,
     // from 0.085 (beads) to 0.3 (heavy bobs), in steps of 1/64.
     i32 scale = (spacing * (497 + ((1260 * st.lump) >> 15))) >> 15;   // radius / 5.6 px, Q10
     scale = scale > 2 * unit ? 2 * unit : scale < 16 ? 16 : (scale + 8) & ~15;
@@ -445,7 +442,7 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
         return put_turned(frame, on, (x0 + x1) / 2, (y0 + y1) / 2, coil_scale, c, sn, cubic ? shade::hard : shade::coil, stroke) +
                conceal(frame, off);
     };
-    // Weights and coils past the chain's end hide; a new spacing or coil
+    // Bobs and coils past the chain's end hide; a new spacing or coil
     // kind redraws everything, a group at a time.
     for (u32 j = n; j < chain::most && room; ++j) {
         const u32 changed = conceal(frame, node::mass + j) + conceal(frame, node::cone + j + 1) + conceal(frame, node::straight + j + 1);
@@ -471,35 +468,5 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
     if (!most) conceal(frame, node::pin);
     else put(frame, node::pin, weight_x(most - 1),
              plate::row_y * unit - (st.shown[most - 1] << 2) - ((plate::bob * scale) >> 10) - (st.lift << 2), unit, shade::pin, stroke);
-
-    // The harmonic index: graduations at k / count of its length, and a
-    // pointer at each partial's ratio (on its graduation when harmonic, short
-    // of it by the chain's dispersion), bright while its mode sounds.
-    const u32 count = n < chain::voiced ? n : chain::voiced;
-    const u32 inverse = tables::reciprocal[count];   // Q16
-    chain::Folded f;
-    chain::fold(st.chain, f);
-    const u32* ratio = &tables::ratio[(s.size * 4 + s.m - 1) * 17];
-    const u32* harmonic = &tables::harmonic[(s.m - 1) * 17];
-    for (u32 k = 0; k < chain::voiced && room; ++k) {
-        u32 changed = 0;
-        if (k >= count) {
-            changed += conceal(frame, node::graduation + k);
-            changed += conceal(frame, node::pointer + k);
-        } else {
-            const i32 gx = plate::index_left * unit + static_cast<i32>(((k + 1) * inverse * plate::index_width) >> 6);
-            changed += put(frame, node::graduation + k, gx, plate::index_y * unit, unit, shade::graduation, stroke);
-            const i32 h = static_cast<i32>(harmonic[k + 1]), r = static_cast<i32>(ratio[k + 1]);
-            const u32 blend = static_cast<u32>(h + ((((r - h) >> 4) * s.dispersion) >> 11));   // Q16
-            const u32 along = ((blend >> 4) * s.m * inverse) >> 12;                         // ratio m / count, Q16
-            const i32 px = plate::index_left * unit + static_cast<i32>((along * plate::index_width) >> 6);
-            const u32 a = level(st.chain, f, k + 1, s.shift);   // Q12
-            const u32 grey = a > 2048 ? shade::loud : a > 1024 ? shade::sounding : shade::quiet;
-            const Node& d = frame.nodes[node::pointer + k];
-            if (fresh || magnitude(d.x - px) >= unit / 2 || d.shade != grey || d.y != plate::index_y * unit)
-                changed += put(frame, node::pointer + k, px, plate::index_y * unit, unit, grey, stroke);
-        }
-        room -= changed > room ? room : changed;
-    }
 }
 }

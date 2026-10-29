@@ -138,6 +138,7 @@ int main() {
         const Take take = play(f, 3.5);
         const mach::Voice& first = take.blocks.front();
         const double m = first.mach / 268435456.0, d = first.image[0].d / q26;
+        const double hz = f.hz * first.pitch / 65536.0;   // the source's own pitch, tune's factor on the key
         bool single = true, exact = true;
         double worst = 0;
         for (const mach::Voice& v : take.blocks) {
@@ -166,7 +167,7 @@ int main() {
             const mach::Voice& v = take.blocks[block];
             const double sigma = v.root[0].sigma / q26, x = m * sigma, r = std::sqrt(x * x + d * d);
             const double cos_theta = -x / r;   // between the flight and the line to the listener
-            const double want = f.hz / (1 - m * cos_theta);
+            const double want = hz / (1 - m * cos_theta);
             // The engine's rate over its last sub-step, at the middle of that sub-step.
             const double mid = v.root[0].sigma / q26 - v.root[0].step / q26 / 2, xm = m * mid;
             const double rate_want = 1 / (1 - m * -xm / std::sqrt(xm * xm + d * d));
@@ -179,7 +180,7 @@ int main() {
                 for (size_t i = 0; i < half; ++i) {
                     const size_t n = from + hh * half + i;
                     const double t = t0 + n / rate;
-                    const double ph = 2 * M_PI * f.hz * exact_root(m, d, t, 1);
+                    const double ph = 2 * M_PI * hz * exact_root(m, d, t, 1);
                     const double w = (0.5 - 0.5 * std::cos(2 * M_PI * i / half)) * take.out[n];
                     re[hh] += w * std::cos(ph);
                     im[hh] -= w * std::sin(ph);
@@ -197,10 +198,10 @@ int main() {
         check(peak(take.out, 0, take.out.size()) <= declared, "subsonic: within the declared peak");
     }
 
-    // 1b. Tune: the source is pitched so the chosen moment sounds the key
-    //     exactly: the flight's start (-1), its closest pass (0, the source's
-    //     own pitch) or its end (1), each at most 0.5 s from the pass; above
-    //     Mach 1 the start is where the backward image ends.
+    // 1b. Tune: at -1 the source is pitched so the flight's start sounds the
+    //     key exactly (above Mach 1, where the backward image ends), at 1 so
+    //     its end does, each at most 0.5 s or four closest distances' flight
+    //     from the pass; between them it moves evenly in pitch (at 0, half way).
     for (double m : {0.5, 0.8, 2.0, 3.0})
         for (double tune : {-1.0, 0.0, 1.0}) {
             Flight f;
@@ -208,10 +209,13 @@ int main() {
             const Take take = play(f, 0.05);
             const mach::Voice& v = take.blocks.front();
             const double mm = v.mach / 268435456.0, d = v.image[0].d / q26;
-            const double edge = tune < 0 ? std::fmax(v.sigma_start / q26, -0.5) : std::fmin(v.sigma_end / q26, 0.5);
-            const double x = mm * edge, r = std::sqrt(x * x + d * d);
-            const double rate = tune == 0 ? 1 : r / std::fabs(r + mm * x);   // dtau/dt heard there
-            const double want = std::fmin(std::fmax(1 / rate, std::pow(2.0, -2.5)), std::pow(2.0, 2.5));
+            const double most = std::fmax(0.5, 4 * d / mm);
+            auto octaves = [&](double edge) {   // log2 of dtau/dt heard there, held within 2.5 octaves
+                const double x = mm * edge, r = std::sqrt(x * x + d * d);
+                return std::fmin(std::fmax(std::log2(r / std::fabs(r + mm * x)), -2.5), 2.5);
+            };
+            const double first = octaves(std::fmax(v.sigma_start / q26, -most)), last = octaves(std::fmin(v.sigma_end / q26, most));
+            const double want = std::pow(2.0, -(first + (last - first) * (tune + 1) / 2));
             const double got = v.pitch / 65536.0;
             const double cents = 1200 * std::log2(got / want);
             char what[128];
@@ -261,10 +265,11 @@ int main() {
         const mach::Voice& v = take.blocks[block];
         const double rf = v.root[0].step / double(mach::substep_time), rr = v.root[1].step / double(mach::substep_time);
         const size_t from = block * 64 - 2048;
-        const double sf = strength(take.out, from, 4096, f.hz * rf), sr = strength(take.out, from, 4096, f.hz * -rr);
-        const double floor = strength(take.out, from, 4096, f.hz * (rf - rr) / 2 * 1.13);
+        const double hz = f.hz * first.pitch / 65536.0;
+        const double sf = strength(take.out, from, 4096, hz * rf), sr = strength(take.out, from, 4096, hz * -rr);
+        const double floor = strength(take.out, from, 4096, hz * (rf - rr) / 2 * 1.13);
         std::printf("      forward at %.1f Hz: %.4f, backward at %.1f Hz: %.4f, between: %.4f\n",
-                    f.hz * rf, sf, -f.hz * rr, sr, floor);
+                    hz * rf, sf, -hz * rr, sr, floor);
         check(sf > 4 * floor && sr > 4 * floor, "supersonic: both components are heard, each at its own pitch");
         check(peak(take.out, 0, take.out.size()) <= declared, "supersonic: within the declared peak");
     }
@@ -295,6 +300,36 @@ int main() {
         check(both && worst < 2e-7 && back > 0.5, what);
     }
 
+    // 2c. Below Mach 1 there is no shock: the boom is the bow wave's pressure
+    //     pulse, heard as the pass's sound arrives, ahead of the tone there.
+    {
+        Flight f;
+        f.mach = 0.6; f.pass = 12; f.dur = 2; f.hz = 220; f.boom = 0.8; f.tune = 1;
+        const Take take = play(f, 2);
+        Flight quiet = f;
+        quiet.boom = 0;
+        const Take tone = play(quiet, 2);
+        const mach::Voice& first = take.blocks.front();
+        const int at = first.image[0].boom_at;
+        const double pass_at = (first.image[0].d - first.t_start) / q26 * rate;
+        double pulse = 0;
+        for (size_t i = 0; i < take.out.size(); ++i) pulse = std::fmax(pulse, std::fabs(take.out[i] - tone.out[i]));
+        std::printf("      pulse at %d (the pass heard at %.0f), %.3f over the tone\n", at, pass_at, pulse);
+        check(first.image[0].cone == 0 && std::abs(at - pass_at) < 64 && pulse > 0.05, "subsonic boom: a pulse as the pass is heard");
+    }
+
+    // 2d. A cone that leaves right at the flight's start (Mach 1.67 at 190 m,
+    //     tune at the end): the flight sounds, and settles on the key.
+    {
+        Flight f;
+        f.mach = 1.6667; f.pass = 189; f.dur = 2.5; f.hz = 220; f.boom = 0.3; f.tune = 1; f.source = mach::BELL;
+        const Take take = play(f, 6);
+        const mach::Voice& last = take.blocks[static_cast<size_t>(4.0 * rate / opxy::block_frames)];
+        const double heard = last.root[0].step / double(mach::substep_time) * last.pitch / 65536.0;
+        std::printf("      peak %.3f; at 4 s the forward image at %.3f of the key\n", peak(take.out, 0, take.out.size()), heard);
+        check(peak(take.out, 0, take.out.size()) > 0.05 && std::fabs(std::log2(heard)) < 0.05, "a cone at the flight's start: it sounds, settling on the key");
+    }
+
     // 2b. Heard backwards: with the bell (struck as the flight starts and at
     //     its closest pass, a second apart in its own time),
     //     the backward image's prime partial swells through a strike period and
@@ -306,13 +341,14 @@ int main() {
         const Take take = play(f, 3);
         const mach::Voice& first = take.blocks.front();
         const double m = first.mach / 268435456.0, d = first.image[0].d / q26, t0 = first.t_start / q26;
+        const double hz = f.hz * first.pitch / 65536.0;   // the source's own pitch
         // The partial's strength around sample n along one root.
         auto partial = [&](size_t n, int branch) {
             double re = 0, im = 0;
             const size_t w = 1024;
             for (size_t i = 0; i < w; ++i) {
                 const double t = t0 + (n - w / 2 + i) / rate;
-                const double ph = 2 * M_PI * f.hz * exact_root(m, d, t, branch);
+                const double ph = 2 * M_PI * hz * exact_root(m, d, t, branch);
                 const double x = (0.5 - 0.5 * std::cos(2 * M_PI * i / w)) * take.out[n - w / 2 + i];
                 re += x * std::cos(ph);
                 im += x * std::sin(ph);

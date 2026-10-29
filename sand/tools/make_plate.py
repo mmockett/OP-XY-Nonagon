@@ -51,7 +51,7 @@ FIGURES = [(1, 2, 1), (1, 3, 1), (2, 3, 1), (1, 4, 1), (2, 4, -1), (3, 4, 1),
 # coordinate u, from the back (0) to the front (1), and the second, v, runs in
 # from that edge: x = 1 - v, y = u. Outlines are drawn at half size in path
 # units (+-64) and scaled by 2.
-PX, PY, W, H, S = 226, 100, 206, 88, -46
+PX, PY, W, H, S = 236, 100, 206, 88, -46
 THICK = 4.5               # the plate's thickness on screen (px)
 PATH_SCALE = 2
 GRAINS_SHOWN = 48
@@ -471,8 +471,8 @@ def build_header():
 #
 # Every part of the plate is a node, drawn from the column's joint, so the
 # whole plate can tip on its column (Tilt). Each control changes it plainly:
-# the material its thickness, edge and marks (a ruled border for metal,
-# glints for glass, grain for wood), Settle its finish (a polished sheen or a
+# the material its thickness and marks (plain metal, glints on glass, grain
+# in wood), Settle its finish (a polished sheen or a
 # matte, rosined tooth), Shake its edge (doubled, as an engraver shows a thing
 # that trembles), Grain the grains' size, Bow the bow's contact and the
 # mallet's approach.
@@ -480,25 +480,29 @@ def build_header():
 HEADER_FIRST = PATHS                  # 4..11
 PLATE_TOP = HEADER_FIRST + 8          # 12: the plate's top edge
 THICKNESS = PLATE_TOP + 1             # 13..15: its edges in thickness, by material
-METAL_MARK = THICKNESS + 3            # 16: the ruled border
-GLASS_MARKS = METAL_MARK + 1          # 17..19: glints
-WOOD_MARKS = GLASS_MARKS + 3          # 20..23: grain
-CLAMP = WOOD_MARKS + 4                # 24..26: washer, nut, nut's top
-SHEEN = CLAMP + 3                     # 27..28: a polished plate's reflections
-MATTE = SHEEN + 2                     # 29..31: a sticky plate's rosined tooth
-TREMOR = MATTE + 3                    # 32..33: a shaken plate's double image
-BOW_FIRST = TREMOR + 2                # 34..37: stick, head, tip face, hair
-MALLET = BOW_FIRST + 4                # 38..39: shaft, head
-GRAIN_FIRST = MALLET + 2              # 40..87
-DRIFT_FIRST = GRAIN_FIRST + GRAINS_SHOWN  # 88..135: the sand each grain stands for, settled on a line
+GLASS_MARKS = THICKNESS + 3           # 16..17: glints
+WOOD_MARKS = GLASS_MARKS + 2          # 18..21: grain
+CLAMP = WOOD_MARKS + 4                # 22..24: washer, nut, nut's top
+SHEEN = CLAMP + 3                     # 25..26: a polished plate's reflections
+MATTE = SHEEN + 2                     # 27..28: a sticky plate's rosined tooth
+TREMOR = MATTE + 2                    # 29..30: a shaken plate's double image
+BOW_FIRST = TREMOR + 2                # 31..34: stick, head, tip face, hair
+MALLET = BOW_FIRST + 4                # 35..36: shaft, head
+GRAIN_FIRST = MALLET + 2              # 37..84
+DRIFT_FIRST = GRAIN_FIRST + GRAINS_SHOWN  # 85..132: the sand each grain stands for, settled on a line
 NODES = DRIFT_FIRST + GRAINS_SHOWN
 FONT = 'font-family="UniversNextPro-Light"'
 GREYS = ['#000000', '#0d0d0d', '#141414', '#1c1c1c', '#262626', '#333333', '#404040', '#4d4d4d',
          '#5c5c5c', '#6e6e6e', '#808080', '#999999', '#b3b3b3', '#cccccc', '#e6e6e6', '#ffffff']
 LINE = GREYS[8]          # the nodal lines
+# Three line weights: the plate's top, brightest and boldest; the rest of the
+# apparatus a step down; marks on the plate another step down.
+MAIN, MAIN_WIDTH = GREYS[13], 1.5
+SECOND, SECOND_WIDTH = GREYS[10], 1.0
+DETAIL_WIDTH = 1.0
 DEPTH = H / W            # how much a circle on the plate's plane is flattened
 COLUMN_X, COLUMN_TOP = PIVOT
-BASE_Y, BASE_R, BASE_THICK = 195, 38, 4
+BASE_Y, BASE_R = 191, 34
 BOW_ANGLE = math.radians(27)          # the bow below horizontal, its head over the plate
 MATERIAL_THICK = [4.5, 3.0, 8.0]      # metal, glass, wood (px)
 MALLET_AT = (0.2, 0.8)                # where the mallet strikes (plate x, y)
@@ -637,40 +641,32 @@ def build_panel():
                (COLUMN_TOP + 26, 3.2), (COLUMN_TOP + 27.5, 5.0), (COLUMN_TOP + 30.5, 5.0), (COLUMN_TOP + 32, 3.4),
                (BASE_Y - 6, 3.6), (BASE_Y - 2.5, 6.0), (BASE_Y, 7.5)]
     for side in (-1, 1):
-        out.append(line([(cx + side * r, y) for y, r in profile], 0.8, GREYS[9]))
+        out.append(line([(cx + side * r, y) for y, r in profile], SECOND_WIDTH, SECOND))
     for y, r in [(COLUMN_TOP + 3.5, 6.0), (COLUMN_TOP + 27.5, 5.0)]:
-        out.append(line(ellipse(cx, y, r, r * DEPTH, 9, 0, math.pi), 0.7, GREYS[9]))
+        out.append(line(ellipse(cx, y, r, r * DEPTH, 9, 0, math.pi), SECOND_WIDTH, SECOND))
     ry = BASE_R * DEPTH
     back = [pt for pt in ellipse(cx, BASE_Y, BASE_R, ry, 48, math.pi, 2 * math.pi) if abs(pt[0] - cx) > 8.2]
-    out.append(line([pt for pt in back if pt[0] < cx], 0.8, GREYS[9]))
-    out.append(line([pt for pt in back if pt[0] > cx], 0.8, GREYS[9]))
-    out.append(line(ellipse(cx, BASE_Y, BASE_R, ry, 32, 0, math.pi), 0.8, GREYS[9]))
-    out.append(line(ellipse(cx, BASE_Y + BASE_THICK, BASE_R, ry, 32, 0, math.pi), 0.7, GREYS[8]))
-    for side in (-1, 1):
-        out.append(line([(cx + side * BASE_R, BASE_Y), (cx + side * BASE_R, BASE_Y + BASE_THICK)], 0.7, GREYS[8]))
-    for a in (math.radians(150), math.radians(30)):
-        x, y = cx + BASE_R * 0.78 * math.cos(a), BASE_Y + BASE_THICK + ry * 0.78 * math.sin(a)
-        out.append(line([(x - 2.6, y), (x - 2.4, y + 3.6), (x + 2.4, y + 3.6), (x + 2.6, y)], 0.7, GREYS[9]))
+    out.append(line([pt for pt in back if pt[0] < cx], SECOND_WIDTH, SECOND))
+    out.append(line([pt for pt in back if pt[0] > cx], SECOND_WIDTH, SECOND))
+    out.append(line(ellipse(cx, BASE_Y, BASE_R, ry, 32, 0, math.pi), SECOND_WIDTH, SECOND))
 
     # The plate, every part a node from the pivot. Behind it, the shaken
     # plate's doubled edges.
     corners = [top(0, 0), top(1, 0), top(1, 1), top(0, 1)]
     silhouette = corners[:3] + [(x, y + THICK) for x, y in (top(1, 1), top(0, 1), top(0, 0))]
     for k in range(2):
-        out.append(node_path(silhouette, TREMOR + k, "none", GREYS[7], 0.8))
+        out.append(node_path(silhouette, TREMOR + k, "none", GREYS[8], DETAIL_WIDTH))
     for k, t in enumerate(MATERIAL_THICK):
-        out.append(node_path(thickness(t), THICKNESS + k, "none", GREYS[7], 0.7))
-    out.append(node_path(corners, PLATE_TOP, "none", GREYS[9], 0.9))
-    i = 0.09
-    out.append(node_path([top(i, i), top(1 - i, i), top(1 - i, 1 - i), top(i, 1 - i)], METAL_MARK, "none", GREYS[6], 0.7))
-    for k, (a, b, w) in enumerate([((0.04, 0.24), (0.24, 0.04), 0.9), ((0.05, 0.4), (0.4, 0.05), 0.8), ((0.6, 0.96), (0.96, 0.6), 0.8)]):
-        out.append(node_line([top(*a), top(*b)], w, GREYS[12], GLASS_MARKS + k))
+        out.append(node_path(thickness(t), THICKNESS + k, "none", SECOND, SECOND_WIDTH))
+    out.append(node_path(corners, PLATE_TOP, "none", MAIN, MAIN_WIDTH))
+    for k, (a, b) in enumerate([((0.05, 0.32), (0.32, 0.05)), ((0.62, 0.95), (0.95, 0.62))]):
+        out.append(node_line([top(*a), top(*b)], 1.2, GREYS[12], GLASS_MARKS + k))
     for k, (y, seed) in enumerate([(0.14, 0.4), (0.38, 2.3), (0.62, 4.1), (0.86, 1.2)]):
-        out.append(node_line([top(x / 40, y + 1.6 * wobble(x / 40, seed)) for x in range(1, 40)], 0.9, GREYS[8], WOOD_MARKS + k))
+        out.append(node_line([top(x / 40, y + 1.6 * wobble(x / 40, seed)) for x in range(1, 40)], DETAIL_WIDTH, GREYS[8], WOOD_MARKS + k))
     for k, (a, b) in enumerate([((0.08, 0.62), (0.62, 0.08)), ((0.22, 0.9), (0.9, 0.22))]):
         out.append(node_line([top(*a), top(*b)], 1.4, GREYS[10], SHEEN + k))
-    for k, y in enumerate([0.22, 0.5, 0.78]):
-        out.append(node_line(zigzag(y, 0.025, 0.03), 0.6, GREYS[6], MATTE + k))
+    for k, y in enumerate([0.3, 0.7]):
+        out.append(node_line(zigzag(y, 0.03, 0.035), DETAIL_WIDTH, GREYS[6], MATTE + k))
 
     # The figure's nodal lines: authored as small distinct rings; the first
     # frame reshapes and places them.
@@ -680,15 +676,15 @@ def build_panel():
 
     # The clamp at the plate's centre: its washer and the knurled nut.
     c = rel((PX, PY))
-    out.append(node_path(ellipse(c[0], c[1], 10, 10 * DEPTH, 32), CLAMP, "#000000", GREYS[9], 0.7))
+    out.append(node_path(ellipse(c[0], c[1], 10, 10 * DEPTH, 32), CLAMP, "#000000", SECOND, SECOND_WIDTH))
     nut = (ellipse(c[0], c[1] - 6, 6.5, 6.5 * DEPTH, 13, math.pi, 2 * math.pi) + ellipse(c[0], c[1], 6.5, 6.5 * DEPTH, 13, 0, math.pi))
-    out.append(node_path(nut, CLAMP + 1, "#000000", GREYS[10], 0.7))
+    out.append(node_path(nut, CLAMP + 1, "#000000", SECOND, SECOND_WIDTH))
     knurl = []
     for k in range(13):  # the nut's top and its knurled side, as one outline
         a = math.pi * k / 12
         knurl.append((c[0] + 6.5 * math.cos(a), c[1] - 6 + 6.5 * DEPTH * math.sin(a)))
     knurl += [(c[0] + 6.5 * math.cos(a), c[1] - 6 - 6.5 * DEPTH * math.sin(a)) for a in [math.pi * k / 12 for k in range(11, 0, -1)]]
-    out.append(node_path(knurl, CLAMP + 2, "none", GREYS[11], 0.6))
+    out.append(node_path(knurl, CLAMP + 2, "none", SECOND, SECOND_WIDTH))
 
     # The settled sand: a drift for each grain, a low mound along x that the
     # screen turns along the nodal line it lies on and lengthens with Sand;
@@ -740,7 +736,7 @@ def build_view():
         f"const opxy::i32 mallet_x = {q10(on_screen(*MALLET_AT)[0])}, mallet_y = {q10(on_screen(*MALLET_AT)[1])};",
         f"const opxy::i32 mallet_cos = {q10(math.cos(MALLET_ANGLE))}, mallet_sin = {q10(math.sin(MALLET_ANGLE))};",
         "// Node numbers.",
-        f"const opxy::u32 header_first = {HEADER_FIRST}, plate_top = {PLATE_TOP}, thickness_first = {THICKNESS}, metal_mark = {METAL_MARK},",
+        f"const opxy::u32 header_first = {HEADER_FIRST}, plate_top = {PLATE_TOP}, thickness_first = {THICKNESS},",
         f"                glass_first = {GLASS_MARKS}, wood_first = {WOOD_MARKS}, clamp_first = {CLAMP}, sheen_first = {SHEEN},",
         f"                matte_first = {MATTE}, tremor_first = {TREMOR}, bow_first = {BOW_FIRST}, mallet_first = {MALLET},",
         f"                grain_first = {GRAIN_FIRST}, drift_first = {DRIFT_FIRST}, node_total = {NODES};",

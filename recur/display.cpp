@@ -2,13 +2,12 @@
 // a bold picture named for it (the cat of Arnold and Avez, a loaf, a nautilus,
 // a silver moon, scissors, a honeycomb), carried in pieces on the grid's square
 // tiles; they slide to where the map puts the slices they stand for, as the
-// sound plays them, and come home together at the period. The knob is the
+// sound plays them, and come home together at the period. The print is the
 // map, the pendulum's weight slice, the lever rate, the comb's plucked teeth
-// and the print's outline again under the tiles chrd, the pinned and darkened
-// tiles depth, the lit stretch of the sample's tape pos and the window's
-// length, and the key turns a click an iteration. With no sample, a
-// cover says how to load one. Drawn from the controls, the notes and time
-// through recur.h, not read from the audio.
+// chrd, the pinned and darkened tiles depth, and the lit stretch of the
+// sample's tape pos and the window's length.
+// With no sample, a cover says how to load one. Drawn from the controls, the
+// notes and time through recur.h, not read from the audio.
 #include "display.h"
 #include "recur.h"
 #include <opxy/sample_overview.hpp>
@@ -18,8 +17,8 @@ namespace {
 using namespace opxy::draw;
 
 // Shades (palette entries, black to white in 16 steps).
-const u32 moving_shade = 15, held_shade = 5, part = 11, pin_shade = 14, tooth_lit = 15, tooth_dark = 6;
-const u32 ghost_shade = 9, bar_lit = 15, bar_dim = 6, bar_outside = 4;
+const u32 moving_shade = 15, held_shade = 5, pin_shade = 14, tooth_lit = 15, tooth_dark = 6;
+const u32 bar_lit = 15, bar_dim = 6, bar_outside = 4;
 // All of a frame's changes to tiles and pins, sliding ones included: the frame's churn.
 const u32 most_changes = 20;
 // A lit comb tooth stands this much longer than the rest, Q10.
@@ -85,13 +84,16 @@ void put(Frame& frame, u32 node, i32 x, i32 y, u32 shade, i32 scale = unit, Turn
     turn(frame, node, t);
 }
 
-void place_header(DisplayState& state, const Input& input, Frame& frame, const Sample& sample, u32 k, u32 period) {
+// The header: real values. pos in seconds to the window's start; step the
+// iteration and its fraction; depth the share of the slices that move.
+void place_header(DisplayState& state, const Input& input, Frame& frame, const Sample& sample, u32 from, u32 k, u32 ahead16,
+                  u32 period, u32 moving_share) {
     const char* const titles[8] = {"pos", "grid", "slice", "map", "step", "rate", "depth", "chrd"};
     char values[8][header_capacity] = {};
     if (sample.shown) {
         // Seconds into the sample, to 5 characters: 0.62s, 12.4s, 123s.
         const u32 per_ms = sample.rate / 1000 ? sample.rate / 1000 : 1;
-        const u32 hundredths = scaled(sample.span, level(input.slots[kPos]) >> 4, 4096) / (per_ms * 10);
+        const u32 hundredths = from / (per_ms * 10);
         char* at = values[kPos];
         if (hundredths < 1000) { at = put(at, hundredths / 100); *at++ = '.'; at = put(at, hundredths / 10 % 10); at = put(at, hundredths % 10); }
         else if (hundredths < 10000) { at = put(at, hundredths / 100); *at++ = '.'; at = put(at, hundredths / 10 % 10); }
@@ -101,12 +103,16 @@ void place_header(DisplayState& state, const Input& input, Frame& frame, const S
     copy(values[kGrid], header_capacity, grid_names[choice(input.slots[kGrid], grid_count)]);
     copy(values[kSlice], header_capacity, slice_names[choice(input.slots[kSlice], slice_count)]);
     copy(values[kMap], header_capacity, map_names[choice(input.slots[kMap], map_count)]);
-    // The iteration of the period: 2/3, 11/96; past 5 characters, the iteration alone.
-    char* at = put(values[kStep], k);
-    if (period < 100 || k < 10) { *at++ = '/'; at = put(at, period); }
+    // The iteration of the period, and a tenth for a part of the next:
+    // 2/3, 1.5/3, 11/96; past 5 characters, the iteration alone.
+    const u32 nearest = k * 10 + ((ahead16 * 10 + 32768) >> 16), whole = nearest / 10 % period, tenths = nearest % 10;
+    char* at = put(values[kStep], whole);
+    if (tenths) { *at++ = '.'; at = put(at, tenths); }
+    if (at - values[kStep] + 1 + (period < 10 ? 1 : period < 100 ? 2 : 3) <= 5) { *at++ = '/'; at = put(at, period); }
     *at = 0;
     copy(values[kRate], header_capacity, rate_names[choice(input.slots[kRate], rate_count)]);
-    header_amount(values[kDepth], header_capacity, input.slots[kDepth]);
+    if (moving_share <= 100) { at = put(values[kDepth], moving_share); *at = 0; }
+    else header_amount(values[kDepth], header_capacity, input.slots[kDepth]);
     at = values[kDepth];
     while (*at) ++at;
     *at++ = '%'; *at = 0;
@@ -119,8 +125,8 @@ void place_header(DisplayState& state, const Input& input, Frame& frame, const S
 // on them a piece a cell. Changes are spent from a budget each frame, in turn
 // round the tray, so a big reshuffle ripples across it; a sliding tile and its
 // pieces always move together.
-void place_tiles(DisplayState& state, Frame& frame, u32 bits, u32 map, u32 k, const u32 (&moving)[2], bool hiss,
-                 u32 hiss_bits, u32 depth, u32 chord, u32 ms, bool snap, u32& budget) {
+void place_tiles(DisplayState& state, Frame& frame, u32 bits, u32 map, u32 k, const Orbits& orbits, bool hiss,
+                 u32 hiss_bits, u32 depth, u32 ms, bool snap, u32& budget) {
     const u32 side = 1u << bits, cells = side * side;
     if (state.bits != bits) {   // a new grid: its tiles start at home
         state.bits = bits;
@@ -129,12 +135,12 @@ void place_tiles(DisplayState& state, Frame& frame, u32 bits, u32 map, u32 k, co
     }
     // Inks: a moving tile bright, a held one dark; in hiss, each tile by how
     // much of it is heard in place: the part back home, and depth's plain window.
-    const u32 key = (hiss ? map << 24 | hiss_bits << 16 | k : 1u << 31) ^ (moving[0] * 2654435761u) ^ moving[1] ^ bits ^ depth << 7;
+    const u32 key = (hiss ? map << 24 | hiss_bits << 16 | k : 1u << 31) ^ (orbits.moving[0] * 2654435761u) ^ orbits.moving[1] ^ bits ^ depth << 7;
     if (key != state.hiss_key) {
         const u32 fine = 1u << hiss_bits, per = fine >> bits;   // sub-cells a tile a side
         const Mat m = power(map, k, hiss_bits);
         for (u32 c = 0; c < cells; ++c) {
-            u32 ink = moves(moving, c) ? moving_shade : held_shade;
+            u32 ink = moves(orbits.moving, c) ? moving_shade : held_shade;
             if (hiss) {
                 u32 home = 0;
                 for (u32 y = 0; y < per; ++y)
@@ -159,7 +165,8 @@ void place_tiles(DisplayState& state, Frame& frame, u32 bits, u32 map, u32 k, co
         const u32 at = piece_cell[print_first[map] - print_first[0] + j];
         ++cost[((at >> 3) >> shift) * side + ((at & 7) >> shift)];
     }
-    const Mat forward = power(map, k, bits);
+    // A moving tile goes where k iterations take its slice; one a step ahead, k + 1.
+    const Mat forward = power(map, k, bits), beyond = power(map, (k + 1) % recur::period(map, bits), bits);
     u32 sliding = 0;
     for (u32 c = 0; c < cells; ++c) sliding += state.slides[c].ms != at_rest ? cost[c] : 0;
     budget = budget > sliding ? budget - sliding : 0;   // slides under way spend the budget first
@@ -170,9 +177,9 @@ void place_tiles(DisplayState& state, Frame& frame, u32 bits, u32 map, u32 k, co
         const u32 c = (n + state.sweep) % cells;
         Slide& s = state.slides[c];
         u32 target = c;
-        if (!hiss && moves(moving, c)) {
+        if (!hiss && moves(orbits.moving, c)) {
             u32 x = c & (side - 1), y = c >> bits;
-            send(forward, map, bits, x, y);
+            send(moves(orbits.ahead, c) ? beyond : forward, map, bits, x, y);
             target = y * side + x;
         }
         const bool was_sliding = s.ms != at_rest;
@@ -198,8 +205,9 @@ void place_tiles(DisplayState& state, Frame& frame, u32 bits, u32 map, u32 k, co
         at_x[c] = x;
         at_y[c] = y;
         gliding[c] = was_sliding || s.ms != at_rest;
-        // The square a shade under its print, so the picture reads over the grid.
-        const u32 node = (bits == 1 ? large_first : small_first) + c, ink = state.inks[c] * 5 / 8;
+        // The square under its print, so the picture reads over the grid: well
+        // under on the 8 grid, where the squares are many and the pieces small.
+        const u32 node = (bits == 1 ? large_first : small_first) + c, ink = state.inks[c] * (bits == 3 ? 3 : 5) / 8;
         if (!changed(frame, node, x, y, ink, square_scale)) continue;
         if (!snap && !gliding[c]) { if (!budget) continue; --budget; }
         put(frame, node, x, y, ink, square_scale);
@@ -212,8 +220,9 @@ void place_tiles(DisplayState& state, Frame& frame, u32 bits, u32 map, u32 k, co
         if (!used && shown(frame, node) && (snap || budget)) { hide(frame, node); if (!snap) --budget; }
     }
     // The map's print rides on the tiles, a piece in each cell of the 8 grid
-    // it crosses; the other prints go.
-    const i32 cell = (tray_side * unit) >> 3;
+    // it crosses, shrunk about its tile's centre to sit inside the tile's
+    // square, as if printed on it; the other prints go.
+    const i32 cell = (tray_side * unit) >> 3, fit = tile_fit[bits - 1];
     for (u32 m = 0; m < map_count; ++m)
         for (u32 j = 0; j < print_count[m]; ++j) {
             const u32 node = print_first[m] + j;
@@ -225,24 +234,12 @@ void place_tiles(DisplayState& state, Frame& frame, u32 bits, u32 map, u32 k, co
             const u32 t = (cy >> shift) * side + (cx >> shift);
             i32 hx, hy;
             slot_centre(bits, t, hx, hy);
-            const i32 x = at_x[t] + tray_x * unit + i32(cx) * cell + cell / 2 - hx;
-            const i32 y = at_y[t] + tray_y * unit + i32(cy) * cell + cell / 2 - hy;
+            const i32 x = at_x[t] + (((tray_x * unit + i32(cx) * cell + cell / 2 - hx) * fit) >> 10);
+            const i32 y = at_y[t] + (((tray_y * unit + i32(cy) * cell + cell / 2 - hy) * fit) >> 10);
             const u32 ink = state.inks[t];
-            if (!changed(frame, node, x, y, ink)) continue;
+            if (!changed(frame, node, x, y, ink, fit)) continue;
             if (!snap && !gliding[t]) { if (!budget) continue; --budget; }
-            put(frame, node, x, y, ink);
-        }
-    // chrd's second reader: the print's outline again under the tiles, faint,
-    // raised and shifted by the reader's interval.
-    const i32 semis = i32(chord_notes[chord][1]), apart = semis < 3 ? 3 : semis;
-    const i32 gx = (tray_x + tray_side / 2) * unit + apart * 614, gy = (tray_y + tray_side / 2) * unit - apart * 410;
-    for (u32 m = 0, node = ghost_first; m < map_count; ++m)
-        for (u32 j = 0; j < ghost_count[m]; ++j, ++node) {
-            if (m != map || chord_readers[chord] < 2) {
-                if (shown(frame, node) && (snap || budget)) { hide(frame, node); if (!snap) --budget; }
-                continue;
-            }
-            if (changed(frame, node, gx, gy, ghost_shade) && (snap || budget)) { put(frame, node, gx, gy, ghost_shade); if (!snap) --budget; }
+            put(frame, node, x, y, ink, fit);
         }
 }
 
@@ -268,16 +265,24 @@ void place_pins(Frame& frame, u32 bits, const u32 (&moving)[2], bool hiss, bool 
     }
 }
 
-// The window pos picks, frames into the sample's region: in slices it starts
-// at pos of the whole region and wraps round its end (to may fall below from);
-// in hiss it starts at pos of the room the window leaves.
+// The window pos picks, frames into the sample's region, as the engine
+// places it: from the region's start to the window ending at its end. In
+// slices a window longer than the region wraps round it (to may fall below
+// from) and pos turns it, to a slice short of a whole turn.
 void window(const Sample& sample, const Input& input, u32 bits, u32 slice, bool hiss, u32 hiss_bits, u32& from, u32& to) {
     const u32 span = sample.span ? sample.span : 1, pos = level(input.slots[kPos]) >> 4;
     // A slice's frames at 120 BPM: 1378 a 64th note.
-    const u32 length = hiss ? 1u << (2 * hiss_bits) : (1u << (2 * bits)) * slice64[slice] * 1378;
-    if (length >= span) { from = 0; to = span; return; }
-    if (hiss) { from = scaled(span - length + 1, pos, 4096); to = from + length; return; }
-    from = scaled(span, pos, 4096);
+    const u32 one = hiss ? 1 : slice64[slice] * 1378;
+    const u32 length = hiss ? 1u << (2 * hiss_bits) : (1u << (2 * bits)) * one;
+    if (hiss) {
+        if (length >= span) { from = 0; to = span; return; }
+        from = scaled(span - length + 1, pos, 4096);
+        to = from + length;
+        return;
+    }
+    const u32 room = span > length ? span - length : span > one ? span - one : 0;
+    from = scaled(room + 1, pos, 4096);
+    if (length >= span) { to = from; return; }   // the whole region, turned
     to = from + length < span ? from + length : from + length - span;
 }
 
@@ -322,12 +327,9 @@ void place_tape(const Input& input, Frame& frame, const SampleOverview& overview
     }
 }
 
-// The knob, the pendulum, the lever, the comb, the key and the caliper.
+// The pendulum, the lever, the comb and the caliper.
 void place_works(DisplayState& state, const Input& input, Frame& frame, const Sample& sample, u32 bits, bool hiss,
                  u32 hiss_bits, bool held, u32 ms, bool snap) {
-    const u32 map = choice(input.slots[kMap], map_count);
-    place(frame, pointer_node, knob_x * unit, knob_y * unit, unit, 14, stroke);
-    turn(frame, pointer_node, rotation(map_angles[map]));
     // The pendulum: its weight up the rod by slice; while a note plays it
     // swings a side each slice, less for slices too quick to follow.
     const u32 slice = choice(input.slots[kSlice], slice_count);
@@ -356,10 +358,6 @@ void place_works(DisplayState& state, const Input& input, Frame& frame, const Sa
         place(frame, teeth_first + t, (comb_x + i32(t) * comb_pitch) * unit, comb_y * unit, lit ? plucked : unit,
               lit ? tooth_lit : tooth_dark, lit ? fill_and_stroke : stroke);
     }
-    for (u32 pose = 0; pose < key_poses; ++pose) {
-        if (pose == state.turns % key_poses) place(frame, key_first + pose, key_x * unit, key_y * unit, unit, held ? 14 : part, stroke);
-        else hide(frame, key_first + pose);
-    }
     // The caliper: the window pos picks, on the tape.
     const u32 frames = sample.frames;
     u32 from, to;
@@ -380,8 +378,6 @@ inline void display_reset(DisplayState& state) {
     state.fresh = 1;
     state.held_ms = 0;
     state.bits = 0;
-    state.iteration = 0;
-    state.turns = 0;
     state.hiss_key = 0;
     state.swing = 0;
     state.sweep = 0;
@@ -414,12 +410,17 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         if (!hiss) sixty_fourths = sixty_fourths / slice64[slice] * slice64[slice];
         moved = sixty_fourths / rate;
     }
-    const u32 start = hiss ? step_position(input.slots[kStep], period) >> iteration_bits : (level(input.slots[kStep]) * period) >> 16;
+    const u32 position = step_position(input.slots[kStep], period) >> 4;   // Q16 iterations
+    const u32 start = hiss ? step_position(input.slots[kStep], period) >> iteration_bits : position >> 16;
+    const u32 ahead16 = hiss ? 0 : position & 0xffff;
     const u32 k = (start + moved) % period;
-    if (k != state.iteration && held && !snap) ++state.turns;
-    state.iteration = k;
 
-    place_header(state, input, frame, sample, k, period);
+    Orbits orbits = {{~0u, ~0u}, {0, 0}, 0};
+    if (!hiss) rank_orbits(map, bits, depth16(input.slots[kDepth]), ahead16, orbits);
+    u32 from, to;
+    window(sample, input, bits, slice, hiss, hiss_bits, from, to);
+    const u32 cells = 1u << (2 * bits);
+    place_header(state, input, frame, sample, from, k, ahead16, period, hiss ? ~0u : (orbits.moving_cells * 100 + cells / 2) / cells);
     // With no sample, a cover over everything but the header says how to load one.
     if (!overview.assigned) {
         place(frame, cover_stage, 0, 0, unit, 0, fill_and_stroke);
@@ -431,12 +432,9 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     }
     hide(frame, cover_stage);
     place(frame, cover_hint, 0, 0, unit, 0, fill_and_stroke);
-    u32 moving[2] = {~0u, ~0u};
-    if (!hiss) moving_cells(map, bits, depth16(input.slots[kDepth]), moving);
     u32 budget = most_changes;
-    place_tiles(state, frame, bits, map, k, moving, hiss, hiss_bits, depth16(input.slots[kDepth]), choice(input.slots[kChrd], chord_count),
-                ms, snap, budget);
-    place_pins(frame, bits, moving, hiss, snap, budget);
+    place_tiles(state, frame, bits, map, k, orbits, hiss, hiss_bits, depth16(input.slots[kDepth]), ms, snap, budget);
+    place_pins(frame, bits, orbits.moving, hiss, snap, budget);
     place_tape(input, frame, overview, sample, bits, slice, hiss, hiss_bits, snap, budget > 2 ? budget : 2);   // what's left, and a little
     place_works(state, input, frame, sample, bits, hiss, hiss_bits, held, ms, snap);
     state.fresh = 0;

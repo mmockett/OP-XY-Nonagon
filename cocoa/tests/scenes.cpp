@@ -147,10 +147,10 @@ unsigned phrase(Note* notes, const double (&n)[N][3]) {
 int main(int argc, char** argv) {
     const char* folder = argc > 1 ? argv[1] : nullptr;
     // The presets (definition.json).
-    const double keys[8] = {0.32, 0.0, 0.7, 0.1667, 0.65, 0.6, 0.15, 1.0};
-    const double bells[8] = {0.22, 0.0, 0.8, 0.5, 0.25, 0.8, 0.05, 1.0};
+    const double keys[8] = {0.32, 0.0, 0.7, 0.1667, 0.65, 0.6, 0.15, 0.6};
+    const double bells[8] = {0.22, 0.0, 0.8, 0.5, 0.25, 0.8, 0.05, 0.8};
     const double tin[8] = {0.45, 0.62, 0.55, 0.8333, 0.45, 0.85, 0.3, 0.3};
-    const double bass[8] = {0.25, 0.0, 0.75, 0.1667, 0.8, 0.35, 0.0, 1.0};
+    const double bass[8] = {0.25, 0.0, 0.75, 0.1667, 0.8, 0.35, 0.0, 0.3};
     const double chocolate[8] = {0.87, 0.55, 0.2, 0.1667, 0.5, 0.6, 0.35, 1.0};
     const double fizz[8] = {0.7, 0.85, 0.35, 0.5, 0.4, 0.9, 1.0, 0.5};
     const double spoonful[8] = {0.7, 0.0, 0.45, 0.1667, 0.6, 0.6, 0.25, 0.0};

@@ -5,14 +5,15 @@ and commit all three.
 
 The whole screen is the Euler's Disk toy: a heavy chrome-steel disk spinning
 on its concave mirror, seen from 16 degrees above in mild perspective (the
-same projection as display.cpp's), engraved in greys and fine line. The base
-is a knurled ring round the mirror, its side hatched. The note's disk is the
-four reshaping outlines: its face's rim, its edge, its reflection and what is
-engraved on its face. Everything else that moves is nodes: the motion lines
-of the contact path, slip's scuffs, the eccentric weight, the contact
-point's glint, the air squeezed from under the low edge, the ring's
-ripples, wobble's ghost of the rim, each base's own marks and the companion
-disks many adds.
+same projection as display.cpp's), drawn in a few greys and line weights:
+the disk's rim brightest and boldest, its edge, face and the base a step
+down, the effects a step further. The base is a plain ring with its side.
+The note's disk is the four reshaping outlines: its face's rim, its edge,
+its reflection and what is engraved on its face. Everything else that moves
+is nodes: the motion lines of the contact path, the eccentric weight, the
+contact point's glint, the air squeezed from under the low edge, the ring's
+ripples, wobble's ghost of the rim, wood's grain and stone's specks, and
+the companion disks many adds.
 
 Lines are closed ribbons or rings; nothing large is filled."""
 import math
@@ -32,7 +33,7 @@ G = lambda i: GREYS[max(0, min(15, round(i)))]
 # base fits below the header with its front edge in view.
 CX, CY, DIST = 240, 136, 1400
 SIN_E, COS_E = 4516 / 16384, 15749 / 16384      # display.h's Q14 values
-BASE_R, MIRROR_R, BASE_H = 210, 196, 8
+BASE_R, BASE_H = 210, 8
 REF_R = 77                                      # the motion lines as authored: size 1:8's 70 px, and 7
 RIPPLE_R, RIPPLE_STEP = 86, 100 / 7            # the ring's ripples as authored: 16 px out from size 1:8's rim to 186
 COMPANION_R, COMPANION_W = 50, 15               # a companion disk as authored
@@ -42,16 +43,14 @@ MIRRORED = 0.4                                  # the concave mirror's image, fl
 DISK, EDGE, REFLECTION, FACE = 0, 1, 2, 3
 HEADER = 4
 TRAIL, TRAILS = 12, 24
-SCUFF, SCUFFS = 36, 8
-WEIGHT, GLINT = 44, 45
-MIRROR_MARK, MIRROR_MARKS = 46, 6
-GRAIN, GRAINS = 52, 5
-SPECK, SPECKS = 57, 10
-COMPANION = 67                                  # three disks: face, edge, reflection, glint
-AIR, AIRS = 79, 5
-RIPPLE, RIPPLES = 84, 8                         # the ring's ripples across the mirror
-GHOST, GHOSTS = 92, 12                          # wobble's ghost of the rim, in dashes
-NODES = 104
+WEIGHT, GLINT = 36, 37
+GRAIN, GRAINS = 38, 5
+SPECK, SPECKS = 43, 6                           # four specks and two veins
+COMPANION = 49                                  # three disks: face, edge, reflection, glint
+AIR, AIRS = 61, 5
+RIPPLE, RIPPLES = 66, 8                         # the ring's ripples across the mirror
+GHOST, GHOSTS = 74, 12                          # wobble's ghost of the rim, in dashes
+NODES = 86
 POINTS = 64
 
 
@@ -133,48 +132,30 @@ for i, (x, y, ink, size) in enumerate(texts):
     out.append(f'<text id="{ID}_text_{i}" transform="matrix(1 0 0 1 {num(x)} {num(y)})" fill="{ink}" {FONT} '
                f'font-size="{size}px">-</text>')
 
-# ---- The base: a knurled ring round a concave mirror. ----
-# Its side: the outer rim's front half and the same half lower, closed.
+# ---- The base: a ring round a concave mirror, its top and its side. ----
 front = [math.pi * i / 63 for i in range(64)]
 top = [project(BASE_R * math.cos(-a), BASE_R * math.sin(-a), 0) for a in front]
 bottom = [project(BASE_R * math.cos(-a), BASE_R * math.sin(-a), -BASE_H) for a in front]
 out.append(path(outline(top + bottom[::-1], 2), "none", G(9), 0.8))
-# The side's knurling: upright strokes evenly across, about 26 px apart, so
-# they stay apart at the screen's own size.
-for i in range(2, 47, 3):
-    a = math.acos(1 - 2 * i / 48)
-    x0, y0 = project(BASE_R * math.cos(-a), BASE_R * math.sin(-a), -1.5)
-    x1, y1 = project(BASE_R * math.cos(-a), BASE_R * math.sin(-a), -BASE_H + 1.5)
-    out.append(path(outline(ribbon([(x0, y0), (x1, y1)], 0.4), 2), "none", G(7), 0.5))
-# The ring's top and the mirror's edge, 4 px apart at the front.
-out.append(path(outline(ring(BASE_R, 0, 128), 2), "none", G(12), 0.8))
-out.append(path(outline(ring(MIRROR_R, 0, 128), 2), "none", G(10), 0.7))
+out.append(path(outline(ring(BASE_R, 0, 128), 2), "none", G(12), 1.0))
 
-# ---- Each base's own marks, in the front of the base's mirror ring. ----
-# Mirror: six streaks of reflected light, front left and front right, 5 px apart.
-for i in range(6):
-    side = -1 if i < 3 else 1
-    r0, at = 136 + (i % 3) * 20, (226 if side < 0 else 300) + (i % 3) * 5
-    length = [22, 32, 18][i % 3]
-    start = polar_point(r0, at)
-    a = math.radians(-28 if side < 0 else -152)
-    pts = [(start[0] + t * math.cos(a), start[1] + t * math.sin(a) * 0.35) for t in (0, length / 2, length)]
-    out.append(path(outline(ribbon(pts, 0.6), 2), "none", G(8), STROKE, MIRROR_MARK + i))
+# ---- Each base's own marks, in the front of the base's mirror ring (glass
+# has none: it shows the disk's reflection). ----
 # Wood: a flat-sawn top, its grain running across the base in front of the
 # disk, long wavy lines that stop at the ring.
 for i, y in enumerate((-104, -122, -140, -158, -176)):
     span = math.sqrt(max(0.0, 188 ** 2 - y * y))
     xs = [-span + 2 * span * k / 23 for k in range(24)]
     pts = [project(x, y + 3.5 * math.sin(x / 23 + i * 1.7) + 1.5 * math.sin(x / 9 + i), 0) for x in xs]
-    out.append(path(outline(ribbon(pts, 0.6), 2), "none", G(6), STROKE, GRAIN + i))
-# Stone: specks and two fine veins.
-specks = [(150, 204), (172, 222), (186, 247), (158, 262), (178, 284), (150, 306), (184, 322), (166, 340)]
+    out.append(path(outline(ribbon(pts, 0.6), 2), "none", G(9), STROKE, GRAIN + i))
+# Stone: four specks and two veins.
+specks = [(172, 222), (158, 262), (150, 306), (166, 340)]
 for i, (r, at) in enumerate(specks):
     px, py = polar_point(r, at)
-    out.append(circle(px, py, 2, G(8), G(8), STROKE, SPECK + i))
+    out.append(circle(px, py, 2.2, G(9), G(9), STROKE, SPECK + i))
 for i, (r, a0, a1) in enumerate(((170, 214, 268), (160, 284, 336))):
     pts = [polar_point(r + 5 * math.sin(k * 1.3), a0 + (a1 - a0) * k / 15) for k in range(16)]
-    out.append(path(outline(ribbon(pts, 0.6), 2), "none", G(6), STROKE, SPECK + 8 + i))
+    out.append(path(outline(ribbon(pts, 0.6), 2), "none", G(9), STROKE, SPECK + 4 + i))
 
 # ---- The note's disk: four reshaping outlines, nodes 0-3, placed at the
 # mirror's centre at twice their size. Authored flat at size 1:8.
@@ -189,18 +170,12 @@ out.append(path(outline(low[32:] + edge[32:][::-1]), "none", G(11), STROKE, EDGE
 out.append(path(outline(disk_points(R, W)), "none", G(15), STROKE, DISK, (CX, CY)))
 out.append(path(outline(disk_points(R * 0.6, W + 0.01)), "none", G(10), STROKE, FACE, (CX, CY)))
 
-# The contact path's 24 motion lines and 8 scuffs, about the mirror's centre
-# for size 1:8 (display.cpp scales them with the disk; the disk hides the back).
+# The contact path's 24 motion lines, about the mirror's centre for size 1:8
+# (display.cpp scales them with the disk; the disk hides the back).
 for i in range(TRAILS):
     a0, a1 = math.radians(15 * i + 1.5), math.radians(15 * i + 13.5)
     pts = [(x - CX, y - CY) for x, y in arc(REF_R, a0, a1, 0, 5)]
-    out.append(path(outline(ribbon(pts, 0.5), 3), "none", G(2), STROKE, TRAIL + i, (CX, CY)))
-for i in range(SCUFFS):
-    a = 196 + 19 * i + (i * 7) % 5
-    p0 = polar_point(REF_R - 6, a)
-    p1 = polar_point(REF_R + 10, a + 5)
-    out.append(path(outline(ribbon([(p0[0] - CX, p0[1] - CY), (p1[0] - CX, p1[1] - CY)], 0.8), 3), "none", G(9),
-                    STROKE, SCUFF + i, (CX, CY)))
+    out.append(path(outline(ribbon(pts, 0.5), 3), "none", G(9), STROKE, TRAIL + i, (CX, CY)))
 # The eccentric weight: a lead balance weight clamped to the rim, a tab 12
 # by 9.
 tab = [(-6, -4.5), (0, -5), (6, -4.5), (6, 4.5), (0, 5), (-6, 4.5)]

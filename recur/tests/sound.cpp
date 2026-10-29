@@ -21,6 +21,8 @@ void check(bool ok, const char* what) {
 i32 at(double value) { return i32(value * 2147483647.0); }
 // The middle of choice n of an enum with count choices.
 i32 choice_of(u32 n, u32 count) { return at((n + 0.5) / count); }
+// step at iteration k of a period: step runs from iteration 0 to the last.
+i32 step_at(u32 k, u32 period) { return at((k + 0.005) / (period - 1)); }
 // Enum choices by name.
 enum { grid2, grid4, grid8 };
 enum { hiss, s64, s32, s16, s8, s4 };
@@ -159,30 +161,40 @@ int main() {
                 }
             }
     }
-    {   // depth: none move at 0, every cell at 1; between, whole orbits stay, so
-        // each iteration is still a permutation.
+    {   // depth: none move at 0, every cell at 1, and between about depth's
+        // share of the cells; whole orbits stay, so each iteration is still a
+        // permutation. step's fraction puts a share of the moving orbits an
+        // iteration ahead, still a permutation.
+        bool still = true, every = true, permutes = true, shares = true, none_ahead = true;
         for (u32 map = 0; map < recur::map_count; ++map)
             for (u32 bits = 1; bits <= 3; ++bits) {
                 const u32 n = 1u << bits, cells = n * n, period = recur::period(map, bits);
-                u32 none[2], all[2], some[2];
-                recur::moving_cells(map, bits, 0, none);
-                recur::moving_cells(map, bits, 65536, all);
-                recur::moving_cells(map, bits, 32768, some);
-                bool still = true, every = true, permutes = true;
-                for (u32 c = 0; c < cells; ++c) { still = still && !recur::moves(none, c); every = every && recur::moves(all, c); }
+                recur::Orbits none, all, some;
+                recur::rank_orbits(map, bits, 0, 0, none);
+                recur::rank_orbits(map, bits, 65536, 0, all);
+                recur::rank_orbits(map, bits, 32768, 32768, some);
+                for (u32 c = 0; c < cells; ++c) {
+                    still = still && !recur::moves(none.moving, c);
+                    every = every && recur::moves(all.moving, c);
+                    none_ahead = none_ahead && !recur::moves(all.ahead, c);
+                }
+                // At 8 a side the orbits are small enough for the share to land within a sixth.
+                if (bits == 3) shares = shares && some.moving_cells * 6 >= cells * 2 && some.moving_cells * 6 <= cells * 4;
                 for (u32 k = 0; k < period; ++k) {
-                    const recur::Mat m = recur::power(map, k, bits);
+                    const recur::Mat m = recur::power(map, k, bits), m1 = recur::power(map, (k + 1) % period, bits);
                     std::vector<bool> seen(cells, false);
                     for (u32 c = 0; c < cells; ++c) {
                         u32 x = c % n, y = c / n;
-                        if (recur::moves(some, c)) recur::send(m, map, bits, x, y);
+                        if (recur::moves(some.moving, c)) recur::send(recur::moves(some.ahead, c) ? m1 : m, map, bits, x, y);
                         permutes = permutes && !seen[y * n + x];
                         seen[y * n + x] = true;
                     }
                 }
-                check(still && every, "depth 0 holds every cell and depth 1 moves them all");
-                check(permutes, "at any depth each iteration is a permutation");
             }
+        check(still && every, "depth 0 holds every cell and depth 1 moves them all");
+        check(shares, "depth at half moves about half the cells");
+        check(none_ahead, "a whole step puts no orbit ahead");
+        check(permutes, "at any depth and step each iteration is a permutation");
     }
 
     // --- The slice path ---------------------------------------------------------
@@ -202,7 +214,7 @@ int main() {
             r.set(recur::kRate, off, recur::rate_count);
             r.set(recur::kMap, map, recur::map_count);
             r.parameters[recur::kDepth] = at(1);
-            r.parameters[recur::kStep] = at(1.5 / recur::period(map, 2));   // iteration 1
+            r.parameters[recur::kStep] = step_at(1, recur::period(map, 2));   // iteration 1
             r.run(pass / opxy::block_frames + 1);
             const recur::Mat g = recur::power(map, recur::period(map, 2) - 1, 2);
             bool exact = true, moved = false;
@@ -297,7 +309,7 @@ int main() {
             r.set(recur::kRate, off, recur::rate_count);
             r.set(recur::kMap, map, recur::map_count);
             r.parameters[recur::kDepth] = at(1);
-            r.parameters[recur::kStep] = at((k + 0.5) / period);
+            r.parameters[recur::kStep] = step_at(k, period);
             r.run(4096 / opxy::block_frames);
             const recur::Mat g = recur::power(map, (period - k) % period, bits);
             bool same = true;
@@ -339,7 +351,7 @@ int main() {
             r.set(recur::kSlice, hiss, recur::slice_count);
             r.set(recur::kRate, off, recur::rate_count);
             r.parameters[recur::kDepth] = at(1);
-            r.parameters[recur::kStep] = at((k + 0.5) / period);
+            r.parameters[recur::kStep] = step_at(k, period);
             r.run(2 * size / opxy::block_frames);
             return std::vector<i32>(r.heard.begin() + size, r.heard.begin() + 2 * size);
         };

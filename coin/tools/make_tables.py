@@ -16,7 +16,7 @@ DISKS = {
     "steel": ([1.0, 1.732, 2.330], [0.9, 0.6, 0.4], [1.0, 0.55, 0.40]),
     "brass": ([1.0, 1.727, 2.318], [0.55, 0.32, 0.2], [1.0, 0.40, 0.22]),
     "glass": ([1.0, 1.746, 2.355], [0.8, 0.7, 0.6], [0.85, 0.70, 0.60]),
-    "wood":  ([1.0, 1.618, 2.205], [0.09, 0.06, 0.04], [2.0, 0.92, 0.50]),
+    "wood":  ([1.0, 1.618, 2.205], [0.09, 0.06, 0.04], [1.75, 0.81, 0.44]),
 }
 # A real disk is never quite round, so each of its modes is a pair a little
 # apart, and the pair beats. Each material's split (Hz) at the ring; the

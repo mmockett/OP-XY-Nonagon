@@ -24,6 +24,7 @@ struct Lines {
 struct Voice {
     opxy::SampleView sample;
     u32 step, frame, fraction;   // the bed: frames per output sample (Q16) and its read point
+    i32 gust; u32 gust_next;     // without a sample, the bed's whisper: its gust's strength (Q15), and the next (target << 16 | blocks to go)
     u32 noise, random;           // xorshift: breath, and this note's own choices
     u32 slot;                    // 1 + the pool slot it holds, or 0
     u32 cycle;                   // the census cycle it last rendered in

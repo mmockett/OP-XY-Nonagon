@@ -47,7 +47,7 @@
     {
       "id": "time",
       "label": "Time",
-      "default": 0.22,
+      "default": 0.39,
       "mapping": {
         "kind": "linear",
         "minimum": 0,
@@ -59,7 +59,7 @@
       "id": "dispersion",
       "label": "Disperse",
       "control": 0,
-      "default": 0.2,
+      "default": 0.15,
       "mapping": {
         "kind": "linear",
         "minimum": 0,
@@ -177,17 +177,17 @@
       "energy": 0.5,
       "masses": 0.3571,
       "springs": 0,
-      "time": 0.22,
-      "dispersion": 0.2,
+      "time": 0.39,
+      "dispersion": 0.15,
       "mode": 0.125,
       "damping": 0,
       "seed": 0.0078
     },
     "Organ": {
-      "energy": 0.2,
+      "energy": 0.045,
       "masses": 0.6429,
       "springs": 0,
-      "time": 0.37,
+      "time": 0.66,
       "dispersion": 0,
       "mode": 0.125,
       "damping": 0,
@@ -198,17 +198,17 @@
       "masses": 0.9286,
       "springs": 0,
       "time": 0.0,
-      "dispersion": 0.3,
+      "dispersion": 0.1,
       "mode": 0.125,
       "damping": 0,
       "seed": 0.0078
     },
     "Clarinet": {
-      "energy": 0.42,
+      "energy": 0.37,
       "masses": 0.3571,
       "springs": 1,
-      "time": 0.42,
-      "dispersion": 0.1,
+      "time": 0.75,
+      "dispersion": 0.06,
       "mode": 0.125,
       "damping": 0,
       "seed": 0.0078
@@ -217,7 +217,7 @@
       "energy": 0.6,
       "masses": 0.0714,
       "springs": 0.3,
-      "time": 0.12,
+      "time": 0.21,
       "dispersion": 1,
       "mode": 0.375,
       "damping": 0.55,
@@ -228,7 +228,7 @@
       "masses": 0.2143,
       "springs": 0.15,
       "time": 0.0,
-      "dispersion": 0.15,
+      "dispersion": 0.13,
       "mode": 0.125,
       "damping": 0.5,
       "seed": 0.0078
@@ -237,8 +237,8 @@
       "energy": 1.0,
       "masses": 0.6429,
       "springs": 0.25,
-      "time": 0.12,
-      "dispersion": 0.3,
+      "time": 0.21,
+      "dispersion": 0.08,
       "mode": 0.125,
       "damping": 0,
       "seed": 0.1172
@@ -248,24 +248,24 @@
       "masses": 0.0714,
       "springs": 0,
       "time": 0.0,
-      "dispersion": 0.2,
+      "dispersion": 0.23,
       "mode": 0.125,
       "damping": 0.2,
       "seed": 0.0078
     }
   },
   "resources": {
-    "voiceBytes": 552,
+    "voiceBytes": 556,
     "voiceAlignment": 4,
     "voiceCapacity": 8,
-    "sharedBytes": 0,
+    "sharedBytes": 140,
     "outputPeakQ31": 1073741824,
     "display": {
       "stateBytes": 1060,
       "stateAlignment": 4,
       "paths": 4,
       "points": 64,
-      "nodes": 147,
+      "nodes": 115,
       "texts": 16,
       "palette": 16
     }

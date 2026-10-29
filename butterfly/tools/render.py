@@ -73,8 +73,8 @@ def svg(data, width, height):
             f'<rect width="480" height="220" fill="#000"/>{body}</svg>')
 
 
-def screenshot(html, png, width, height, chrome=CHROME):
-    """Rasterises an HTML file with headless Chrome."""
+def screenshot(html, png, width, height, chrome=CHROME, scale=1):
+    """Rasterises an HTML file with headless Chrome, `scale` device pixels a CSS pixel."""
     subprocess.run([chrome, '--headless=new', '--disable-gpu', '--hide-scrollbars', '--allow-file-access-from-files',
-                    '--virtual-time-budget=3000', '--force-device-scale-factor=1', f'--window-size={width},{height}',
+                    '--virtual-time-budget=3000', f'--force-device-scale-factor={scale}', f'--window-size={width},{height}',
                     f'--screenshot={png}', f'file://{html}'], check=True, capture_output=True)

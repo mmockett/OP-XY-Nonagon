@@ -1,9 +1,9 @@
 #include "display.h"
 #include "plate.h"
 
-// Coin's screen: the Euler's Disk toy, the whole of it, engraved in greys and
-// fine line (tools/make_panel.py): a heavy chrome-steel disk spinning on its
-// concave mirror, seen low, at 16 degrees, with its reflection.
+// Coin's screen: the Euler's Disk toy, the whole of it, in a few greys and
+// line weights (tools/make_panel.py): a heavy chrome-steel disk spinning on
+// its concave mirror, seen low, at 16 degrees, with its reflection.
 //
 // The note's first disk is four reshaping outlines, projected here each
 // frame: its face's rim, its edge, its reflection (the mirror flattens it) and
@@ -19,14 +19,13 @@
 //
 // Every control acts on the toy. Spin sets the lean the disk is thrown at;
 // size its radius and thickness, a coin to a heavy disk; disk its metal (or
-// glass, or wood) and what is engraved on it; base the base's own marks, and
-// the reflection shows only on the mirror; wobble the eccentric weight on the
-// rim, a dashed ghost of the rim rocked further over, the rattle and scuffs
-// on the path; air the streaks of air squeezed from under the low edge; ring
-// the ripples across the glass, more, wider and brighter as it rises; many
-// the companion disks spinning beside it. Between
-// notes, turning a control stands the disks up at their throw, still, to show
-// it; after a note they lie flat until the next.
+// glass, or wood) and what is engraved on it; base the reflection (glass),
+// grain (wood) or specks (stone); wobble the eccentric weight on the rim, a
+// dashed ghost of the rim hopped and rocked over, and the rattle; air the
+// streaks of air squeezed from under the low edge; ring the ripples across
+// the glass, more and wider as it rises; many the companion disks spinning
+// beside it. Between notes, turning a control stands the disks up at their
+// throw, still, to show it; after a note they lie flat until the next.
 //
 // The screen cannot hear the voices: it keeps its own disks' lives, stepped
 // with the voices' own code (spin.h), for each 64 samples of time since the
@@ -34,7 +33,7 @@
 namespace coin {
 namespace screen {
 using namespace opxy::draw;
-const u32 budget = 6;           // re-scaled and swapped nodes a frame, at most
+const u32 budget = 4;           // the base's marks swapped a frame, at most
 const i32 fade_step = 5190000;  // spin at hold with no note held: the disks settle in 0.3 s
 // Each size's radius (px) and half its thickness (Q10 of the radius): a thin
 // coin to the toy's own heavy disk, a third of its radius thick, and heavier.
@@ -43,9 +42,10 @@ const i32 half_of[spin::sizes] = {82, 113, 154, 174, 195};
 // The companions: each one's way round from the note's disk (tenths of a
 // degree) and its size against it (Q10).
 const i32 companion_at[3] = {1750, 50, 2330}, companion_size[3] = {451, 420, 389};
-// Shades: each disk material's rim, edge, face and reflection.
-const u32 rim_shade[4] = {15, 13, 11, 12}, edge_shade[4] = {11, 9, 7, 8}, face_shade[4] = {10, 11, 8, 9},
-          reflection_shade[4] = {8, 7, 6, 7};
+// Greys, few and used alike: the disk's rim brightest (and boldest, drawn at
+// twice its size), its edge, face, the weight and the companions a step down,
+// the effects a step further, the reflection last.
+const u32 brightest = 15, second = 12, third = 9, faint = 6;
 
 inline i32 magnitude(i32 v) { return v < 0 ? -v : v; }
 inline u32 root(u32 v) {
@@ -167,10 +167,23 @@ inline void caption_spin(char* out, i32 spin) {
     if (spin::held(spin)) copy(out, header_capacity, "hold");
     else caption_seconds(out, spin::settle_hundredths(spin));
 }
-// Air as the rate's exponent: -.33 (rolling friction) to -.17 (viscous air).
-inline void caption_air(char* out, i32 air) {
-    const u32 h = (static_cast<u32>(spin::exponent(air)) * 100u + 32768u) >> 16;
-    const char t[5] = {'-', '.', static_cast<char>('0' + h / 10), static_cast<char>('0' + h % 10), 0};
+// Air as the rush: how long the whirr's last octave onto the note takes,
+// as 0.18s or 25ms; with air it hangs low longer and rushes sooner. At hold
+// there is no rush.
+inline void caption_air(char* out, const i32* slots) {
+    if (spin::held(slots[SPIN])) { copy(out, header_capacity, "-"); return; }
+    const i32 n = spin::exponent(slots[AIR]), cut = spin::top(slots[SIZE]);
+    const i32 from = spin::life_at_cut(cut - spin::octave, n), to = spin::life_at_cut(cut, n);
+    const u32 ms = spin::settle_hundredths(slots[SPIN]) * 10u * (static_cast<u32>(from - to) >> 14) >> 16;
+    if (ms >= 100) { caption_seconds(out, (ms + 5) / 10); return; }
+    char t[5];
+    u32 at = 0;
+    if (ms < 1) { t[at++] = '<'; t[at++] = '1'; }
+    else {
+        if (ms >= 10) t[at++] = static_cast<char>('0' + ms / 10);
+        t[at++] = static_cast<char>('0' + ms % 10);
+    }
+    t[at++] = 'm'; t[at++] = 's'; t[at] = 0;
     copy(out, header_capacity, t);
 }
 // The throw's lean, tenths of a degree: 4 degrees for the shortest spin to 28
@@ -241,8 +254,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     copy(values[DISK], header_capacity, disks[material]);
     copy(values[BASE], header_capacity, bases[ground]);
     header_amount(values[WOBBLE], header_capacity, slots[WOBBLE]);
-    caption_air(values[AIR], slots[AIR]);
-    caption_seconds(values[RING], spin::after_hundredths(slots[RING]));
+    caption_air(values[AIR], slots);
+    caption_seconds(values[RING], spin::after_hundredths(slots[RING], material));
     const char many[2] = {static_cast<char>('0' + spin::count(slots[MANY])), 0};
     copy(values[MANY], header_capacity, many);
     const opxy::u8 pages[2][4] = {{0, 1, 2, 3}, {4, 5, 6, 7}};
@@ -390,17 +403,17 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
                                   : lay(pose, plate::face_angle[material][i] + face, pose.half,
                                         pose.radius * plate::face_radius[material][i] >> 10, false);
     outline(frame, node::face, points, state.key, fresh);
-    put(frame, node::disk, cx, cy, 2 * unit, rim_shade[material], stroke);
-    put(frame, node::edge, cx, cy, 2 * unit, edge_shade[material], stroke);
-    put(frame, node::face, cx, cy, 2 * unit, face_shade[material], stroke);
-    if (ground == 0) put(frame, node::reflection, cx, cy, 2 * unit, reflection_shade[material], stroke);
+    put(frame, node::disk, cx, cy, 2 * unit, brightest, stroke);
+    put(frame, node::edge, cx, cy, 2 * unit, second, stroke);
+    put(frame, node::face, cx, cy, 2 * unit, second, stroke);
+    if (ground == 0) put(frame, node::reflection, cx, cy, 2 * unit, faint, stroke);
     else conceal(frame, node::reflection);
 
     // The contact point (hidden when the disk is in front of it), and the
     // eccentric weight on the face.
     if (lead.rolling && pose.st < 300) {
         const Point p = lay(pose, 0, -pose.half, pose.radius, false);
-        nudge(frame, node::glint, cx + p.x, cy + p.y, 14, stroke);
+        nudge(frame, node::glint, cx + p.x, cy + p.y, brightest, stroke);
     } else {
         conceal(frame, node::glint);
     }
@@ -412,14 +425,14 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     if (wobble > 1300 && facing > 200) {
         const Point p = lay(pose, at, 0, pose.radius, false);
         const i32 heavy = 717 + static_cast<i32>(wobble * 1331u >> 16);   // 0.7 to 2, Q10
-        put(frame, node::weight, cx + p.x, cy + p.y, heavy, 14, stroke);
+        put(frame, node::weight, cx + p.x, cy + p.y, heavy, second, stroke);
     } else {
         conceal(frame, node::weight);
     }
     // Wobble's rattle: a dashed ghost of the face's rim, where the eccentric
     // weight throws it, hopped up and rocked further over: none at 0, 6 px
-    // and 5 degrees at 50, 12 px and 10 degrees at 100, brighter as it rises. It rattles with the disk, a third of its
-    // dashes a frame; gone when the disk lies flat.
+    // and 5 degrees at 50, 12 px and 10 degrees at 100. It rattles with the
+    // disk, a third of its dashes a frame; gone when the disk lies flat.
     const bool rocking = wobble > 1300 && (lead.rolling || state.poised);
     if (rocking) {
         Pose ghost = pose;
@@ -427,7 +440,6 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         ghost.sa = sine(lead.tilt + swing);
         ghost.ca = sine(lead.tilt + swing + 900);
         ghost.middle = (ghost.half * ghost.ca >> 10) + (ghost.radius * ghost.sa >> 10) + hop + jitter;
-        const u32 grey = 8 + (wobble * 6u >> 16);
         for (u32 j = 0; j < node::ghosts; ++j) {
             if (!fresh && (j + state.frames) % 3) continue;
             const i32 phi = static_cast<i32>(j) * 300;
@@ -437,7 +449,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             const i32 length = static_cast<i32>(root(static_cast<u32>(dx * dx + dy * dy))) + 1;
             const Turn along = {dx * unit / length, dy * unit / length};
             put_turned(frame, node::ghost + j, cx + ((p0.x + p1.x) >> 1), cy + ((p0.y + p1.y) >> 1),
-                       clamp(4 * length / scene::dash, 64, 2 * unit), along, grey);
+                       clamp(4 * length / scene::dash, 64, 2 * unit), along, third);
         }
     } else {
         for (u32 j = 0; j < node::ghosts; ++j)
@@ -445,52 +457,29 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     }
 
     // The contact path, as motion lines 7 px outside the rim, its back hidden
-    // by the disk: lit behind the contact point, or a blur past 3 turns a
-    // second; the scuffs the rattle leaves, more as wobble rises, brightening
-    // as the contact passes.
-    // Re-scaling for a new size and swapping the base's marks share a budget.
-    u32 spare = budget;
+    // by the disk: three lit behind the contact point as it rolls, or a blur
+    // past 3 turns a second; none when it is still.
     const i32 scale = (radius + 7 * unit) / scene::reference;
     const u32 head = static_cast<u32>(way / 150);
     const bool blur = laps > 3u * 4194304u;   // 3 turns a second
     for (u32 j = 0; j < node::trails; ++j) {
-        if (j >= 1 && j <= 10) { conceal(frame, node::trail + j); continue; }   // behind the disk
-        u32 grey = 2;
-        if (lead.rolling && !reduced) {
-            const u32 behind = (head + node::trails - j) % node::trails;
-            grey = blur ? 5 : behind == 0 ? 13 : behind == 1 ? 9 : behind == 2 ? 6 : behind == 3 ? 4 : 2;
-        }
         const u32 n_ = node::trail + j;
-        if (frame.nodes[n_].scale != scale && frame.nodes[n_].scale) {
-            if (!spare) { shade(frame, n_, grey, stroke); continue; }
-            --spare;
-        }
-        put(frame, n_, cx, cy, scale, grey, stroke);
+        const u32 behind = (head + node::trails - j) % node::trails;
+        const bool lit = lead.rolling && !reduced && (blur || behind < 3);
+        if (!lit || (j >= 1 && j <= 10)) { conceal(frame, n_); continue; }   // 1 to 10 are behind the disk
+        put(frame, n_, cx, cy, scale, blur ? third : behind == 0 ? brightest : behind == 1 ? second : third, stroke);
     }
-    const u32 scuffs = (wobble * 8 + 32768) >> 16;
-    for (u32 j = 0; j < node::scuffs; ++j) {
-        const u32 n_ = node::scuff + j;
-        if (j >= scuffs) { conceal(frame, n_); continue; }
-        const u32 at = (196 + 19 * j + (j * 7) % 5) / 15;
-        const u32 behind = (head + node::trails - at) % node::trails;
-        const u32 grey = lead.rolling && !reduced && behind < 2 ? 14 : 10;
-        if (frame.nodes[n_].scale != scale && frame.nodes[n_].x == cx) {
-            if (!spare) { shade(frame, n_, grey, stroke); continue; }
-            --spare;
-        }
-        put(frame, n_, cx, cy, scale, grey, stroke);
-    }
-    // The base's own marks: streaks on the mirror, growth rings in wood, specks in stone.
-    for (u32 j = node::mirror_mark; j < node::speck + node::specks; ++j) {
-        const u32 group = j < node::grain ? 0 : j < node::speck ? 1 : 2;
-        const bool show = group == ground;
+    // The base's own marks: wood's grain, stone's specks and veins. Swapping
+    // them has a budget a frame.
+    u32 spare = budget;
+    for (u32 j = node::grain; j < node::speck + node::specks; ++j) {
+        const bool show = (j < node::speck ? 1u : 2u) == ground;
         const Node& d = frame.nodes[j];
         const bool shown = d.scale == unit && d.x == 0 && d.y == 0;
         if (show == shown && d.scale) continue;
         if (!spare && d.scale) continue;
         if (d.scale) --spare;
-        if (show) put(frame, j, 0, 0, unit, group == 2 && j < node::speck + 8 ? 7 : group == 1 ? 6 : 8,
-                      group == 2 && j < node::speck + 8 ? fill_and_stroke : stroke);
+        if (show) put(frame, j, 0, 0, unit, third, j >= node::speck && j < node::speck + 4 ? fill_and_stroke : stroke);
         else conceal(frame, j);
     }
 
@@ -519,13 +508,13 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 roll = d.tilt * sine(way_ + 900) >> 10;
         const i32 lift = ((across * sine(d.tilt) >> 10) * scene::cos_e) >> 14;
         const Turn tipped = rotation(roll), mirror = rotation(-roll);
-        put_turned(frame, at, cx + p.x, cy + p.y - lift, scale_, tipped, rim_shade[material]);
-        put_turned(frame, at + 1, cx + p.x, cy + p.y - lift, scale_, tipped, edge_shade[material]);
-        if (ground == 0) put_turned(frame, at + 2, cx + p.x, cy + p.y + (lift * 2 >> 2), scale_, mirror, reflection_shade[material] - 1);
+        put_turned(frame, at, cx + p.x, cy + p.y - lift, scale_, tipped, second);
+        put_turned(frame, at + 1, cx + p.x, cy + p.y - lift, scale_, tipped, third);
+        if (ground == 0) put_turned(frame, at + 2, cx + p.x, cy + p.y + (lift * 2 >> 2), scale_, mirror, faint);
         else conceal(frame, at + 2);
         if (d.rolling && !reduced) {
             const Point c = project(x + (rc * sine(way_ + 900) >> 10), y + (rc * sine(way_) >> 10), 0);
-            nudge(frame, at + 3, cx + c.x, cy + c.y, 13, stroke);
+            nudge(frame, at + 3, cx + c.x, cy + c.y, second, stroke);
         } else {
             conceal(frame, at + 3);
         }
@@ -552,30 +541,33 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 dx = c, dy = -(s * scene::sin_e >> 14);
         const i32 length = static_cast<i32>(root(static_cast<u32>(dx * dx + dy * dy))) + 1;
         const Turn outward = {dx * unit / length, dy * unit / length};
-        put_turned(frame, n_, cx + p.x, cy + p.y, gust, outward, breathing ? 13 : 11);
+        put_turned(frame, n_, cx + p.x, cy + p.y, gust, outward, breathing ? second : third);
     }
 
     // The ring's ripples across the mirror in front of the disk, as many as
-    // ring sets, from just beyond its rim out to the mirror's edge: none for a dead
-    // slap, eight reaching the glass's edge for a 4 s bell, brighter as ring
-    // grows and each a little dimmer than the one inside it. As the disk
+    // ring sets, from just beyond its rim out to the mirror's edge: none for a
+    // dead slap, eight reaching the glass's edge for a 4 s bell. As the disk
     // falls flat they flare, outward a frame a ripple, and fade over the
-    // ring's time.
+    // ring's time; at most three change a frame.
     const u32 ripples = (ring * 8 + 32768) >> 16;
-    const i32 ringing = static_cast<i32>(spin::after_hundredths(slots[RING]) * 1024u / 100u);   // Q10 s
-    const u32 steady = 6 + (ring * 6u >> 16);
+    const i32 ringing = static_cast<i32>(spin::after_hundredths(slots[RING], material) * 1024u / 100u);   // Q10 s
     const i32 gap = ((scene::reach - 16) * unit - radius) / 7;
+    u32 moved = 0;
     for (u32 j = 0; j < node::ripples; ++j) {
         const u32 n_ = node::ripple + j;
         if (j >= ripples) { conceal(frame, n_); continue; }
         const i32 r = radius + 16 * unit + static_cast<i32>(j) * gap;
         const i32 authored = scene::ripple * unit + static_cast<i32>(j) * scene::ripple_step;
         const i32 since = state.since - 34 * static_cast<i32>(j);
-        u32 bright = steady;
+        u32 grey = third;
         if (!lead.rolling && since >= 0 && since < ringing)
-            bright += static_cast<u32>(static_cast<i32>(15 - steady) * (ringing - since) / ringing);
-        const u32 dim = (3 * j + 4) / 8;
-        put(frame, n_, cx, cy, (r << 10) / authored, bright > dim + 5 ? bright - dim : 5, stroke);
+            grey += static_cast<u32>(static_cast<i32>(brightest - third) * (ringing - since) / ringing);
+        const i32 size_ = (r << 10) / authored;
+        const Node& d = frame.nodes[n_];
+        if (d.x == cx && d.y == cy && d.scale == size_ && d.shade == grey && d.paint == stroke) continue;
+        if (!fresh && moved >= 3) continue;
+        ++moved;
+        put(frame, n_, cx, cy, size_, grey, stroke);
     }
 }
 }

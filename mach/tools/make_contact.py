@@ -5,7 +5,7 @@ it at rest: at 1:1 (480 x 222 a frame, docs/controls-1x.png), as the screen
 shows it, or enlarged (docs/controls.png at 2) to look closely. tests/screen.cpp's still scenario prints each frame,
 tools/frame2svg.py applies it to the artwork and headless Chrome rasterises
 the sheet. Not part of the machine.
-  python tools/make_contact.py <screen binary> <out.png> [scale]"""
+  XY_FONT=<path> python tools/make_contact.py <screen binary> <out.png> [scale]"""
 import json
 import pathlib
 import subprocess
@@ -37,7 +37,8 @@ page = f'<html><head><style>{style}</style></head><body><table>{"".join(rows)}</
 work = pathlib.Path(tempfile.mkdtemp(prefix="mach-contact-"))
 (work / "sheet.html").write_text(page)
 width, height = 3 * 490 + 100, 8 * 250 + 20
-subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars", f"--force-device-scale-factor={scale}",
+subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--allow-file-access-from-files", "--virtual-time-budget=3000",
+                f"--force-device-scale-factor={scale}",
                 f"--screenshot={out.resolve()}", f"--window-size={width},{height}", (work / "sheet.html").as_uri()],
                capture_output=True, check=True)
 print(out)

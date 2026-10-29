@@ -376,6 +376,7 @@ struct Slices {
     u32 source;             // a slice of the recording at the sample's root, frames, Q8
     u32 home;               // pos: the window's start, frames into the region
     u32 step;               // step's iteration
+    u32 ahead;              // and its fraction toward the next, Q16
     u32 rate;               // 64ths an iteration, 0 to hold
     u32 sixty_fourths;      // 64ths a slice
     u32 taps;
@@ -399,22 +400,32 @@ Slices decode_slices(Voice& voice, const opxy::SampleBlock& block, u32 bits, u32
     s.fade = s.length >> 10 < 256 ? s.length >> 10 : 256;
     s.reciprocal = 65536 / s.fade;
     s.source = times(s.length, voice.root);
-    s.home = times(level(p[kPos]), s.span);
-    s.step = (level(p[kStep]) * s.period) >> 16;
+    // pos runs from the window at the region's start to the window ending at
+    // its end; a window longer than the region wraps round it, and pos turns
+    // it, to a slice short of a whole turn.
+    const u32 window = (s.cells * s.source) >> 8, slice = s.source >> 8;
+    const u32 room = s.span > window ? s.span - window : s.span > slice ? s.span - slice : 0;
+    s.home = times(level(p[kPos]), room + 1);
+    const u32 position = step_position(p[kStep], s.period) >> 4;   // Q16 iterations
+    s.step = position >> 16;
+    s.ahead = position & 0xffff;
     s.rate = rate64[choice(p[kRate], rate_count)];
     s.taps = chord_taps[choice(p[kChrd], chord_count)];
     const u32 key = map << 24 | bits << 20 | depth16(p[kDepth]);
-    if (key != voice.moving_key) {
-        moving_cells(map, bits, depth16(p[kDepth]), voice.moving);
+    if (key != voice.moving_key || s.ahead != voice.ahead_key) {
+        rank_orbits(map, bits, depth16(p[kDepth]), s.ahead, voice.orbits);
         voice.moving_key = key;
+        voice.ahead_key = s.ahead;
     }
     return s;
 }
 
 // The recording's slice that slot plays at iteration k: where the map's
-// inverse, applied k times, takes it, if its orbit moves at this depth.
+// inverse, applied k times (k + 1 for an orbit a step ahead), takes it, if
+// its orbit moves at this depth.
 u32 source_slot(Voice& voice, const Slices& s, u32 k, u32 slot) {
-    if (!moves(voice.moving, slot)) return slot;
+    if (!moves(voice.orbits.moving, slot)) return slot;
+    if (moves(voice.orbits.ahead, slot)) k = (k + 1) % s.period;
     const u32 key = s.map << 24 | s.bits << 20 | k;
     if (key != voice.gather_key) {
         voice.gather = power(s.map, (s.period - k) % s.period, s.bits);
@@ -597,7 +608,7 @@ void initialize(Voice& voice, const opxy::SampleView& sample) {
     voice.cents = 0;
     voice.root = 65536;
     voice.slot = voice.into = voice.length = voice.carry = voice.iteration = voice.counted = 0;
-    voice.moving_key = voice.gather_key = ~0u;
+    voice.moving_key = voice.ahead_key = voice.gather_key = ~0u;
     voice.fresh = true;
     voice.presence = presence_full;
 }
