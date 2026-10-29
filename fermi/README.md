@@ -25,8 +25,8 @@ rather than white. With damping, the high partials die first and a note
 settles toward its struck mode, as a string's does.
 
 **Status: experimental.** Fermi passes the SDK's tests and runs on an
-OP-XY. Its CPU figures are estimates, not measurements on the
-device.
+OP-XY, where its CPU is
+measured (below).
 
 ## Controls
 
@@ -315,7 +315,13 @@ velocity: stock applies both after `render`.
 
 ## CPU
 
-These are estimates: Fermi has not been measured on an OP-XY. They are
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, three runs, at
+`v0.1.0`: one voice playing middle C with the first four controls at their
+midpoint costs **3.82%** of the 580,352-cycle audio block, so eight voices
+take about 31%. The OP-XY's own engines measure 1.6–2.7% a voice in the same
+test. It plays one setting; heavier settings cost more.
+
+The figures below are host estimates made during development. They are
 counted from the compiled Blackfin code (`sdk.py compile`), since the SDK's
 host estimate varies widely from run to run (3,500 to 17,500 instructions).
 At the heaviest setting (32 masses, energy 1, the fastest clock, damping on)

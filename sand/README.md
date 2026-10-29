@@ -23,8 +23,8 @@ note it rings. Robert Hooke had seen flour do the same on a bowed glass plate
 in 1680; Chladni made the figures a method and published them.
 
 **Status: experimental.** Sand passes the SDK's tests and runs on an
-OP-XY. Its CPU figures (below) are the SDK's host estimate and a
-count from the compiled code, not measurements on the device.
+OP-XY, where its CPU is
+measured (below).
 
 ## Controls
 
@@ -257,7 +257,13 @@ the frames a turning tilt moves the plate by half a degree.
 
 ## CPU
 
-Not yet measured on an OP-XY. Counted from the compiled code, a block at the
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, three runs, at
+`v0.1.0`: one voice playing middle C with the first four controls at their
+midpoint costs **5.42%** of the 580,352-cycle audio block, so eight voices
+take about 43%. The OP-XY's own engines measure 1.6–2.7% a voice in the same
+test. It plays one setting; heavier settings cost more.
+
+Counted from the compiled code, a block at the
 heaviest setting, a full plate of resting sand with the rattle ringing, comes
 to about 13,000 Blackfin instructions per voice: the six upper modes about
 900 each (12 instructions a sample, one at a time), the bowed mode with its

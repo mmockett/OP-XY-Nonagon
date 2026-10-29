@@ -22,8 +22,8 @@ collapses (Wood's equation, 1930), and the liquid column's note with it. As
 the bubbles rise out, the note climbs back to the key.
 
 **Status: experimental.** Cocoa passes the SDK's tests and runs on an
-OP-XY. Its CPU figures (below) are the SDK's host estimate and a
-count from the compiled code, not measurements on the device.
+OP-XY, where its CPU is
+measured (below).
 
 ## Controls
 
@@ -336,7 +336,13 @@ falls back to the browser's face.
 
 ## CPU
 
-Not yet measured on an OP-XY. At the heaviest setting:
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, three runs, at
+`v0.1.0`: one voice playing middle C with the first four controls at their
+midpoint costs **5.68%** of the 580,352-cycle audio block, so eight voices
+take about 45%. The OP-XY's own engines measure 1.6–2.7% a voice in the same
+test. It plays one setting; heavier settings cost more.
+
+At the heaviest setting:
 
 - **Host estimate.** `sdk.py test` gives 5,000 to 8,900 Blackfin
   instructions per voice block, depending on the host's load.

@@ -32,8 +32,8 @@ Coin's presets give it full sustain and the longest release, so a spin plays
 out after the key is let go.
 
 **Status: experimental.** Coin passes the SDK's tests and runs on an
-OP-XY, and its CPU figures (below) are estimates, not
-measurements on the device.
+OP-XY, and its CPU is measured there
+(below).
 
 ## Controls
 
@@ -238,7 +238,13 @@ caption the screen can show.
 
 ## CPU
 
-These are estimates: Coin has not been measured on an OP-XY.
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, three runs, at
+`v0.1.0`: one voice playing middle C with the first four controls at their
+midpoint costs **1.46%** of the 580,352-cycle audio block, so eight voices
+take about 12%. The OP-XY's own engines measure 1.6–2.7% a voice in the same
+test. It plays one setting; heavier settings cost more.
+
+The figures below are host estimates made during development.
 
 Counted from the pinned Blackfin compiler's output (`-O2 -mcpu=bf707`, as
 the firmware build), at the heaviest setting, four disks rolling:

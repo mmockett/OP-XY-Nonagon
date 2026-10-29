@@ -37,8 +37,8 @@ With no sample loaded, its screen shows a cover reading "load a sample ·
 shift +" and the Sample key's icon.
 
 **Status: experimental.** Recur passes the SDK's tests and runs on an
-OP-XY, and its CPU figure (below) is a host estimate, not a
-measurement on the device.
+OP-XY, and its CPU is measured there
+(below).
 
 ## Controls
 
@@ -231,7 +231,12 @@ contact sheets come from `tools/screen.cpp` on the host.
 
 ## CPU
 
-This is an estimate: Recur has not been measured on an OP-XY.
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, three runs, at
+`v0.1.0`: Recur's sample callback at its default settings, playing the SDK's
+generated two-second test sample, costs **1.16%** of the 580,352-cycle audio
+block. This test plays one setting; heavier settings cost more.
+
+The figures below are host estimates made during development.
 
 The host estimate (`tools/cpu.cpp`: the SDK's reference loop timed in turn
 with the voice, best of nine) is about 1,700 Blackfin instructions a voice

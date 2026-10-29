@@ -18,8 +18,8 @@ with levels matched to it, but stranger: less a set of familiar instruments
 than nine sounds you won't have heard from a synth before.
 
 **Status: experimental.** All nine pass the SDK's tests and run on the
-OP-XY, and their screens are checked against how it draws. Their CPU figures
-are estimates (below), not yet measured on the device. Expect rough edges.
+OP-XY, their screens are checked against how it draws, and their CPU is
+measured on it (below). Expect rough edges.
 
 ## The machines
 
@@ -289,27 +289,31 @@ and a loaded sample takes its place.
 
 ## CPU
 
-Not yet measured on an OP-XY. The figures are Blackfin instructions per
-voice block at each machine's heaviest setting: counted from the compiled
-code where marked, otherwise the SDK's host-timed estimate (`sdk.py test`),
-which varies from run to run. The SDK's guide is at most about 15,000; for
-scale, it puts 2op FM at about 14,000 and Macro Osc at about 9,000.
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, three
+runs each, at `v0.1.0`. For a synth, one voice plays middle C with the first
+four controls at their midpoint; for a sample engine, its sample callback
+plays the SDK's generated two-second test sample at its default settings. Each
+figure is a share of the OP-XY's 580,352-cycle audio block.
 
-| Machine | Heaviest setting | How |
-| --- | ---: | --- |
-| Sand | ~13,000 | counted, a full plate of sand rattling (about 10,500 settled) |
-| Cocoa | ~14,700 | counted (about 9,400 for a held note on the default) |
-| Ghost | ~14,900 | counted (about 13,000 on the default) |
-| Coin | ~14,650 | counted, four disks; the host estimate reads higher, ~18,000 |
-| Recur | ~9,800 | host estimate, hiss with a chord (about 2,500 on the default) |
-| Fermi | ~14,300 | counted |
-| Mach | ~13,400 | counted |
-| Butterfly | ~11,400 | counted |
-| Drop | ~11,100 | host estimate, best of many runs |
+| Machine | One voice | Eight voices |
+| --- | ---: | ---: |
+| Sand | 5.4% | ~43% |
+| Cocoa | 5.7% | ~45% |
+| Coin | 1.5% | ~12% |
+| Fermi | 3.8% | ~31% |
+| Mach | 4.5% | ~36% |
+| Butterfly | 5.6% | ~44% |
+| Drop | 3.2% | ~26% |
+| Ghost (sample callback) | 3.0% | n/a |
+| Recur (sample callback) | 1.2% | n/a |
 
-Hexagon's synths, measured on the device, cost 2.4–6.2% of the audio block a
-voice; most of these will cost more. A full chord on one track should be
-fine; several tracks of heavy chords at once, with effects, may run out.
+The OP-XY's own engines measure 1.6–2.7% a voice in the same test, and
+Hexagon's synths 2.4–6.5%. A full chord on one track is fine; several tracks
+of heavy chords at once, with effects, can run out. Each test plays one
+setting, and heavier settings cost more: Coin's four disks, a fully rattling
+plate in Sand or a hissing chord in Recur cost several times their figure
+here. The sample engines' tests time the callback alone, not the stock
+sampler's own mixing, so they don't compare directly with the synths.
 
 ## Building
 

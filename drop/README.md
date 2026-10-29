@@ -32,8 +32,8 @@ the pulses come at 23 Hz, the rate the papers measured, and the song turns
 back into a flutter.
 
 **Status: experimental.** Drop passes the SDK's tests. It runs on an
-OP-XY, and its CPU figures (below) are estimates, not
-measurements on the device.
+OP-XY, and its CPU is measured there
+(below).
 
 ## Controls
 
@@ -260,8 +260,13 @@ hottest as well.
 
 ## CPU
 
-These are estimates on a host computer; Drop has not been measured on an
-OP-XY.
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, three runs, at
+`v0.1.0`: one voice playing middle C with the first four controls at their
+midpoint costs **3.24%** of the 580,352-cycle audio block, so eight voices
+take about 26%. The OP-XY's own engines measure 1.6–2.7% a voice in the same
+test. It plays one setting; heavier settings cost more.
+
+The figures below are host estimates made during development.
 
 - `tools/cpu.py` builds `sdk.py test`'s own bench and reference and runs
   them alternately 20 times, keeping the fastest of each: 11,100 Blackfin

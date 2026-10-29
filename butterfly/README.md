@@ -31,8 +31,8 @@ wingbeat slowly moves the flux and the struck site, so the bands drift and
 the bright partials trade places.
 
 **Status: experimental.** Butterfly passes the SDK's tests. It runs on an
-OP-XY, and its CPU figures (below) are estimates, not
-measurements on the device.
+OP-XY, and its CPU is measured there
+(below).
 
 ## Controls
 
@@ -317,8 +317,13 @@ peaks at 0.93.
 
 ## CPU
 
-These are estimates on a host computer; Butterfly has not been measured on
-an OP-XY.
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, three runs, at
+`v0.1.0`: one voice playing middle C with the first four controls at their
+midpoint costs **5.55%** of the 580,352-cycle audio block, so eight voices
+take about 44%. The OP-XY's own engines measure 1.6–2.7% a voice in the same
+test. It plays one setting; heavier settings cost more.
+
+The figures below are host estimates made during development.
 
 - By count of the Blackfin build: the bank's inner loop is 11 instructions
   a partial a half-rate sample, about 6,000 a block for 17 partials, and

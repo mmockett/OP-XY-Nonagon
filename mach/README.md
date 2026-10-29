@@ -27,8 +27,8 @@ envelope open on the whole pass, including what arrives after the object has
 gone. Releasing fades it, as sound already in the air cannot be called back.
 
 **Status: experimental.** Mach passes the SDK's tests and runs on an
-OP-XY. Its CPU figures are estimates, not measurements on the
-device.
+OP-XY, where its CPU is
+measured (below).
 
 ## Controls
 
@@ -222,7 +222,13 @@ so nothing steps audibly.
 
 ## CPU
 
-These are estimates: Mach has not been measured on an OP-XY.
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, three runs, at
+`v0.1.0`: one voice playing middle C with the first four controls at their
+midpoint costs **4.48%** of the 580,352-cycle audio block, so eight voices
+take about 36%. The OP-XY's own engines measure 1.6–2.7% a voice in the same
+test. It plays one setting; heavier settings cost more.
+
+The figures below are host estimates made during development.
 
 - **`sdk.py test`** estimates about 8,200 to 8,800 Blackfin instructions a
   voice block at the heaviest setting of its sweep (it varies from run to
