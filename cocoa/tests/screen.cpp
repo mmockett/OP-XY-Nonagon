@@ -3,10 +3,13 @@
 //   - checks every frame is valid, and says which element is not;
 //   - counts the nodes and outlines that change each frame (churn), on
 //     average and at most, and holds them to the budget;
-//   - checks the idle screen is still, and reduced motion and a reset snap.
+//   - checks the idle screen is still, and reduced motion and a reset snap;
+//   - checks the spoon never crosses a line of the cup: every cup, spoon from
+//     wood to silver, taps' every rest, a tap's whole swing.
 // Given a file, it also writes every fifth frame there as JSON lines, for
 // tools/make_gif.py.
 #include "../display.cpp"
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -46,6 +49,45 @@ const char* invalid(const Frame& f, unsigned& which) {
     }
     which = 0;
     return opxy::draw::valid(f) ? nullptr : "valid() says no";
+}
+
+// Path p of a frame as drawn, in screen pixels.
+unsigned drawn(const Frame& f, unsigned p, double (*xy)[2]) {
+    const opxy::draw::Node& n = f.nodes[p];
+    const double k = n.scale / 1024.0, a = n.cos / 1024.0 * k, b = n.sin / 1024.0 * k;
+    for (unsigned i = 0; i < Frame::point_count; ++i) {
+        const double px = f.paths[p].points[i].x / 1024.0, py = f.paths[p].points[i].y / 1024.0;
+        xy[i][0] = a * px - b * py + n.x / 1024.0;
+        xy[i][1] = b * px + a * py + n.y / 1024.0;
+    }
+    return Frame::point_count;
+}
+// The least distance, px, from the spoon's lines (bowl and handle, every half
+// pixel along them) to the cup's.
+double spoon_to_cup(const Frame& f) {
+    double cup[64][2], spoon[64][2], least = 1e9;
+    drawn(f, node::vessel, cup);
+    for (unsigned part = node::bowl; part <= node::handle; ++part) {
+        drawn(f, part, spoon);
+        for (unsigned i = 0; i < 64; ++i) {
+            const double* s0 = spoon[i];
+            const double* s1 = spoon[(i + 1) % 64];
+            const unsigned steps = 1 + static_cast<unsigned>(std::hypot(s1[0] - s0[0], s1[1] - s0[1]) * 2);
+            for (unsigned j = 0; j < steps; ++j) {
+                const double x = s0[0] + (s1[0] - s0[0]) * j / steps, y = s0[1] + (s1[1] - s0[1]) * j / steps;
+                for (unsigned c = 0; c < 64; ++c) {
+                    const double* c0 = cup[c];
+                    const double* c1 = cup[(c + 1) % 64];
+                    const double dx = c1[0] - c0[0], dy = c1[1] - c0[1];
+                    double t = ((x - c0[0]) * dx + (y - c0[1]) * dy) / (dx * dx + dy * dy);
+                    t = t < 0 ? 0 : t > 1 ? 1 : t;
+                    const double d = std::hypot(c0[0] + t * dx - x, c0[1] + t * dy - y);
+                    least = d < least ? d : least;
+                }
+            }
+        }
+    }
+    return least;
 }
 
 struct Run {
@@ -157,6 +199,32 @@ int main(int argc, char** argv) {
         sheet(out);
         std::fclose(out);
         return failures ? 1 : 0;
+    }
+    // The spoon against the cup: every cup, 33 spoons, five tap rates, at rest
+    // and through a held note's taps (a second at 60 fps).
+    {
+        double least = 1e9;
+        const double cups[3] = {0.1667, 0.5, 0.8333};
+        for (int cup = 0; cup < 3; ++cup)
+            for (int sp = 0; sp <= 32; ++sp)
+                for (int tp = 0; tp <= 4; ++tp) {
+                    Run r;
+                    r.c[3] = cups[cup];
+                    r.c[5] = sp / 32.0;
+                    r.c[1] = tp / 4.0;
+                    for (int f = 0; f < 80; ++f) {
+                        if (f == 10) { r.in.note_serial = 1; r.in.held_notes = 1; }
+                        r.tick();
+                        const double d = spoon_to_cup(r.frame);
+                        if (d < least) least = d;
+                        if (d < 0.9) {
+                            std::printf("FAIL the spoon touches the cup: %.2f px (cup %d, spoon %d/32, taps %d/4, frame %d)\n", d, cup, sp, tp, f);
+                            ++failures;
+                            f = 80;
+                        }
+                    }
+                }
+        std::printf("spoon: at least %.2f px from the cup's lines, over every cup, spoon and tap\n", least);
     }
     Run run;
     if (argc > 1) run.out = std::fopen(argv[1], "w");

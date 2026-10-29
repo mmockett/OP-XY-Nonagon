@@ -5,7 +5,7 @@ and commit all three.
 
 The screen is a clockwork tin picture puzzle. Each map has its own print, a
 bold picture named for it: the cat of Arnold and Avez (1968) for the cat map,
-a loaf for the baker's, a nautilus for gold, a scroll (a pell) for pell,
+a loaf for the baker's, a nautilus for gold, a silver moon for pell,
 scissors for the shear and a honeycomb for hex. The tiles are plain square
 outlines shared by every print; a print is cut on the finest grid's cells,
 one node for each piece of a stroke in a cell, and a piece rides on whichever
@@ -169,15 +169,31 @@ def nautilus():
     return [], [spiral, mouth], [(spiral, False)]
 
 
-def scroll():
-    # A pell: a parchment rolled at its head and foot, a few lines written on it.
-    top = arc(512, 700, 190, 44, 180, 0, 9)
-    foot = arc(512, 300, 190, 44, 0, -180, 9)
-    sheet = top + foot
-    writing = [[(400, 580), (624, 580)], [(400, 440), (560, 440)]]
-    return [sheet], writing, [(sheet, True)]
+def moon():
+    # A silver moon (pell's ratio is the silver one, as gold's is the golden):
+    # a crescent opening to the right, and a five-pointed star in its arms.
+    (ox, oy), outer = MOON_OUTER
+    (ix, iy), inner = MOON_INNER
+    # Where the two circles cross: the crescent's horns.
+    dx, dy = ix - ox, iy - oy
+    d = math.hypot(dx, dy)
+    a = (outer ** 2 - inner ** 2 + d ** 2) / (2 * d)
+    h = (outer ** 2 - a ** 2) ** 0.5
+    mx, my = ox + a * dx / d, oy + a * dy / d
+    horns = [(mx - h * dy / d, my + h * dx / d), (mx + h * dy / d, my - h * dx / d)]
+    angle = lambda c, p: math.degrees(math.atan2(p[1] - c[1], p[0] - c[0]))
+    o0, o1 = angle((ox, oy), horns[0]), angle((ox, oy), horns[1])
+    i0, i1 = angle((ix, iy), horns[1]), angle((ix, iy), horns[0])
+    if o1 < o0: o1 += 360
+    if i1 > i0: i1 -= 360
+    crescent = arc(ox, oy, outer, outer, o0, o1, 15)[:-1] + arc(ix, iy, inner, inner, i0, i1, 11)[:-1]
+    sx, sy, r = MOON_STAR
+    star = [(sx + (r if i % 2 == 0 else r * 0.42) * math.sin(math.radians(36 * i)),
+             sy + (r if i % 2 == 0 else r * 0.42) * math.cos(math.radians(36 * i))) for i in range(10)]
+    return [crescent, star], [], [(crescent, True)]
 
 
+MOON_OUTER, MOON_INNER, MOON_STAR = ((448, 512), 256), ((578, 551), 220), (704, 570, 66)   # the star fills one cell, so it stays whole
 def scissors():
     # Two blades crossed at the pivot, each running back to its ring.
     rings = [ring(370, 280, 80, 80, 12), ring(654, 280, 80, 80, 12)]
@@ -198,7 +214,7 @@ def honeycomb():
 
 
 CAT_SIZE = 0.72
-PRINTS = [cat(), loaf(), nautilus(), scroll(), scissors(), honeycomb()]
+PRINTS = [cat(), loaf(), nautilus(), moon(), scissors(), honeycomb()]
 
 
 def to_screen(p):

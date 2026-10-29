@@ -161,7 +161,7 @@ come home together at the period.
     Mechanics* (1968);
   - baker: a tin loaf;
   - gold: a nautilus, its shell a golden spiral;
-  - pell: a scroll (a pell is a roll of parchment);
+  - pell: a crescent moon and a star;
   - shear: a pair of scissors;
   - hex: a honeycomb cell.
 
@@ -203,14 +203,14 @@ spends at most 20 changes on tiles and the pieces they carry, so a big
 reshuffle ripples across the tray. The display cannot read the tempo, so it
 times slices at 120 BPM. Reduced motion and reset snap. Churn over a
 scripted run averages 6.4 nodes a frame (7.6 while notes play) and peaks
-at 26. The screen uses all 256 nodes the SDK allows, no reshaping outlines,
-and 45.6 KB of artwork.
+at 26. The screen uses 254 of the 256 nodes the SDK allows, no reshaping
+outlines, and 45.7 KB of artwork.
 
 The tiles are 68 plain squares shared by every print (the 8 grid's 64, the
 first 16 of them doubled in size for the 4 grid, and 4 large ones). Each
 print is cut on the 8 grid's cells, a node for each piece of a stroke in a
 cell, and a piece rides on whichever tile holds its cell, so the prints are
-kept simple: 16 to 26 pieces each.
+kept simple: 14 to 26 pieces each.
 
 Sample engines have no browser preview, so the screen's frames, churn and
 contact sheets come from `tools/screen.cpp` on the host.

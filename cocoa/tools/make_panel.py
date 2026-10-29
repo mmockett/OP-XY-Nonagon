@@ -169,6 +169,9 @@ def vessel(kind):
 
 
 VESSELS = {k: vessel(k) for k in ("china", "glass", "tin")}
+# The centre of each cup's rounded right rim (vessel() draws it so).
+LIPS = {"china": (CX + INNER + WALL["china"] / 2, RIM), "glass": (CX + INNER + 1.5 * MM, RIM),
+        "tin": (CX + INNER + 1.8 * MM, RIM)}
 
 
 # ---- The spoon, face on, along +x from the bowl's tip (px), in two parts:
@@ -178,19 +181,8 @@ VESSELS = {k: vessel(k) for k in ("china", "glass", "tin")}
 # to morph. Each rests with its tip on the floor and rocks about where it
 # leans.
 SPOON = {"wood": dict(length=74, bowl=42, width=38, neck=13, end=15, drop=4.0),
-         "silver": dict(length=116, bowl=34, width=21, neck=3, end=8.5, drop=0.6)}
+         "silver": dict(length=108, bowl=34, width=21, neck=3, end=8.5, drop=0.6)}
 TIP_X = CX - 5
-
-
-def rest(kind):
-    """The spoon's tip on the floor and where it leans: the rim for silver,
-    the wall at the handle's end for wood."""
-    p = SPOON[kind]
-    tip = (TIP_X, BOTTOM - 1 - p["drop"])
-    if kind == "silver":
-        return tip, (CX + INNER, RIM)
-    dx = CX + INNER - 7 - tip[0]   # its end's corner, not its middle, against the wall
-    return tip, (CX + INNER - 7, tip[1] - math.sqrt((p["length"] * MM) ** 2 - dx ** 2))
 
 
 def bowl(kind):
@@ -222,6 +214,102 @@ def handle(kind):
     pts = upper + end + [(x, -y) for x, y in upper[::-1]]
     pts = [(x - HANDLE_MID, y) for x, y in distinct(pts)]
     return fill_to(pts, POINTS)
+
+
+# ---- Where the spoon rests, solved against each cup's own outline. The tip
+# stands on the floor; the spoon tips over toward the right wall until it
+# touches the cup (the rim's rounded lip for a long spoon, the inner wall for
+# a short one), never crossing a line of it. Each tap rocks it about a point
+# that keeps it clear: the lip's centre of curvature, or the handle end's.
+# Solved for 33 shapes from wood to silver, as display.cpp morphs them, and
+# checked at every lift taps can give (0 to 24 degrees).
+MORPHS = 33
+LIFT_MOST = 24.0     # degrees: taps' highest rest (display.cpp)
+CLEAR = 1.4          # px between the spoon's line and the cup's, centre to centre (each about 0.9 px wide)
+HEADER_BOTTOM = 40.0 # px: nothing of the spoon above this, under the header
+
+
+def morphed(m):
+    """The spoon's outline in its own frame (tip at 0, +x along it), m from wood 0 to silver 1, densified."""
+    shapes = []
+    for part in ((bowl("wood"), bowl("silver"), 0.0), (handle("wood"), handle("silver"), HANDLE_MID)):
+        a, b, shift = part
+        pts = [(ax + (bx - ax) * m + shift, ay + (by - ay) * m) for (ax, ay), (bx, by) in zip(a, b)]
+        dense = []
+        for i in range(len(pts)):
+            (x0, y0), (x1, y1) = pts[i], pts[(i + 1) % len(pts)]
+            n = max(1, math.ceil(math.dist((x0, y0), (x1, y1)) / 1.5))
+            dense += [(x0 + (x1 - x0) * j / n, y0 + (y1 - y0) * j / n) for j in range(n)]
+        shapes += dense
+    return shapes
+
+
+def segments(points):
+    out = []
+    for i in range(len(points)):
+        (x0, y0), (x1, y1) = points[i], points[(i + 1) % len(points)]
+        out.append((x0, y0, x1, y1, min(x0, x1) - CLEAR, max(x0, x1) + CLEAR, min(y0, y1) - CLEAR, max(y0, y1) + CLEAR))
+    return out
+
+
+def clear(points, segs, margin=CLEAR):
+    """True when every point is at least margin from every segment."""
+    m2 = margin * margin
+    for px, py in points:
+        for x0, y0, x1, y1, a, b, c, d in segs:
+            if px < a or px > b or py < c or py > d:
+                continue
+            dx, dy = x1 - x0, y1 - y0
+            t = ((px - x0) * dx + (py - y0) * dy) / (dx * dx + dy * dy or 1)
+            t = 0 if t < 0 else 1 if t > 1 else t
+            ex, ey = x0 + t * dx - px, y0 + t * dy - py
+            if ex * ex + ey * ey < m2:
+                return False
+    return True
+
+
+def placed(shape, angle):
+    """The spoon at angle with its tip at TIP_X, standing on the floor: (points, tip)."""
+    c, s = math.cos(angle), math.sin(angle)
+    pts = [(x * c - y * s, x * s + y * c) for x, y in shape]
+    tip = (TIP_X, BOTTOM - CLEAR - 0.1 - max(y for _, y in pts))
+    return [(tip[0] + x, tip[1] + y) for x, y in pts], tip
+
+
+def rocked(points, pivot, lift):
+    c, s = math.cos(lift), math.sin(lift)
+    return [(pivot[0] + (x - pivot[0]) * c - (y - pivot[1]) * s, pivot[1] + (x - pivot[0]) * s + (y - pivot[1]) * c)
+            for x, y in points]
+
+
+def lean_on(kind, m):
+    """The spoon's rest on cup `kind` at morph m: (pivot, angle in radians, tip)."""
+    segs = segments(VESSELS[kind])
+    shape = morphed(m)
+    a = math.radians(-89.0)
+    assert clear(placed(shape, a)[0], segs), (kind, m, "upright")
+    while clear(placed(shape, a + math.radians(1))[0], segs):
+        a += math.radians(1)
+    b = a + math.radians(1)
+    for _ in range(20):
+        mid = (a + b) / 2
+        if clear(placed(shape, mid)[0], segs):
+            a = mid
+        else:
+            b = mid
+    angle = a
+    rest_points, tip = placed(shape, angle)
+    assert min(y for _, y in rest_points) >= HEADER_BOTTOM, (kind, m, "into the header", min(y for _, y in rest_points))
+    # Rock about the lip's centre (where the rim rounds over) or the handle end's.
+    lip = LIPS[kind]
+    p = SPOON["wood"] if m < 0.5 else SPOON["silver"]
+    length = (SPOON["wood"]["length"] + (SPOON["silver"]["length"] - SPOON["wood"]["length"]) * m) * MM
+    cap = (SPOON["wood"]["end"] + (SPOON["silver"]["end"] - SPOON["wood"]["end"]) * m) / 2 * MM
+    end = (tip[0] + (length - cap) * math.cos(angle), tip[1] + (length - cap) * math.sin(angle))
+    for pivot in (lip, end):
+        if all(clear(rocked(rest_points, pivot, math.radians(l / 2)), segs, CLEAR - 0.4) for l in range(1, int(LIFT_MOST * 2) + 1)):
+            return pivot, angle, tip
+    raise SystemExit(f"no pivot keeps the spoon off the {kind} cup at morph {m:.3f}")
 
 
 out = [f'<g id="{ID}_panel">',
@@ -373,8 +461,9 @@ surface = ribbon([(-INNER / 2 + 0.2 + i * (INNER - 0.4) / 31, 0.0) for i in rang
 out.append(path(outline([(x, y) for x, y in surface]), G(13), STROKE, SURFACE, (CX, BOTTOM - 59 * MM)))
 # The spoon: its bowl (outline 2) and handle (outline 3), silver, at rest
 # in the drink.
-TIP, PIVOT = rest("silver")
-angle = math.atan2(PIVOT[1] - TIP[1], PIVOT[0] - TIP[0])
+POSES = {k: [lean_on(k, i / (MORPHS - 1)) for i in range(MORPHS)] for k in ("china", "glass", "tin")}
+TIP = POSES["china"][-1][2]
+angle = POSES["china"][-1][1]
 c, sn = math.cos(angle), math.sin(angle)
 def turned(points, at):
     return [((x * c - y * sn) / 2, (x * sn + y * c) / 2) for x, y in points]
@@ -448,15 +537,18 @@ emit("bowl", "// The spoon's bowl about its tip (wood, silver), drawn at twice."
      [[(x / 2, y / 2) for x, y in bowl(k)] for k in ("wood", "silver")])
 emit("handle", f"// The spoon's handle about a point {HANDLE_MID:g} px from the tip (wood, silver), drawn at twice.",
      [[(x / 2, y / 2) for x, y in handle(k)] for k in ("wood", "silver")])
-lines.append("// The spoon at rest (wood, silver): its tip on the floor and where it leans,")
-lines.append("// on the wall or the rim (Q10 px), and its angle from tip to there (tenths")
-lines.append("// of a degree, clockwise).")
-RESTS = [rest(k) for k in ("wood", "silver")]
+lines.append("// The spoon at rest, for each cup (china, glass, tin) and each of 33 shapes")
+lines.append("// from wood to silver: its tip's height on the floor and the point it rocks")
+lines.append("// about (Q10 px), and its angle (tenths of a degree, clockwise), leaning on")
+lines.append("// the cup without crossing it (make_panel.py: lean_on).")
 lines.append("const opxy::i32 tip_x = " + str(round(TIP_X * 1024)) + ";")
-lines.append("const opxy::i32 tip_y[2] = {" + ", ".join(str(round(t[1] * 1024)) for t, _ in RESTS) + "};")
-lines.append("const opxy::i32 pivot_x[2] = {" + ", ".join(str(round(v[0] * 1024)) for _, v in RESTS) + "};")
-lines.append("const opxy::i32 pivot_y[2] = {" + ", ".join(str(round(v[1] * 1024)) for _, v in RESTS) + "};")
-lines.append("const opxy::i32 lean[2] = {" + ", ".join(str(round(math.degrees(math.atan2(v[1] - t[1], v[0] - t[0])) * 10)) for t, v in RESTS) + "};")
+for name, pick in (("tip_y", lambda q: round(q[2][1] * 1024)),
+                   ("pivot_x", lambda q: round(q[0][0] * 1024)), ("pivot_y", lambda q: round(q[0][1] * 1024)),
+                   ("lean", lambda q: round(math.degrees(q[1]) * 10))):
+    lines.append(f"const opxy::i32 {name}[3][{MORPHS}] = {{")
+    for k in ("china", "glass", "tin"):
+        lines.append("    {" + ", ".join(str(pick(q)) for q in POSES[k]) + "},")
+    lines.append("};")
 across = [round(rng.uniform(-INNER + 5, INNER - 5) * 1024) for _ in range(BUBBLES)]
 up = [round(rng.uniform(0.02, 0.98) * 1024) for _ in range(BUBBLES)]
 lines.append("// Each bubble's place across the mug (Q10 px from the axis) and up its")

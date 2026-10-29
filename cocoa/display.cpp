@@ -15,8 +15,8 @@
 // and its surface dips into a vortex.
 //
 // A spoon stands in the drink, its bowl on the floor (spoon): a short, fat,
-// grained wooden spoon leaning on the wall inside, to a long, slim, polished
-// silver one resting on the rim. It rests lifted, 24 degrees for a single tap
+// grained wooden spoon leaning on the wall inside, to a long, slim silver one
+// leaning on the inside of the rim's lip; neither crosses a line of the cup. It rests lifted, 24 degrees for a single tap
 // to 2 for the fastest (taps), and each tap rocks it onto the floor in time
 // with the voices' taps, rippling the surface and the floor; tapping fast it
 // shakes.
@@ -93,6 +93,12 @@ inline u32 next(u32& seed) {
     seed ^= seed >> 17;
     seed ^= seed << 5;
     return seed;
+}
+// A row of plate's 33 spoon rests, wood to silver, at m (Q10).
+inline i32 along(const i32 (&row)[33], i32 m) {
+    const i32 i = m >> 5;
+    if (i >= 32) return row[32];
+    return row[i] + (((row[i + 1] - row[i]) * (m & 31)) >> 5);
 }
 // The drink's height in Q10 px (1.5 px a millimetre).
 inline i32 height(i32 fill) { return static_cast<i32>(drink::fill_um(fill) * 1536u >> 10); }
@@ -404,11 +410,10 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             lift = rest - rest * (r * r >> 10) / 1024;
         }
         lift = lift / 5 * 5;   // in half degrees, to change less often
-        // The tip, turned about where the spoon leans by the lift.
-        const i32 tip_rest_y = plate::tip_y[0] + (((plate::tip_y[1] - plate::tip_y[0]) >> 4) * m >> 6);
-        const i32 pivot_x = plate::pivot_x[0] + (((plate::pivot_x[1] - plate::pivot_x[0]) >> 4) * m >> 6);
-        const i32 pivot_y = plate::pivot_y[0] + (((plate::pivot_y[1] - plate::pivot_y[0]) >> 4) * m >> 6);
-        const i32 lean = plate::lean[0] + (((plate::lean[1] - plate::lean[0]) * m) >> 10);
+        // Its rest on this cup, leaning on the rim's lip or the wall without
+        // crossing them (plate.h), and the tip turned about the lip by the lift.
+        const i32 tip_rest_y = along(plate::tip_y[cup], m), lean = along(plate::lean[cup], m);
+        const i32 pivot_x = along(plate::pivot_x[cup], m), pivot_y = along(plate::pivot_y[cup], m);
         const Turn rock = rotation(lift);
         const i32 ox = (plate::tip_x - pivot_x) >> 4, oy = (tip_rest_y - pivot_y) >> 4;   // Q6
         const i32 tip_x = pivot_x + ((ox * rock.cos - oy * rock.sin) >> 6);

@@ -1,6 +1,6 @@
 // Recur's screen: a clockwork tin picture puzzle. Each map has its own print,
 // a bold picture named for it (the cat of Arnold and Avez, a loaf, a nautilus,
-// a scroll, scissors, a honeycomb), carried in pieces on the grid's square
+// a silver moon, scissors, a honeycomb), carried in pieces on the grid's square
 // tiles; they slide to where the map puts the slices they stand for, as the
 // sound plays them, and come home together at the period. The knob is the
 // map, the pendulum's weight slice, the lever rate, the comb's plucked teeth

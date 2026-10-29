@@ -231,8 +231,12 @@ under 3 px, no lines closer than 5 px, no difference carried by grey alone.
   24° for a single tap, so its bowl hangs mid-drink, down to 2° for the
   fastest, where it lies on the floor and shakes, with strokes beside its
   bowl while it taps. **Spoon** turns a short, fat wooden spoon, grained
-  along its handle and in its bowl, leaning on the wall inside the mug, into
-  a long, slim silver teaspoon resting on the rim, with a shine in its bowl.
+  along its handle and in its bowl, into a long, slim silver teaspoon with a
+  shine in its bowl. Either leans on the inside of the rim's lip and carries
+  on up past it, and neither crosses a line of the cup: each spoon's rest is
+  worked out against each cup's own outline, and each tap rocks it about the
+  lip, so it stays clear at every cup, spoon and tap (`tests/screen.cpp`
+  checks a gap of at least 1 px).
 - **The drink shows the pitch.** A note's stir dips the surface further and
   fills the drink with bubbles: five rings to a class, larger for
   larger bubbles (**fizz**), each class rising at its own speed from the
@@ -262,7 +266,7 @@ and the pops still, and a reset snaps everything into place.
 
 **Churn.** `tests/screen.cpp` plays a 22 s scene at 60 fps (a long climb,
 page 2 and its controls, a second note, a chord at fast taps, then cup and
-fill changes): 6.0 nodes change a frame on average, 42 at most, at a fill
+fill changes): 6.0 nodes change a frame on average, 47 at most, at a cup
 change. The idle screen changes nothing. Bubbles move in 2 px steps, at most
 14 a frame, and the drink's lines change at most six a frame.
 
@@ -274,11 +278,11 @@ change. The idle screen changes nothing. Bubbles move in 2 px steps, at most
 | `core.h`, `engine.cpp` | The voice: the drink, the column's and cup's modes, the pops, the strum and the soft clip |
 | `display.h`, `display.cpp` | The screen |
 | `tables.h` | Written by `tools/make_tables.py`: log₂ and 2^x, the sine, W(s), the modes, the cups, the spoon |
-| `panel.svg.fragment`, `plate.h` | Written by `tools/make_panel.py`: the artwork, the vessels and spoons, the scatter of bubbles and flecks |
+| `panel.svg.fragment`, `plate.h` | Written by `tools/make_panel.py`: the artwork, the vessels and spoons, each spoon's rest on each cup, the scatter of bubbles and flecks |
 | `tests/sound.cpp` | The physics and playing checks |
 | `tests/controls.cpp` | Each control at 0/25/50/75/100, measured (the table above) |
 | `tests/scenes.cpp` | The preset phrases; writes the WAVs when given a folder |
-| `tests/screen.cpp` | The screen: validity, churn, stillness, reduced motion, reset; writes frames for the GIF and the contact sheet |
+| `tests/screen.cpp` | The screen: validity, churn, stillness, reduced motion, reset, the spoon clear of the cup; writes frames for the GIF and the contact sheet |
 | `tools/measure.py` | The level measurements, from WAVs |
 | `tools/make_gif.py` | Renders `docs/cocoa.gif` and, with `--sheet`, `docs/controls-1x.png` and `docs/controls.png` from the real display code, in the device's face |
 
@@ -309,7 +313,7 @@ Not yet measured on an OP-XY. At the heaviest setting:
   held note in the default, with the cup rung out, is about 9,400.
 
 **Memory.** A voice is 292 bytes, `Shared` 96 and the display state 236.
-`sdk.py test --firmware` compiles it for the Blackfin in 65.4 KiB of module
+`sdk.py test --firmware` compiles it for the Blackfin in 67.2 KiB of module
 memory, 8 KiB of it the sine table.
 
 ## Prior art

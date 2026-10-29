@@ -6,16 +6,16 @@ namespace recur {
 // The screen's nodes: the header's bar (0..7), the tiles' squares, each map's
 // print in pieces, the prints' ghosts, depth's pins, the tape's bars, then the moving parts.
 const opxy::u32 small_first = 8, large_first = 72;
-const opxy::u32 print_first[6] = {76, 102, 124, 144, 160, 180}, print_count[6] = {26, 22, 20, 16, 20, 16};
+const opxy::u32 print_first[6] = {76, 102, 124, 144, 158, 178}, print_count[6] = {26, 22, 20, 14, 20, 16};
 // The ghosts: 1 copies of every print's main outline, a copy after another.
-const opxy::u32 ghost_first = 196, ghost_copies = 1, ghosts_a_copy = 7;
+const opxy::u32 ghost_first = 194, ghost_copies = 1, ghosts_a_copy = 7;
 const opxy::u32 ghost_count[6] = {1, 1, 1, 1, 2, 1};
-const opxy::u32 pin_first = 203, pin_count = 16, bar_first = 219, bar_count = 20,
-                pointer_node = 239, lever_node = 240, teeth_first = 241, teeth = 7,
-                rod_node = 248, weight_node = 249, key_first = 250, key_poses = 2, jaw_first = 252,
-                cover_stage = 254, cover_hint = 255, node_total = 256;
+const opxy::u32 pin_first = 201, pin_count = 16, bar_first = 217, bar_count = 20,
+                pointer_node = 237, lever_node = 238, teeth_first = 239, teeth = 7,
+                rod_node = 246, weight_node = 247, key_first = 248, key_poses = 2, jaw_first = 250,
+                cover_stage = 252, cover_hint = 253, node_total = 254;
 // The cell (of the 8 grid) each print piece sits in, from print_first[0] on.
-const opxy::u8 piece_cell[120] = {10, 13, 18, 18, 19, 20, 21, 21, 26, 26, 27, 28, 29, 29, 34, 34, 35, 35, 36, 36, 37, 37, 42, 43, 44, 45, 18, 19, 19, 20, 20, 21, 25, 26, 27, 28, 29, 30, 33, 34, 37, 38, 42, 45, 50, 51, 52, 53, 22, 23, 23, 27, 28, 28, 29, 30, 31, 34, 35, 36, 38, 39, 43, 44, 45, 46, 52, 53, 18, 19, 20, 21, 26, 27, 28, 29, 34, 35, 36, 37, 42, 43, 44, 45, 10, 13, 18, 21, 27, 28, 35, 35, 36, 36, 42, 43, 43, 44, 44, 45, 50, 51, 52, 53, 11, 12, 13, 18, 19, 21, 22, 26, 30, 34, 35, 37, 38, 43, 44, 45};
+const opxy::u8 piece_cell[118] = {10, 13, 18, 18, 19, 20, 21, 21, 26, 26, 27, 28, 29, 29, 34, 34, 35, 35, 36, 36, 37, 37, 42, 43, 44, 45, 18, 19, 19, 20, 20, 21, 25, 26, 27, 28, 29, 30, 33, 34, 37, 38, 42, 45, 50, 51, 52, 53, 22, 23, 23, 27, 28, 28, 29, 30, 31, 34, 35, 36, 38, 39, 43, 44, 45, 46, 52, 53, 17, 18, 19, 25, 26, 29, 33, 34, 35, 41, 42, 43, 43, 44, 10, 13, 18, 21, 27, 28, 35, 35, 36, 36, 42, 43, 43, 44, 44, 45, 50, 51, 52, 53, 11, 12, 13, 18, 19, 21, 22, 26, 30, 34, 35, 37, 38, 43, 44, 45};
 // The semitone each comb tooth stands for.
 const opxy::u8 tooth_notes[7] = {0, 1, 3, 4, 7, 12, 19};
 // Where things sit, px: the print's corner and side, the knob, the comb, the lever, the key, the rule.
