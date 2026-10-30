@@ -38,6 +38,18 @@ Spot spot(const Place& p) {
 // The vowel's mouth, rx and ry in tenths of a pixel: breath (closed), oo, oh, ah, eh, ee.
 const opxy::i16 mouth_rx[vowel_count] = {16, 18, 22, 29, 38, 45}, mouth_ry[vowel_count] = {8, 22, 32, 42, 26, 16};
 
+// Whether an outline turns back on itself at b, to within about 3 degrees: the
+// device's stroke can draw a turn that sharp as a long spike, and 2.5 degrees is
+// the sharpest seen to draw well. Each edge is brought down on its own to keep
+// its products in 32 bits, which leaves the angle as it was.
+inline bool turns_back(const Point& a, const Point& b, const Point& c) {
+    i32 ux = b.x - a.x, uy = b.y - a.y, vx = c.x - b.x, vy = c.y - b.y;
+    while (ux > 4095 || ux < -4095 || uy > 4095 || uy < -4095) { ux /= 2; uy /= 2; }
+    while (vx > 4095 || vx < -4095 || vy > 4095 || vy < -4095) { vx /= 2; vy /= 2; }
+    const i32 cross = ux * vy - uy * vx, dot = ux * vx + uy * vy;
+    return dot < 0 && (cross < 0 ? -cross : cross) * 20 < -dot;
+}
+
 // The apparition and its twin: posed by voice (bowed at breath, singing at
 // ee); trembling all round by beat, the tremble running at beat's rate while
 // held; its robe frayed as bed rises, into the sample's own waveform or,
@@ -103,22 +115,19 @@ void shape_figure(Frame& frame, u32 voice, u32 beat, u32 tremble, u32 bed, const
         frame.paths[apparition].points[i].y = clamp(y, -63 * unit, 63 * unit);
     }
     // Where pushes bring a point within an eighth of a pixel of the last, or
-    // make the outline turn straight back at it, it and its neighbours return
-    // to their places in the pose, whose points are all half a pixel or more
-    // apart.
+    // make the outline turn back on itself at it, it and its neighbours return
+    // to their places in the pose, whose points are all a pixel or more apart
+    // and whose turns are all wide. Each pass returns at least one point, so
+    // this ends clean.
     Point* p = frame.paths[apparition].points;
-    for (u32 pass = 0; pass < 8; ++pass) {
+    for (u32 pass = 0; pass < 64; ++pass) {
         bool moved = false;
         for (u32 i = 0; i < 64; ++i) {
             const u32 before = (i + 63) & 63, after = (i + 1) & 63;
             const Point& a = p[before], &b = p[i], &c = p[after];
             const i32 dx = b.x - a.x, dy = b.y - a.y;
             const bool merged = dx > -unit / 8 && dx < unit / 8 && dy > -unit / 8 && dy < unit / 8;
-            const i32 ux = dx >> 4, uy = dy >> 4, vx = (c.x - b.x) >> 4, vy = (c.y - b.y) >> 4;   // 1/64 px
-            const i32 cross = ux * vy - uy * vx, dot = ux * vx + uy * vy;
-            const i32 lengths = ((ux < 0 ? -ux : ux) + (uy < 0 ? -uy : uy)) * ((vx < 0 ? -vx : vx) + (vy < 0 ? -vy : vy));
-            const bool back = dot < 0 && (cross < 0 ? -cross : cross) < lengths / 25;
-            if (!merged && !back) continue;
+            if (!merged && !turns_back(a, b, c)) continue;
             const u32 near[3] = {before, i, after};
             for (u32 k = 0; k < 3; ++k)
                 if (p[near[k]].x != posed[near[k]].x || p[near[k]].y != posed[near[k]].y) { p[near[k]] = posed[near[k]]; moved = true; }
