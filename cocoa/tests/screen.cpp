@@ -341,6 +341,29 @@ int main(int argc, char** argv) {
     std::printf("idle: %u node changes in a second\n", idle);
     check(idle == 0, "the idle screen moves");
 
+    // A held note keeps moving until it is let go, whatever the stir, then the screen settles.
+    const double stirs[3] = {0.0, 0.6, 1.0};
+    for (double stir : stirs) {
+        run.c[7] = stir;
+        run.in.note_serial = static_cast<opxy::u32>(1000);
+        run.in.held_notes = 1;
+        unsigned moving = 0;
+        for (int f = 0; f < 60 * 4; ++f) { const unsigned n = run.tick(); if (f >= 60 * 2 && n) ++moving; }
+        check(moving >= 100, "a held note stops moving");
+        run.in.held_notes = 0;
+        ++run.in.note_off_serial;
+        for (int f = 0; f < 60 * 12; ++f) run.tick();
+        unsigned after = 0;
+        for (int f = 0; f < 60; ++f) after += run.tick();
+        check(after == 0, "the screen still moves after release");
+        run.in.note_serial = 0;
+        run.in.note_off_serial = 0;
+        display_reset(run.state);
+        run.frames = 0;
+        for (int f = 0; f < 60; ++f) run.tick();
+    }
+    run.c[7] = 0.6;
+
     // A note held 7 s, tapping, then let go; page 2 and its controls; a second
     // note with stir at a third; a chord; then the cup and fill change.
     run.counting = true;

@@ -54,5 +54,7 @@ struct DisplayState {
     i32 pop_age[4];       // each pop ring's age, Q10 s (negative when idle)
     i32 pop_x[4];         // and its place, Q10 px
     i32 ring_age[3];      // each floor ripple's age, Q10 s (negative when idle)
+    i32 slosh;            // how far the held drink sloshes at the walls, Q10 px, eased
+    u32 slosh_phase;      // the sloshing's phase, as the voices' (Q32 cycles)
 };
 }

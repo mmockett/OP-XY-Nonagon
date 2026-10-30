@@ -55,7 +55,7 @@ static opxy::draw::Turn rotation(i32 tenths) {
 
 namespace screen {
 using namespace opxy::draw;
-const u32 budget = 14;          // bubbles moved a frame, at most
+const u32 budget = 11;          // bubbles moved a frame, at most
 const i32 release = 512;        // Q10 s the voices sound on after the last key is let go (an estimate)
 const i32 froth_void = 470;     // a void fraction (Q31) that flattens the column 3 cents
 // Four greys, each with its weight (make_panel.py): the mug, the spoon and
@@ -270,6 +270,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         state.cup = 0xffffffffu;
         state.seed = 0x2545f491u;
         state.turn = 0;
+        state.slosh = 0;
+        state.slosh_phase = 0;
         for (u32 k = 0; k < node::pops; ++k) state.pop_age[k] = -1, state.pop_x[k] = 0;
         for (u32 k = 0; k < node::rings; ++k) state.ring_age[k] = -1;
     }
@@ -339,6 +341,16 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     state.surface = keep ? ease(state.surface, depth, keep) : depth;
     if (magnitude(state.surface - depth) < 128) state.surface = depth;
     const i32 h = state.surface, level = floor - h;
+    // While a key is held the drink keeps sloshing from wall to wall at the
+    // mug's sloshing mode, which fill sets, 1 px for a still drink to 2.5 px
+    // for one stirred at 100. It settles when the key is let go.
+    {
+        const i32 target = held && !reduced ? 1024 + static_cast<i32>(1536u * drink::q16(slots[STIR]) >> 16) : 0;
+        state.slosh = keep ? ease(state.slosh, target, keep) : target;
+        if (magnitude(state.slosh - target) < 32) state.slosh = target;
+        state.slosh_phase += static_cast<u32>(drink::along(tables::slosh_inc, slots[FILL])) * static_cast<u32>(blocks);
+    }
+    const i32 sloshing = state.slosh ? static_cast<i32>((state.slosh_phase >> 16) * 3600u >> 16) : 0;   // tenths of a degree
     {
         // The stirred drink's standing vortex, to 12 px (stir), and a note's stir on top.
         i32 vortex = static_cast<i32>(drink::q16(slots[STIR]) * 12 >> 6), ripple = 0;
@@ -350,6 +362,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
                 ripple = (fade * sine(state.since_tap * 3600 * 5 / 1024)) >> 10;            // 5 Hz
             }
         }
+        const i32 tilt = (state.slosh * sine(sloshing)) >> 10;
         const i32 meniscus[4] = {2560, 1280, 580, 230};   // Q10 px up, at the wall and inward
         // A thin closed ribbon, a quarter pixel thick (at its own scale), started
         // in the middle of its top run: the device draws a short closing edge
@@ -362,6 +375,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             const i32 v = 32 - (w < 0 ? -w : w);
             y += vortex * (v * v * 3 - 1024) / 3072;                                         // a funnel, D ((1 - |u|/a)^2 - 1/3)
             y += (ripple * sine(static_cast<i32>(i) * 3600 * 3 / 31)) >> 10;
+            y += (tilt * sine(static_cast<i32>(i) * 1800 / 31 + 2700)) >> 10;                 // up one wall, down the other
             ring[i].x = u >> 1;
             ring[i].y = y >> 1;
             ring[63 - i].x = u >> 1;
@@ -419,7 +433,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         for (u32 k = 0; k < node::swirls; ++k) {
             const i32 y = (floor - (h >> 10) * swirl_up[k]) / unit * unit;
             if (k >= swirls || y < level + 6 * unit) { conceal(frame, node::swirl + k); continue; }
-            put(frame, node::swirl + k, cx, y, swirl_size[k], grey::detail, stroke);
+            // Each swirl follows the slosh a little later than the one above it, by whole pixels.
+            const i32 sway = ((state.slosh * sine(sloshing - 500 * static_cast<i32>(k))) >> 10) / unit * unit;
+            put(frame, node::swirl + k, cx + sway, y, swirl_size[k], grey::detail, stroke);
         }
     }
 
