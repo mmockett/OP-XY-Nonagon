@@ -198,7 +198,7 @@ the screen still within a second.
 An engraved plate (`tools/make_panel.py`): a No. 8 cast-iron skillet, 270 mm
 across the rim and 48 mm deep, seen from 30° above, centred under the
 header with a margin round it. Its rim has two pour spouts; a 145 mm handle
-ends in a teardrop hole; a helper handle opposite. 15 static paths and 48
+ends in a teardrop hole; a helper handle opposite. 33 static paths and 48
 nodes.
 
 It is drawn for the screen's 480 × 222 pixels in three weights. The drops
@@ -240,14 +240,14 @@ and fall back. Up to three drops: a fourth note takes the oldest's place.
 
 The screen cannot hear the voices. It keeps its own drops, stepped by
 `leidenfrost.h` exactly as the voices step theirs, a block of time at a time;
-`tests/screen.cpp` checks its first drop keeps the voice's lobes. It is
-still when idle; reduced motion stops the breathing, flashing, spray, sparks
+`tests/screen.cpp` checks its first drop keeps the voice's lobes while its key
+is held. It is still when idle and within a second of the last key's release; reduced motion stops the breathing, flashing, spray, sparks
 and running; a reset snaps everything into place.
 
 **Churn** (host, 60 fps, nodes changing a frame while drops show): a drop's
-life 2.7, peak 7; three drops 6.8, peak 16; a sizzle 9.4, peak 12 (the
-spray); the ratchet 5.1, peak 8; a 16 s run of everything 3.3 on average
-(7.7 while drops show), peak 19. Idle: 0.
+life 3.2, peak 7; three drops 6.7, peak 16; a sizzle 9.5, peak 12 (the
+spray); the ratchet 5.4, peak 8; a 16 s run of everything 2.2 on average
+(6.8 while drops show), peak 17. Idle: 0.
 
 ## Level
 
@@ -275,7 +275,7 @@ The figures below are host estimates made during development.
   (a load of 7). `sdk.py test`'s single runs read 10,500.
 - The pipe and filters take 16-bit products; there is one division a block
   (the allpass) and none a sample.
-- **Memory.** Compiled for the Blackfin (`--firmware`), Drop takes 79.8 KiB
+- **Memory.** Compiled for the Blackfin (`--firmware`), Drop takes 80.6 KiB
   of module memory, eight voices of 4,300 bytes.
 
 ## Tests

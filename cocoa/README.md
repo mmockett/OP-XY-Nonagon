@@ -295,6 +295,10 @@ draws, over every control at five settings, each through a note.
   tumbler's tapering wall and heavy base, or an enamelled tin mug's thin
   wall, rolled rim and strap handle.
 
+While a key is held the drink keeps sloshing from wall to wall, as fast as
+fill sets the mug's sloshing mode, 1 px at stir 0 to 2.5 px at stir 100, and the
+swirls follow it; it settles when the key is let go.
+
 The screen keeps its own drink and spoon, stepped with the voices' code
 (`drink.h`) for each 64 samples of time. It follows the notes and the
 controls, not the audio. It assumes the voices sound for 0.5 s after the last
@@ -303,8 +307,8 @@ and the pops still, and a reset snaps everything into place.
 
 **Churn.** `tests/screen.cpp` plays a 22 s scene at 60 fps (a long climb,
 page 2 and its controls, a second note, a chord at fast taps, then cup and
-fill changes): 5.2 nodes change a frame on average, 32 at most. The idle screen changes nothing. Bubbles move in 2 px steps, at most
-14 a frame, and the drink's lines change at most six a frame.
+fill changes): 5.9 nodes change a frame on average, 30 at most. The idle screen changes nothing. Bubbles move in 2 px steps, at most
+11 a frame, and the drink's lines change at most six a frame.
 
 ## Files
 
@@ -355,7 +359,7 @@ At the heaviest setting:
   the default, with the cup rung out, is about 9,700.
 
 **Memory.** A voice is 304 bytes, `Shared` 96 and the display state 236.
-`sdk.py test --firmware` compiles it for the Blackfin in 64.6 KiB of module
+`sdk.py test --firmware` compiles it for the Blackfin in 65.6 KiB of module
 memory, 8 KiB of it the sine table.
 
 ## Prior art

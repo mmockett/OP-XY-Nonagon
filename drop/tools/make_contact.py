@@ -43,7 +43,7 @@ for k, name in enumerate(names):
         cells.append(f'<td style="width:480px;height:220px;padding:0">{svg}</td>')   # inline, so it can load the font
     rows.append(f'<tr><th>{name}</th>{"".join(cells)}</tr>')
 page = work / "sheet.html"
-page.write_text('<html><body style="margin:0;background:#111;color:#ccc;font:16px Helvetica">'
+page.write_text('<html><body style="margin:0;background:#111;color:#ccc;font:16px UniversNextPro-Light">'
                 '<table cellspacing="6"><tr><th></th><th>0</th><th>50</th><th>100</th></tr>' + "".join(rows) +
                 "</table></body></html>")
 height = 30 + 226 * len(rows)

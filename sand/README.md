@@ -222,8 +222,8 @@ the sand follows a tipping plate within a fifth of a second and never
 redraws all at once. Of the screen's 133 nodes, about 4 change a frame on
 average while a note is bowed at the defaults (at 60 frames a second), and
 about 11 at full Shake or with Tilt turned up, when the sand keeps running;
-at most 30 when a note pours fresh sand, and up to 41 on
-the frames a turning tilt moves the plate by half a degree.
+at most 29 at the heaviest settings measured, and 23 as a turning tilt moves
+the plate.
 
 ## Files
 
@@ -241,6 +241,9 @@ the frames a turning tilt moves the plate by half a degree.
   changing a figure or a shape, and commit all four;
   `python tools/make_plate.py --sheet <file>.svg` also draws every figure's
   outlines for checking by eye. Pure Python, no packages.
+- `tools/make_gif.py`: makes `docs/sand.gif` and, with `--sheet`,
+  `docs/controls.png` and `docs/controls-1x.png`, from the frames
+  `tools/frames.cpp` writes, in UniversNextPro-Light (`XY_FONT`).
 - `tests/sound.cpp`: the sound checks, run by `sdk.py test`: that the rattle
   dies as the sand settles and returns with a new figure or a fresh note,
   that a legato note keeps the settled sand and a struck one throws it, that
@@ -273,5 +276,5 @@ still about 200, a throw and its landing about 420 more) and the modes' block
 maths about 1,300. A settled note at the defaults comes to about 10,500. In
 heavy rattle most looks find a grain in the air, which costs little, so a
 shaken plate comes to about 11,000. The SDK's host estimate (`sdk.py test`)
-is lower, about 6,600 to 6,900. Compiled for the device, Sand takes 80.8 KiB
+is lower, about 6,600 to 6,900. Compiled for the device, Sand takes 81.2 KiB
 of the shared module memory.

@@ -224,13 +224,11 @@ exactly as the voices step theirs, catching up a second a frame so a slow
 screen keeps time. Motion eases on the frame's time. Reduced motion stops
 the turning, blur and drift; a reset snaps everything into place.
 
-Churn at 30 fps, over a 13 s scene of spins with three disks, size, disk and
-base changes and a held note: a mean of 7.4 nodes a frame and a peak of 19
-(10.8 while the disks roll); with reduced motion, 3.7 and 20. A still screen
-changes nothing. Wobble costs little: its ghost is eight dashes, two moved a
-frame, and with four disks spinning wobble 100 changes about one node a frame
-more than wobble 0 (two at hold); the disk's outlines change as often at any
-wobble.
+Churn at 60 fps (`tests/churn.cpp`), over every control through 0..127 and the
+settings that load it most: at most 9.8 nodes a frame on average, a peak of 16,
+and at most two of the four outlines a frame. A still screen changes nothing.
+Wobble costs little: its ghost is eight dashes, two moved a frame, and the
+disk's outlines change as often at any wobble.
 
 The header's captions fit their columns in the OP-XY's font (values at most
 53 px wide at 20 px, titles 56 at 10 px); `tests/captions.cpp` checks every
@@ -266,7 +264,7 @@ The host estimate in `sdk.py test` reads higher (17,700 to 18,400 on a quiet
 host), because the host's portable Q31 multiply takes about ten instructions
 where the Blackfin takes one: the loops that are cheapest on the Blackfin
 are the ones the host times as dearest. The firmware compile
-(`sdk.py test --firmware`) passes, and Coin takes 47.5 KiB of module memory.
+(`sdk.py test --firmware`) passes, and Coin takes 47.6 KiB of module memory.
 
 ## Files
 
@@ -288,4 +286,5 @@ are the ones the host times as dearest. The firmware compile
   `c++ -std=c++11 -O2 -I <sdk>/sdk/include tests/scenes.cpp -o scenes && ./scenes <folder>`.
 - `docs/coin.gif`, `docs/controls.png`, `docs/controls-1x.png`: the screen
   and its contact sheet, enlarged and at 1:1, rendered offline from
-  `display.cpp` in UniversNextPro-Light.
+  `display.cpp` in UniversNextPro-Light by `tools/make_gif.py` (`--sheet` for
+  the sheets), from the frames `tools/frames.cpp` writes.

@@ -327,7 +327,7 @@ as the SDK estimates synths) reads 20k and 21.6k, because the portable
 `q31::multiply` is one instruction on the Blackfin but a slow path on the
 host. With a plain multiply in its place it reads 8.7k and 9.7k.
 
-Memory is 226 KiB, mostly the pool's lines (16 notes × 8 KiB). A note's
+Memory is 228 KiB, mostly the pool's lines (16 notes × 8 KiB). A note's
 first block clears its lines, a one-off of about 4k stores.
 
 ## On the OP-XY
@@ -392,6 +392,10 @@ the top of its file.
 - `tools/render.cpp` writes each preset's phrase as a WAV into a folder you
   give it.
 - `tools/bench.cpp` gives the host CPU estimate.
+- `tests/screen.cpp`, run by `sdk.py test`, holds every shown outline to the
+  device's rules over every control, random settings and the apparition's own
+  shape: points 1/8 px apart, a closing edge of 1/4 px, and no turn sharper than
+  2.5 degrees from straight back.
 - `tools/frames.cpp` checks the screen frame by frame, against the SDK's
   rules and the OP-XY's, counts its churn and writes frames as JSON;
   `frames clear` sweeps every control, with a sample and without, and checks

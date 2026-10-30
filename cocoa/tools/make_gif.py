@@ -82,8 +82,8 @@ if args.sheet:
     cells = []
     for k, name in enumerate(names):
         row = ''.join(f'<div style="display:inline-block;margin:0 6px 6px 0">{svg(frames[3 * k + j], W, H)}</div>' for j in range(3))
-        cells.append(f'<div style="white-space:nowrap"><div style="display:inline-block;width:70px;color:#ccc;font:16px sans-serif;vertical-align:top;padding-top:100px">{name}</div>{row}</div>')
-    head = '<div style="color:#999;font:14px sans-serif;margin:6px 0 6px 76px">' + ''.join(f'<span style="display:inline-block;width:486px">{v}</span>' for v in ('0', '50', '100')) + '</div>'
+        cells.append(f'<div style="white-space:nowrap"><div style="display:inline-block;width:70px;color:#ccc;font:16px UniversNextPro-Light;vertical-align:top;padding-top:100px">{name}</div>{row}</div>')
+    head = '<div style="color:#999;font:14px UniversNextPro-Light;margin:6px 0 6px 76px">' + ''.join(f'<span style="display:inline-block;width:486px">{v}</span>' for v in ('0', '50', '100')) + '</div>'
     html = f'{S}/sheet.html'
     open(html, 'w').write('<html><head>' + FACE + '</head><body style="margin:8px;background:#111">' + head + ''.join(cells) + '</body></html>')
     for scale, name in ((1, 'controls-1x.png'), (2, 'controls.png')):

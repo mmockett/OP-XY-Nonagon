@@ -29,7 +29,7 @@ for scale, name in ((1, "controls-1x.png"), (2, "controls.png")):
     head = "".join(f'<div class="label top">{t}</div>' for t in ("", "0", "50", "100"))
     w, h = 480 * scale, 220 * scale
     html = f"""<html><head><style>
-body {{ margin: 0; background: #1a1a1a; color: #bbb; font: {12 * scale}px Helvetica, sans-serif; }}
+body {{ margin: 0; background: #1a1a1a; color: #bbb; font: {12 * scale}px UniversNextPro-Light; }}
 .grid {{ display: grid; grid-template-columns: {100 * scale}px {w}px {w}px {w}px; gap: {6 * scale}px; padding: {8 * scale}px; }}
 .label {{ display: flex; align-items: center; justify-content: flex-end; padding-right: {8 * scale}px; text-align: right; }}
 .top {{ justify-content: center; height: {20 * scale}px; }}

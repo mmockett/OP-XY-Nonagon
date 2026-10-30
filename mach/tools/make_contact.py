@@ -30,7 +30,7 @@ for c, name in enumerate(NAMES):
         svg = apply(frame).replace('height="220" viewBox="0 0 480 220"', 'height="222" viewBox="0 0 480 222"')
         cells.append(f'<td><div class="cell">{svg}</div><div class="v">{int(value * 100)}</div></td>')
     rows.append(f'<tr><th>{name}</th>{"".join(cells)}</tr>')
-style = ("body{margin:0;background:#111;color:#ccc;font:600 15px -apple-system,Helvetica,sans-serif}"
+style = ("body{margin:0;background:#111;color:#ccc;font:15px UniversNextPro-Light}"
          "table{border-spacing:10px 6px;padding:6px}th{text-align:right;padding-right:6px;width:64px;color:#ddd}"
          "td{vertical-align:top}.cell svg{display:block;width:480px;height:220px}.v{text-align:center;color:#888;font-size:12px}")
 page = f'<html><head><style>{style}</style></head><body><table>{"".join(rows)}</table></body></html>'

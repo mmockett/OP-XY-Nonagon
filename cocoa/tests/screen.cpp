@@ -342,6 +342,8 @@ int main(int argc, char** argv) {
     check(idle == 0, "the idle screen moves");
 
     // A held note keeps moving until it is let go, whatever the stir, then the screen settles.
+    FILE* const dumping = run.out;
+    run.out = nullptr;   // not in the GIF's frames
     const double stirs[3] = {0.0, 0.6, 1.0};
     for (double stir : stirs) {
         run.c[7] = stir;
@@ -363,6 +365,7 @@ int main(int argc, char** argv) {
         for (int f = 0; f < 60; ++f) run.tick();
     }
     run.c[7] = 0.6;
+    run.out = dumping;
 
     // A note held 7 s, tapping, then let go; page 2 and its controls; a second
     // note with stir at a third; a chord; then the cup and fill change.
