@@ -26,6 +26,7 @@ the field, under the SDK's two-page header:
 Node numbers are display.h's."""
 import math
 import pathlib
+import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -199,10 +200,10 @@ for i, (x, y, ink, size) in enumerate(texts):
 cx, cy = CENTRE
 for side in (-1, 1):
     left, right = [], []
-    for k in range(41):
-        y = BAND[0] - 4 + (BAND[1] - BAND[0] + 8) * k / 40
+    for k in range(33):
+        y = BAND[0] - 4 + (BAND[1] - BAND[0] + 8) * k / 32
         x = cx + side * math.sqrt(RADIUS ** 2 - (y - cy) ** 2)
-        w = 1.0 * math.sin(math.pi * k / 40) ** 0.35        # half the band's width
+        w = 1.0 * math.sin(math.pi * k / 32) ** 0.35        # half the band's width
         left.append((x - side * w, y))
         right.append((x + side * w, y))
     out.append(f'<path d="{outline(left + right[::-1][1:-1], 2)}" fill="{G(10)}" stroke="{G(10)}" stroke-width="0.4"/>')
@@ -237,7 +238,18 @@ for i, grey in enumerate(GREYS):
     out.append(f'<circle id="{ID}_palette_{i}" cx="640" cy="0" r="1" fill="{grey}" stroke="{grey}" '
                f'stroke-width="{num(LINE)}"/>')
 out.append("</g>")
-(ROOT / "panel.svg.fragment").write_text("\n".join(out) + "\n")
+body = "\n".join(out) + "\n"
+# The device's rules for every artwork path: one subpath, at most 64 points,
+# neighbours at least 1/8 px apart, a closing edge of at least 1/4 px.
+for d in re.findall(r' d="([^"]+)"', body):
+    assert d.count("M") == 1, d[:60]
+    shape = [(float(x), float(y)) for x, y in re.findall(r"(-?[\d.]+),(-?[\d.]+)", d)]
+    assert 3 <= len(shape) <= 64, (len(shape), d[:60])
+    for i, a in enumerate(shape):
+        b = shape[(i + 1) % len(shape)]
+        assert abs(a[0] - b[0]) + abs(a[1] - b[1]) >= (0.25 if i == len(shape) - 1 else 0.125), (a, b)
+assert len(body) <= 64 * 1024, len(body)
+(ROOT / "panel.svg.fragment").write_text(body)
 
 plate_h = ["// Written by tools/make_panel.py: do not edit.",
            "#pragma once",
