@@ -11,5 +11,6 @@
     "amp": {
       "release": 20000
     }
-  }
+  },
+  "presets": "presets"
 }
