@@ -71,6 +71,17 @@ inline u32 root(u32 v) {
     }
     return r;
 }
+// The way along (dx, dy) as a Q10 unit vector, scaled up first: a short vector
+// has few bits to divide by, and a turn that isn't a unit vector makes the whole
+// frame invalid.
+inline Turn along_of(i32 dx, i32 dy) {
+    if (!dx && !dy) { const Turn none = {unit, 0}; return none; }
+    while (magnitude(dx) < 8192 && magnitude(dy) < 8192) { dx *= 2; dy *= 2; }
+    while (magnitude(dx) >= 32768 || magnitude(dy) >= 32768) { dx /= 2; dy /= 2; }
+    const i32 length = static_cast<i32>(root(static_cast<u32>(dx * dx + dy * dy)));
+    const Turn t = {dx * unit / length, dy * unit / length};
+    return t;
+}
 inline u32 next(u32& s) {
     s ^= s << 13;
     s ^= s >> 17;
@@ -232,6 +243,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     const bool fresh = !state.initialized || state.track != input.track;
     const bool reduced = input.reduced_motion != 0;
     const i32 dt = fresh ? 0 : clamp(input.elapsed, 0, 102);   // motion eases on at most 0.1 s a frame
+    const bool held = input.held_notes != 0 && input.held_notes <= 128;
     if (fresh) {
         state.initialized = 1;
         state.track = input.track;
@@ -281,6 +293,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     for (u32 k = 0; k < scene::most; ++k) {
         ScreenDrop& d = state.drops[k];
         if (!d.used) continue;
+        // Let go, the amp fades the note, and the drop boils away with it.
+        if (!held) d.drop.life -= reduced ? physics::one : (physics::one >> 10) * dt * 4 / 3;
+        if (!held && d.drop.life <= 0) d.drop.lobes = 0;
         for (i32 b = 0; b < blocks && d.drop.lobes; ++b) {
             const u32 events = physics::step(d.drop, p);
             if ((events & (physics::stepped | physics::landed)) && !reduced) {   // a spark, as the sound clicks
@@ -311,9 +326,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     for (u32 k = 0; k < scene::most; ++k) {
         ScreenDrop& d = state.drops[k];
         const u32 rim = node::rim + k, under = node::underside + k;
-        // A drop under 3 px across its radius is gone from the screen: its
+        // A drop under 3.25 px across its radius is gone from the screen: its
         // outline's points would merge, which the OP-XY draws as streaks.
-        if (!d.used || drop_px(physics::radius(d.drop, p)) < 3 * unit) {
+        if (!d.used || drop_px(physics::radius(d.drop, p)) < 3328) {
             rest(points);
             outline(frame, rim, points, d.key, fresh);
             conceal(frame, rim);
@@ -398,7 +413,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             const i32 b1 = static_cast<i32>(physics::hash(p.seed, 7 + k) % 3600u), b2 = static_cast<i32>(physics::hash(p.seed, 11 + k) % 3600u);
             const i32 wobble = reduced ? 0 : sine(static_cast<i32>(dr.age * 97 % 3600)) / 16;
             for (u32 i = 0; i < 64; ++i) {
-                const i32 t = static_cast<i32>(i * 225 / 4);
+                const i32 t = static_cast<i32>((i + 16) * 225 / 4);   // from its back, where its edges are longest
                 const i32 bump = (sine(3 * t + b1) * 3 + sine(5 * t + b2) * 2 + sine(11 * t + b1 + wobble * 40) ) / 6;   // Q10
                 const i32 r = spread + (spread * (bump * 120 >> 10) >> 10);
                 points[i].x = r * sine(t + 900) >> 10;
@@ -474,9 +489,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         if (was.x == x + ex && was.y == y + ey && was.shade == 13) continue;
         place(frame, n, x + ex, y + ey, unit, 13, stroke);
         // Turned outward, along the screen's direction from the drop's centre.
-        const i32 len = static_cast<i32>(root(static_cast<u32>((ex >> 5) * (ex >> 5) + (ey >> 5) * (ey >> 5)))) + 1;
-        const Turn out = {(ex >> 5) * unit / len, (ey >> 5) * unit / len};
-        if (rotation_valid(out.cos, out.sin)) turn(frame, n, out);
+        turn(frame, n, along_of(ex, ey));
     }
 
     // The water mark where the next drop lands: the size a new drop takes.

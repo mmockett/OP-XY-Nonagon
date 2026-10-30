@@ -63,6 +63,32 @@ int main(int argc, char** argv) {
         return c.valid ? 0 : 1;
     }
     bool ok = true;
+    // However long its life, a drop boils away within a second of the key's release.
+    for (int life = 0; life <= 4; ++life) {
+        static drop::DisplayState state;
+        static drop::Frame frame, before;
+        std::memset(&state, 0, sizeof state);
+        std::memset(&frame, 0, sizeof frame);
+        drop::display_reset(state);
+        opxy::draw::Input input = {};
+        input.track = 1;
+        input.elapsed = 17;
+        for (unsigned i = 0; i < 4; ++i) input.shown[i] = static_cast<opxy::u8>(i);
+        double controls[8] = {0.5, 0.85, 0, 0.181, 0, 0.35, life / 4.0, 0.25};
+        for (unsigned i = 0; i < 8; ++i) input.slots[i] = q31(controls[i]);
+        for (unsigned i = 0; i < 4; ++i) input.parameters[i] = input.slots[i];
+        for (int n = 0; n < 240; ++n) {
+            if (n == 10) { input.note_serial = 1; input.held_notes = 1; }
+            if (n == 120) { input.note_off_serial = 1; input.held_notes = 0; }
+            before = frame;
+            drop::display(state, input, frame);
+            if (n >= 120 + 60 && std::memcmp(&frame.nodes, &before.nodes, sizeof frame.nodes)) {
+                std::printf("FAIL the screen still moves %.2f s after release at life %d/4\n", (n - 120) / 60.0, life);
+                ok = false;
+                break;
+            }
+        }
+    }
     for (const char* scenario : {"life", "chord", "sizzle", "ratchet", "session"})
         for (double fps : {60.0, 30.0}) {
             const Churn c = run(scenario, fps, std::vector<double>(), true);
@@ -175,9 +201,9 @@ static Churn run(const char* scenario, double fps, const std::vector<double>& sn
                 drop::render(voice, shared, 1, o, input.slots, pitch);
                 voice_blocks -= 1;
             }
-            // While its drop lives the screen's first drop has its lobes, give or take a block's timing.
+            // While its key is held the screen's first drop has its lobes, give or take a block's timing.
             const drop::ScreenDrop& d = state.drops[0];
-            if (d.used && d.order == 1 && voice.drop.lobes &&
+            if (held && d.used && d.order == 1 && voice.drop.lobes &&
                 (d.drop.lobes > voice.drop.lobes + 1 || d.drop.lobes + 1 < voice.drop.lobes)) matched = false;
         }
         if (!opxy::draw::valid(frame)) {

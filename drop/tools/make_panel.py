@@ -188,16 +188,40 @@ def engrave_line(points, grey, width):
     engrave(stroke(points), grey, round(max(0.2, width - RIBBON), 2))
 
 
+def engrave_long(points, grey, width, h=RIBBON):
+    """A line too long for one path (the loader takes 64 points): ribbons that
+    meet end to end. Its stroke is the line's width less the ribbon's own, so a
+    ribbon under the stroke's width draws solid, as a single stroke would."""
+    for i in range(0, len(points) - 1, 31):
+        engrave(outline(ribbon(points[i:i + 32], h), 2), grey, round(max(0.2, width - h), 2))
+
+
+def closed(points):
+    return points + points[:1]
+
+
+def check(body):
+    """The device's rules for every artwork path: one subpath, at most 64 points,
+    neighbours at least 1/8 px apart, a closing edge of at least 1/4 px."""
+    for d in re.findall(r' d="([^"]+)"', body):
+        assert d.count("M") == 1, d[:60]
+        shape = [(float(x), float(y)) for x, y in re.findall(r"(-?[\d.]+),(-?[\d.]+)", d)]
+        assert 3 <= len(shape) <= 64, (len(shape), d[:60])
+        for i, a in enumerate(shape):
+            b = shape[(i + 1) % len(shape)]
+            assert abs(a[0] - b[0]) + abs(a[1] - b[1]) >= (0.25 if i == len(shape) - 1 else 0.125), (a, b)
+
+
 # The outside: up the left side, round the bottom's front edge, up the right.
 left_top = project(-RIM_OUT, 0, DEPTH)
 right_top = project(RIM_OUT, 0, DEPTH)
 bottom = rim(BASE_R, BASE_Z, 180, 360, 64, lip=False)
-engrave_line([left_top] + bottom + [right_top], OUTLINE, OUTLINE_W)
+engrave_long([left_top] + bottom + [right_top], OUTLINE, OUTLINE_W)
 # The rim, outside and in, with its spouts.
-engrave(outline(rim(RIM_OUT, DEPTH, n=112), 1), OUTLINE, OUTLINE_W)
-engrave(outline(rim(RIM_IN, DEPTH, n=112), 1), EDGE, EDGE_W)
+engrave_long(closed(rim(RIM_OUT, DEPTH, n=112)), OUTLINE, OUTLINE_W, 0.3)
+engrave_long(closed(rim(RIM_IN, DEPTH, n=112)), EDGE, EDGE_W, 0.3)
 # The floor's edge, where it can be seen behind the front wall.
-engrave_line(rim(FLOOR_R, 0, -16, 196, 72, lip=False), EDGE, EDGE_W)
+engrave_long(rim(FLOOR_R, 0, -16, 196, 72, lip=False), EDGE, EDGE_W)
 # Three faint strokes down each end of the outside wall, where it turns away.
 for u in (0.93, 0.8, 0.62, -0.62, -0.8, -0.93):
     t = 180 + math.degrees(math.acos(u))
@@ -243,9 +267,9 @@ def lift(x):
 
 
 plan = handle_plan()
-engrave(outline([project(x, y, lift(x)) for x, y in plan], 1), OUTLINE, OUTLINE_W)
+engrave_long(closed([project(x, y, lift(x)) for x, y in plan]), OUTLINE, OUTLINE_W, 0.3)
 front = [p for p in plan if p[1] < 0 or p[0] > 250]
-engrave_line([project(x, y, lift(x) - 9) for x, y in front] + [project(*front[-1], lift(front[-1][0]))], EDGE, EDGE_W)
+engrave_long([project(x, y, lift(x) - 9) for x, y in front] + [project(*front[-1], lift(front[-1][0]))], EDGE, EDGE_W)
 hole = []
 for i in range(40):                         # a teardrop, its point toward the rim
     a = 2 * math.pi * i / 40
@@ -260,8 +284,8 @@ engrave(outline(hole, 1), EDGE, EDGE_W)
 for k, r in enumerate(HEAT_R):
     reach = math.degrees(math.asin(min(1, 46 / r)))
     pts = []
-    for i in range(40):
-        t = -reach + (180 + 2 * reach) * i / 39
+    for i in range(32):
+        t = -reach + (180 + 2 * reach) * i / 31
         rr = r * (1 + 0.035 * math.sin(math.radians(3 * t) + k) + 0.025 * math.sin(math.radians(7 * t) + 2 * k))
         pts.append(project(rr * math.cos(math.radians(t)), rr * math.sin(math.radians(t)), 0))
     out.append(path(stroke(pts), "none", G(8), 0.9, HEAT + k))
@@ -353,5 +377,7 @@ out.append("</g>")
 ids = [int(m) for m in re.findall(rf'id="{ID}_node_(\d+)"', "\n".join(out))]
 assert sorted(ids) == list(range(NODES)), ("every node once", sorted(set(range(NODES)) - set(ids)))
 body = "\n".join(out) + "\n"
+check(body)
+assert len(body) <= 64 * 1024, len(body)
 (ROOT / "panel.svg.fragment").write_text(body)
 print("wrote panel.svg.fragment,", NODES, "nodes,", static, "static paths,", len(body), "bytes")

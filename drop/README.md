@@ -170,7 +170,8 @@ generated presets an amp envelope of no attack, full sustain and a moderate
 release (14000 of 32767), so notes end when the key is let go, like any
 synth, and the drop's life shapes them while they are held. Letting go
 cannot lift the drop off the plate, since the voice is not told. The screen
-keeps drawing a drop to its end for the same reason.
+is told: it boils the drop away over the amp's fade, so a released note leaves
+the screen still within a second.
 
 ### Where it departs from the physics
 
