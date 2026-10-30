@@ -103,6 +103,24 @@ def ribbon(points, h):
     return points + back
 
 
+def ribbons(points, h, per=32):
+    """A long static line as several closed ribbons, each within the loader's 64
+    points and starting from where the last one ended, so the line has no gap."""
+    return [ribbon(points[i:i + per], h) for i in range(0, len(points) - 1, per - 1)]
+
+
+def check(body):
+    """The device's rules for every artwork path: one subpath, at most 64 points,
+    neighbours at least 1/8 px apart, a closing edge of at least 1/4 px."""
+    for d in re.findall(r' d="([^"]+)"', body):
+        assert d.count("M") == 1, d[:60]
+        shape = [(float(x), float(y)) for x, y in re.findall(r"(-?[\d.]+),(-?[\d.]+)", d)]
+        assert 3 <= len(shape) <= 64, (len(shape), d[:60])
+        for i, a in enumerate(shape):
+            b = shape[(i + 1) % len(shape)]
+            assert abs(a[0] - b[0]) + abs(a[1] - b[1]) >= (0.25 if i == len(shape) - 1 else 0.125), (a, b)
+
+
 def ring(r, z=0.0, n=64, start=0.0, to=None):
     to = to or project
     return [to(r * math.cos(start + 2 * math.pi * i / n), r * math.sin(start + 2 * math.pi * i / n), z) for i in range(n)]
@@ -133,11 +151,17 @@ for i, (x, y, ink, size) in enumerate(texts):
                f'font-size="{size}px">-</text>')
 
 # ---- The base: a ring round a concave mirror, its top and its side. ----
+# The ring's top edge hides the side's, so the side is its lower edge and the
+# two short ends. Each line is ribbons 0.3 px across, drawn 0.3 px thinner than
+# the line was as a single stroke, to weigh the same.
 front = [math.pi * i / 63 for i in range(64)]
 top = [project(BASE_R * math.cos(-a), BASE_R * math.sin(-a), 0) for a in front]
 bottom = [project(BASE_R * math.cos(-a), BASE_R * math.sin(-a), -BASE_H) for a in front]
-out.append(path(outline(top + bottom[::-1], 2), "none", G(9), 0.8))
-out.append(path(outline(ring(BASE_R, 0, 128), 2), "none", G(12), 1.0))
+for piece in ribbons([top[0]] + bottom + [top[-1]], 0.3):
+    out.append(path(outline(piece, 2), "none", G(9), 0.5))
+rim = ring(BASE_R, 0, 128)
+for piece in ribbons(rim + rim[:1], 0.3):
+    out.append(path(outline(piece, 2), "none", G(12), 0.7))
 
 # ---- Each base's own marks, in the front of the base's mirror ring (glass
 # has none: it shows the disk's reflection). ----
@@ -225,6 +249,8 @@ body = "\n".join(out)
 ids = [int(m) for m in re.findall(rf'id="{ID}_node_(\d+)"', body)]
 assert sorted(ids) == list(range(NODES)), ("every node once", sorted(set(range(NODES)) - set(ids)))
 static_paths = len(re.findall(r"<(?:path|circle)(?![^>]*id=)", body))
+check(body)
+assert len(body) + 1 <= 64 * 1024, len(body)
 (ROOT / "panel.svg.fragment").write_text(body + "\n")
 print("wrote panel.svg.fragment,", NODES, "nodes,", static_paths, "static paths,", len(body), "bytes")
 
