@@ -178,18 +178,28 @@ void shape_floor(Frame& frame, u32 orbit, u32 near) {
         const Spot at = spot(place(0, 0, orbit16, near16));
         ellipse_points(p, (at.x - path_x * unit) / 2, (at.y - path_y * unit) / 2, 7 * unit / 2, unit);
     } else {
-        // A ribbon along the arc: out along its front edge, back along its rear.
+        // A ribbon along the arc, a quarter pixel to each side of its middle,
+        // square to the way it runs: an edge offset only up and down lies on
+        // top of the other where the arc runs up the side of the stage.
+        i32 x[32], y[32];
         for (u32 i = 0; i < 32; ++i) {
             const i32 a = i32(i * 2048) - 32768 + 1024;                       // -1..1 of a half turn, Q15
             const u32 angle = u32(a) * 65536u;
             // Spread, a start angle that place() narrows by orbit; circling, a
             // circled angle, near swinging with the side as it does.
             const Spot s = spot(orbit16 > 16384 ? place(0, angle, orbit16, near16) : place(angle, 0, orbit16, near16));
-            const i32 x = (s.x - path_x * unit) / 2, y = (s.y - path_y * unit) / 2;
-            p.points[i].x = x;
-            p.points[i].y = y - unit / 4;
-            p.points[63 - i].x = x;
-            p.points[63 - i].y = y + unit / 4;
+            x[i] = (s.x - path_x * unit) / 2;
+            y[i] = (s.y - path_y * unit) / 2;
+        }
+        for (u32 i = 0; i < 32; ++i) {
+            const i32 dx = x[i < 31 ? i + 1 : 31] - x[i ? i - 1 : 0], dy = y[i < 31 ? i + 1 : 31] - y[i ? i - 1 : 0];
+            const i32 ax = dx < 0 ? -dx : dx, ay = dy < 0 ? -dy : dy;
+            const i32 length = ax > ay ? ax + ay * 3 / 8 : ay + ax * 3 / 8;   // near enough
+            const i32 nx = length ? -dy * (unit / 4) / length : 0, ny = length ? dx * (unit / 4) / length : unit / 4;
+            p.points[i].x = x[i] + nx;
+            p.points[i].y = y[i] + ny;
+            p.points[63 - i].x = x[i] - nx;
+            p.points[63 - i].y = y[i] - ny;
         }
     }
     p.key = key;
