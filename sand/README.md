@@ -217,12 +217,12 @@ while notes are held and a strike ringing down. Its grains are not the
 sound's grains, but they move as they do.
 
 A settled plate redraws nothing. Only part of the sand is redrawn each
-frame, moving grains on alternate frames and settled ones every sixth, so
+frame, moving grains every third frame and settled ones every sixth, so
 the sand follows a tipping plate within a fifth of a second and never
-redraws all at once. Of the screen's 133 nodes, 2 to 4 change a frame on
-average while notes are bowed at the defaults (at 60 and 30 frames a
-second), 13 to 15 at full Shake, and 8 to 15 with Tilt turned up, when the
-sand keeps running; at most 30 when a note pours fresh sand, and up to 41 on
+redraws all at once. Of the screen's 133 nodes, about 4 change a frame on
+average while a note is bowed at the defaults (at 60 frames a second), and
+about 11 at full Shake or with Tilt turned up, when the sand keeps running;
+at most 30 when a note pours fresh sand, and up to 41 on
 the frames a turning tilt moves the plate by half a degree.
 
 ## Files

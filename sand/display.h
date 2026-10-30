@@ -36,6 +36,6 @@ struct DisplayState {
     i32 stroke;     // how far the bow has drawn over the plate, Q10 px
     i32 tilt;       // the plate's tilt, Q10 tenths of a degree (negative: its far edge down)
     i32 struck;     // Q10 seconds since the mallet last struck
-    u32 frames;     // frames drawn: moving grains are redrawn on alternate frames
+    u32 frames;     // frames drawn: moving grains are redrawn every third frame
 };
 }

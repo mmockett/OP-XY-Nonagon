@@ -45,6 +45,8 @@ const i32 kOnLine = 6554;
 const i32 kBelowHeader = 42 * 1024;
 // Settled grains are redrawn one frame in this many.
 const u32 kSettledTurns = 6;
+// Moving grains, one frame in this many.
+const u32 kMovingTurns = 3;
 // A grain in the air is drawn this far above the plate per look it has left
 // to fall, up to the most (px).
 const i32 kRise = 1, kRiseMost = 12;
@@ -370,7 +372,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     // sand it stands for, along the line, so plenty of Sand draws the figure
     // in heaped sand. Only some of the sand is redrawn each frame, so a plate
     // of dancing sand, or one tipping under it, never redraws all of it at
-    // once: moving grains on alternate frames, settled ones every sixth (as
+    // once: moving grains every third frame, settled ones every sixth (as
     // the plate tips they follow it within a tenth or a fifth of a second).
     const i32 size = unit + (grain * unit >> 15);  // 2.6 to 5.2 px across: no dust finer than the screen shows
     // More Sand heaps longer, whiter drifts, until they join along the lines;
@@ -389,7 +391,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const bool moving = g.air || g.rest < kSettled;
         const bool turn_now = !state.started || i % kSettledTurns == state.frames % kSettledTurns;
         const Point2 at = tipped(flat_x(g.u, g.v), flat_y(g.u), r);
-        if (moving ? !state.started || ((i ^ state.frames) & 1) == 0 : turn_now) {
+        if (moving ? !state.started || (i + state.frames) % kMovingTurns == 0 : turn_now) {
             const u32 grey = g.air ? aloft_grey : moving ? moving_grey : rest_grey;
             const i32 rise = clamp(g.air * kRise, 0, kRiseMost) * unit;
             const i32 y = at.y - rise < kBelowHeader ? kBelowHeader : at.y - rise;  // a tipped plate's grains stay clear of the header

@@ -15,8 +15,10 @@ as a real plate splits them. A figure is the mode the bow drives; the note
 sounds at its frequency and the next seven modes up the plate ring above it.
 
 Pure Python, no packages: it runs wherever the SDK does."""
+import itertools
 import math
 import pathlib
+import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -210,17 +212,18 @@ def resample(line, count, closed=False):
     return out
 
 
-def walk(curves):
+def walk(curves, flip=False):
     """One closed outline through edge-to-edge curves: along a curve, then
     along the border (which the artwork draws in the same ink) to the nearest
-    unvisited curve end, and finally back round the border to the start.
+    unvisited curve end, and finally back round the border to the start. `flip`
+    takes the first curve the other way, which leaves it on its other side.
     Returns runs of (kind, points)."""
     left = list(curves)
     runs = []
     first = min(left, key=lambda c: min(border_t(c[0]), border_t(c[-1])))
-    if border_t(first[-1]) < border_t(first[0]):
-        first = first[::-1]
     left.remove(first)
+    if (border_t(first[-1]) < border_t(first[0])) != flip:
+        first = first[::-1]
     start_t = border_t(first[0])
     runs.append(('curve', first))
     here = border_t(first[-1])
@@ -266,6 +269,101 @@ def outline_points(runs, count):
     return out
 
 
+def crossings(points):
+    """How many pairs of a closed outline's edges cross."""
+    def side(a, b, c):
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+    n, found = len(points), 0
+    for i in range(n):
+        a, b = points[i], points[(i + 1) % n]
+        for j in range(i + 2, n):
+            if i == 0 and j == n - 1:
+                continue
+            c, d = points[j], points[(j + 1) % n]
+            if side(a, b, c) * side(a, b, d) < 0 and side(c, d, a) * side(c, d, b) < 0:
+                found += 1
+    return found
+
+
+def drawn(outline):
+    """An outline as display.cpp gets it: path units, Q8."""
+    return distinct(tidy([path_units(pt) for pt in outline], POINTS))
+
+
+def walks_crossing(group, flip=False):
+    """The crossings in one walk through these curves."""
+    if not group:
+        return 0
+    try:
+        return crossings(drawn(outline_points(walk(group, flip), POINTS)))
+    except AssertionError:
+        return 10 ** 6   # too many curves for one outline
+
+
+def best_walk(group):
+    """The outline through these curves, whichever way round crosses itself less."""
+    return outline_points(walk(group, walks_crossing(group, True) < walks_crossing(group)), POINTS)
+
+
+def cells(curves):
+    """The curves round each cell of the figure, as indices: the curves part the
+    plate into cells, and a walk round one cell's curves can't cross itself."""
+    ends = sorted((border_t(c[e]), i, e) for i, c in enumerate(curves) for e in (0, -1))
+    at = {(i, e): k for k, (_, i, e) in enumerate(ends)}
+    seen, found = set(), []
+    for start in range(len(ends)):
+        k, cell = start, set()
+        while k not in seen:
+            seen.add(k)
+            _, i, e = ends[(k + 1) % len(ends)]
+            cell.add(i)
+            k = at[(i, -1 - e)]
+        if cell:
+            found.append(cell)
+    return found
+
+
+def by_cells(curves, walks):
+    """Shares the curves among the walks: the cells that between them hold the
+    most curves, each curve in the cell with fewest so far; then what is left,
+    which the walks must carry across a cell, to the shortest walk."""
+    found = cells(curves)
+    chosen = max(itertools.combinations(found, min(walks, len(found))), key=lambda c: (len(set().union(*c)), -sum(map(len, c))))
+    groups = [[] for _ in chosen]
+    for i, c in sorted(enumerate(curves), key=lambda ic: -length(ic[1])):
+        fits = [g for g, cell in zip(groups, chosen) if i in cell] or groups
+        min(fits, key=lambda g: sum(map(length, g)) + 0.05 * len(g)).append(c)
+    return groups
+
+
+def untangle(groups):
+    """Move curves between the walks while that leaves fewer crossings: curves
+    that pass close at one of the figure's nodal crossings, resampled, can cross."""
+    while True:
+        counts = [min(walks_crossing(g), walks_crossing(g, True)) for g in groups]
+        if not sum(counts):
+            return groups
+        best = None
+        for a, group in enumerate(groups):
+            if not counts[a]:
+                continue
+            for c in group:
+                for b in range(len(groups)):
+                    if b == a:
+                        continue
+                    left = [x for x in group if x is not c]
+                    joined = groups[b] + [c]
+                    total = (min(walks_crossing(left), walks_crossing(left, True)) +
+                             min(walks_crossing(joined), walks_crossing(joined, True)) - counts[a] - counts[b])
+                    if best is None or total < best[0]:
+                        best = (total, a, b, c)
+        if best is None or best[0] >= 0:
+            return groups
+        _, a, b, c = best
+        groups[a] = [x for x in groups[a] if x is not c]
+        groups[b] = groups[b] + [c]
+
+
 def figure_outlines(figure):
     m, n, s = figure
     lines = contours(lambda x, y: shape(m, n, s, x, y))
@@ -290,12 +388,8 @@ def figure_outlines(figure):
             raise SystemExit(f"figure {figure}: a curve ends inside the plate")
     walks = PATHS - len(rings)
     assert walks >= 1, f"figure {figure} has too many rings"
-    # Share the curves among the walks, balancing their length.
-    groups = [[] for _ in range(walks)]
-    for c in sorted(curves, key=length, reverse=True):
-        min(groups, key=lambda g: sum(map(length, g)) + 0.05 * len(g)).append(c)
-    groups = [g for g in groups if g]
-    outlines = [outline_points(walk(g), POINTS) for g in groups]
+    groups = [g for g in untangle(by_cells(curves, walks)) if g]
+    outlines = [best_walk(g) for g in groups]
     outlines += [resample(r, POINTS, closed=True) for r in rings]
     return outlines
 
@@ -454,7 +548,7 @@ def build_header():
         lines.append("    {")
         for p in range(PATHS):
             if p < len(outlines):
-                pts = distinct(tidy([path_units(pt) for pt in outlines[p]], POINTS))
+                pts = drawn(outlines[p])
             else:
                 pts = [(round(256 * math.cos(2 * math.pi * k / POINTS)), round(256 * math.sin(2 * math.pi * k / POINTS))) for k in range(POINTS)]
             lines.append("        {" + ", ".join(f"{{{x}, {y}}}" for x, y in pts) + "},")
@@ -693,7 +787,7 @@ def build_panel():
     for k, (a, b) in enumerate([((0.05, 0.32), (0.32, 0.05)), ((0.62, 0.95), (0.95, 0.62))]):
         out.append(node_line([top(*a), top(*b)], 1.2, GREYS[12], GLASS_MARKS + k))
     for k, (y, seed) in enumerate([(0.14, 0.4), (0.38, 2.3), (0.62, 4.1), (0.86, 1.2)]):
-        out.append(node_line([top(x / 40, y + 1.6 * wobble(x / 40, seed)) for x in range(1, 40)], DETAIL_WIDTH, GREYS[8], WOOD_MARKS + k))
+        out.append(node_line([top(x / 33, y + 1.6 * wobble(x / 33, seed)) for x in range(1, 33)], DETAIL_WIDTH, GREYS[8], WOOD_MARKS + k))
     for k, (a, b) in enumerate([((0.08, 0.62), (0.62, 0.08)), ((0.22, 0.9), (0.9, 0.22))]):
         out.append(node_line([top(*a), top(*b)], 1.4, GREYS[10], SHEEN + k))
     for k, y in enumerate([0.3, 0.7]):
@@ -796,7 +890,18 @@ definition = json.loads(definition_path.read_text())
 definition["parameters"][0]["mapping"]["labels"] = [f'{m}:{n}{"+" if s > 0 else "-"}' for m, n, s in FIGURES]
 definition["resources"]["display"]["nodes"] = NODES
 definition_path.write_text(json.dumps(definition, indent=2) + "\n")
-(ROOT / "panel.svg.fragment").write_text(build_panel())
+panel = build_panel()
+# The device's rules for every artwork path: one subpath, at most 64 points,
+# neighbours at least 1/8 px apart, a closing edge of at least 1/4 px.
+for d in re.findall(r' d="([^"]+)"', panel):
+    assert d.count("M") == 1, d[:60]
+    points = [(float(x), float(y)) for x, y in re.findall(r"(-?[\d.]+),(-?[\d.]+)", d)]
+    assert 3 <= len(points) <= 64, (len(points), d[:60])
+    for i, a in enumerate(points):
+        b = points[(i + 1) % len(points)]
+        assert abs(a[0] - b[0]) + abs(a[1] - b[1]) >= (0.25 if i == len(points) - 1 else 0.125), (a, b)
+assert len(panel) <= 64 * 1024, len(panel)
+(ROOT / "panel.svg.fragment").write_text(panel)
 if SHEET:
     SHEET.write_text(build_sheet(outlines))
 print(f"plate.h, view.h, panel.svg.fragment: {len(FIGURES)} figures, {NODES} nodes")
