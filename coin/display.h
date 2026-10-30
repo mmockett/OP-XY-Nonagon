@@ -11,7 +11,7 @@ namespace node {
 const u32 disk = 0, edge = 1, reflection = 2, face = 3,   // the note's disk: the reshaping outlines
           header = 4,                                     // the two-page header's eight bar steps
           trail = 12, trails = 24,                        // the contact path's motion lines
-          weight = 36,                                    // the eccentric weight on the rim
+          unused = 36,                                    // kept hidden, so the nodes after it keep their numbers
           glint = 37,                                     // the contact point
           grain = 38, grains = 5,                         // wood's grain
           speck = 43, specks = 6,                         // stone's four specks and two veins

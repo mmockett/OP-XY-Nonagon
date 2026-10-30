@@ -20,8 +20,8 @@
 // Every control acts on the toy. Spin sets the lean the disk is thrown at;
 // size its radius and thickness, a coin to a heavy disk; disk its metal (or
 // glass, or wood) and what is engraved on it; base the reflection (glass),
-// grain (wood) or specks (stone); wobble the eccentric weight on the rim, a
-// dashed ghost of the rim hopped and rocked over, and the rattle; air the
+// grain (wood) or specks (stone); wobble a dashed ghost of the rim hopped and
+// rocked over, and the rattle; air the
 // streaks of air squeezed from under the low edge; ring the ripples across
 // the glass, more and wider as it rises; many the companion disks spinning
 // beside it. Between notes, turning a control stands the disks up at their
@@ -64,7 +64,7 @@ const i32 half_of[spin::sizes] = {82, 113, 154, 174, 195};
 // degree) and its size against it (Q10).
 const i32 companion_at[3] = {1750, 50, 2330}, companion_size[3] = {451, 420, 389};
 // Greys, few and used alike: the disk's rim brightest (and boldest, drawn at
-// twice its size), its edge, face, the weight and the companions a step down,
+// twice its size), its edge, face and the companions a step down,
 // the effects a step further, the reflection last.
 const u32 brightest = 15, second = 12, third = 9, faint = 6;
 
@@ -241,14 +241,6 @@ inline void nudge(Frame& frame, u32 n, i32 x, i32 y, u32 grey, Paint paint) {
     if (d.scale == unit && d.shade == grey && d.paint == paint && d.cos == unit &&
         magnitude(d.x - x) < unit && magnitude(d.y - y) < unit) return;
     place(frame, n, x, y, unit, grey, paint);
-}
-
-// The same, for a node drawn at its own size.
-inline void nudge_sized(Frame& frame, u32 n, i32 x, i32 y, i32 scale, u32 grey) {
-    const Node& d = frame.nodes[n];
-    if (d.scale == scale && d.shade == grey && d.paint == stroke && d.cos == unit &&
-        magnitude(d.x - x) < unit && magnitude(d.y - y) < unit) return;
-    place(frame, n, x, y, scale, grey, stroke);
 }
 
 // The header's captions, in the controls' units.
@@ -544,34 +536,24 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     if (ground == 0) put(frame, node::reflection, cx, cy - (hop * scene::mirrored >> 10), 2 * unit, faint, stroke);
     else conceal(frame, node::reflection);
 
-    // The contact point (hidden when the disk is in front of it), and the
-    // eccentric weight on the face.
+    // The contact point (hidden when the disk is in front of it).
     if (lead.rolling && pose.st < 300) {
         const Point p = lay(pose, 0, -pose.half, pose.radius, false);
         nudge(frame, node::glint, cx + p.x, cy + p.y + hop, brightest, stroke);
     } else {
         conceal(frame, node::glint);
     }
-    // Wobble's eccentric weight: a lead balance weight clamped to the rim,
-    // carried round by the disk's turn, 0.7 to 2 times its size as wobble
-    // rises; hidden when the turn takes it to the back.
-    const i32 at = front + 400 - face;
-    const i32 facing = sine(at - front + 900);   // cos of its angle from the camera's side
-    if (wobble > 1300 && facing > 200) {
-        const Point p = lay(pose, at, 0, pose.radius, false);
-        const i32 heavy = 717 + static_cast<i32>(wobble * 1331u >> 16);   // 0.7 to 2, Q10
-        nudge_sized(frame, node::weight, cx + p.x, cy + p.y + hop, heavy, second);
-    } else {
-        conceal(frame, node::weight);
-    }
-    // Wobble's rattle: a dashed ghost of the face's rim, where the eccentric
-    // weight throws it, hopped up and rocked further over: none at 0, 6 px
-    // and 5 degrees at 50, 12 px and 10 degrees at 100. It rattles with the
-    // disk, two of its eight dashes a frame; gone when the disk lies flat.
+    conceal(frame, node::unused);
+    // Wobble's rattle: a dashed ghost of the face's rim, hopped up and rocked
+    // further over, as far as wobble is felt in the sound, w(2 - w): none at
+    // 0, 1 px and 1 degree at 5, 9 px and 7.5 degrees at 50, 12 px and 10
+    // degrees at 100. It rattles with the disk, two of its eight dashes a
+    // frame; gone when the disk lies flat.
     const bool rocking = wobble > 1300 && (lead.rolling || state.poised);
     if (rocking) {
         Pose ghost = pose;
-        const i32 swing = static_cast<i32>(wobble * 100u >> 16), lift = static_cast<i32>(wobble * 12u >> 6);   // tenths, Q10 px
+        const u32 felt = static_cast<u32>(wobble) * (131071u - static_cast<u32>(wobble)) >> 16;   // w(2 - w), Q16
+        const i32 swing = static_cast<i32>(felt * 100u >> 16), lift = static_cast<i32>(felt * 12u >> 6);   // tenths, Q10 px
         ghost.sa = sine(lead.tilt + swing);
         ghost.ca = sine(lead.tilt + swing + 900);
         ghost.middle = (ghost.half * ghost.ca >> 10) + (ghost.radius * ghost.sa >> 10) + lift;

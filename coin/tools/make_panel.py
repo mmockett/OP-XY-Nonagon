@@ -10,7 +10,7 @@ the disk's rim brightest and boldest, its edge, face and the base a step
 down, the effects a step further. The base is a plain ring with its side.
 The note's disk is the four reshaping outlines: its face's rim, its edge,
 its reflection and what is engraved on its face. Everything else that moves
-is nodes: the motion lines of the contact path, the eccentric weight, the
+is nodes: the motion lines of the contact path, the
 contact point's glint, the air squeezed from under the low edge, the ring's
 ripples, wobble's ghost of the rim, wood's grain and stone's specks, and
 the companion disks many adds.
@@ -43,7 +43,7 @@ MIRRORED = 0.4                                  # the concave mirror's image, fl
 DISK, EDGE, REFLECTION, FACE = 0, 1, 2, 3
 HEADER = 4
 TRAIL, TRAILS = 12, 24
-WEIGHT, GLINT = 36, 37
+UNUSED, GLINT = 36, 37                          # 36 is kept hidden, so the nodes after it keep their numbers
 GRAIN, GRAINS = 38, 5
 SPECK, SPECKS = 43, 6                           # four specks and two veins
 COMPANION = 49                                  # three disks: face, edge, reflection, glint
@@ -200,10 +200,7 @@ for i in range(TRAILS):
     a0, a1 = math.radians(15 * i + 1.5), math.radians(15 * i + 13.5)
     pts = [(x - CX, y - CY) for x, y in arc(REF_R, a0, a1, 0, 5)]
     out.append(path(outline(ribbon(pts, 0.5), 3), "none", G(9), STROKE, TRAIL + i, (CX, CY)))
-# The eccentric weight: a lead balance weight clamped to the rim, a tab 12
-# by 9.
-tab = [(-6, -4.5), (0, -5), (6, -4.5), (6, 4.5), (0, 5), (-6, 4.5)]
-out.append(path(outline(tab), "none", G(12), STROKE, WEIGHT, (CX, CY)))
+out.append(path(outline([(-2, 0), (2, 0), (0, 2)]), "none", G(12), STROKE, UNUSED, (640, 320)))
 out.append(circle(0, 0, 2.6, "none", G(14), STROKE, GLINT, (CX, CY + REF_R * SIN_E)))
 
 # ---- Three companion disks, for many: each authored flat about the point of

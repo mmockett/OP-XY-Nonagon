@@ -171,7 +171,7 @@ centred below the header on a plain base with its side.
 
 It is drawn for the screen's own 480 × 222 pixels in four greys and few line
 weights, used alike throughout: the disk's rim brightest and boldest; its
-edge, its face, the base's top, the weight and the companions a step down;
+edge, its face, the base's top and the companions a step down;
 the effects (motion lines, ripples, air, the ghost, wood's grain, stone's
 specks) a step further; the reflection last. There are no labels, ticks or
 decorative marks, and every part reads at 1:1.
@@ -212,7 +212,7 @@ is the same at the screen's own size):
 | size | The disk: a thin coin (radius 44 px, 0.16 of it thick) to a heavy disk (88 px, 0.38 thick) |
 | disk | Its face: steel's large engraved rose, brass's coarse milled ring, glass's underside seen through it, wood's wavy growth ring |
 | base | The base: glass shows the disk's reflection, wood a flat-sawn grain across its top, stone four specks and two veins |
-| wobble | A dashed ghost of the rim where the off-centre weight throws it, hopped up and rocked over: none at 0, 6 px and 5° at 50, 12 px and 10° at 100; and a lead balance weight clamped to the rim, growing from 0.7 to 2 times its size |
+| wobble | A dashed ghost of the rim, hopped up and rocked over as far as wobble is felt in the sound: none at 0, 1 px and 1° at 5, 9 px and 7.5° at 50, 12 px and 10° at 100 |
 | air | Streaks of air fanning from under the low edge: none at rolling friction, five long ones in viscous air |
 | ring | Ripples across the mirror in front of the disk, from just beyond its rim outward: none for a dead slap, four reaching halfway across the glass at 50, eight reaching its edge for a 4 s bell |
 | many | One to four disks on the mirror |
