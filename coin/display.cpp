@@ -92,6 +92,17 @@ inline i32 angle_of(i32 x, i32 y) {
     if (y < 0) a = 3600 - a;
     return a >= 3600 ? a - 3600 : a;
 }
+// The way along (dx, dy) as a Q10 unit vector. A short or foreshortened dash has
+// few bits to divide by, so scale it up first: a turn that isn't a unit vector
+// makes the whole frame invalid, and the screen holds still until a valid one.
+inline Turn along_of(i32 dx, i32 dy) {
+    if (!dx && !dy) { const Turn none = {unit, 0}; return none; }
+    while (magnitude(dx) < 8192 && magnitude(dy) < 8192) { dx *= 2; dy *= 2; }
+    while (magnitude(dx) >= 32768 || magnitude(dy) >= 32768) { dx /= 2; dy /= 2; }
+    const i32 length = static_cast<i32>(root(static_cast<u32>(dx * dx + dy * dy)));
+    const Turn t = {dx * unit / length, dy * unit / length};
+    return t;
+}
 // A Q32 turn in tenths of a degree.
 inline i32 tenths(u32 turn) { return static_cast<i32>((turn >> 16) * 3600u >> 16); }
 // value eased toward target by `keep` (Q16: the share of the distance left).
@@ -149,10 +160,11 @@ inline bool reverses(const Point& a, const Point& b, const Point& c) {
     return dot < 0 && magnitude(cross) < -dot / 10;
 }
 // Sets outline p (drawn at twice its points about the mirror's centre) when a
-// point has moved half a pixel, or `force`. Points that merge or turn back go;
+// point has moved `threshold` (Q10, in its own coordinates), or `force`. Reloading
+// an outline is the dearest thing this screen does. Points that merge or turn back go;
 // the longest edges are halved back to 64 points; and the outline starts
 // where both its edges are longest, so it closes on a long edge.
-inline void outline(Frame& frame, u32 p, Point* points, u32& key, bool force) {
+inline void outline(Frame& frame, u32 p, Point* points, u32& key, bool force, i32 threshold) {
     const u32 count = Frame::point_count;
     Point q[Frame::point_count];
     u32 m = 0;
@@ -204,7 +216,7 @@ inline void outline(Frame& frame, u32 p, Point* points, u32& key, bool force) {
     bool moved = force || !path.key;
     for (u32 i = 0; i < count; ++i) {
         points[i] = q[(start + i) % count];
-        if (magnitude(points[i].x - path.points[i].x) >= 256 || magnitude(points[i].y - path.points[i].y) >= 256)
+        if (magnitude(points[i].x - path.points[i].x) >= threshold || magnitude(points[i].y - path.points[i].y) >= threshold)
             moved = true;
     }
     if (!moved) return;
@@ -229,6 +241,14 @@ inline void nudge(Frame& frame, u32 n, i32 x, i32 y, u32 grey, Paint paint) {
     if (d.scale == unit && d.shade == grey && d.paint == paint && d.cos == unit &&
         magnitude(d.x - x) < unit && magnitude(d.y - y) < unit) return;
     place(frame, n, x, y, unit, grey, paint);
+}
+
+// The same, for a node drawn at its own size.
+inline void nudge_sized(Frame& frame, u32 n, i32 x, i32 y, i32 scale, u32 grey) {
+    const Node& d = frame.nodes[n];
+    if (d.scale == scale && d.shade == grey && d.paint == stroke && d.cos == unit &&
+        magnitude(d.x - x) < unit && magnitude(d.y - y) < unit) return;
+    place(frame, n, x, y, scale, grey, stroke);
 }
 
 // The header's captions, in the controls' units.
@@ -447,12 +467,17 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     const i32 rise = lead.rolling ? spin::rise(lead.life, n) : 0;
     const u32 laps = lead.rolling ? laps_of(lead, n) : 0;
     if (lead.rolling && !reduced) state.turn -= times(1048576u, -2 * rise) * static_cast<u32>(dt);
+    // The rattle: the whole disk hops, +-2 px at full wobble, every other frame
+    // in half pixels. It moves the disk's nodes and leaves its outlines alone.
     i32 jitter = 0;
     if (lead.rolling && !reduced && wobble > 600) {
-        state.seed ^= state.seed << 13;
-        state.seed ^= state.seed >> 17;
-        state.seed ^= state.seed << 5;
-        jitter = static_cast<i32>((state.seed >> 20) * wobble >> 16) - static_cast<i32>(2048u * wobble >> 16);   // +-2 px
+        if (state.frames & 1) {
+            state.seed ^= state.seed << 13;
+            state.seed ^= state.seed >> 17;
+            state.seed ^= state.seed << 5;
+        }
+        jitter = static_cast<i32>((state.seed >> 20) * wobble >> 16) - static_cast<i32>(2048u * wobble >> 16);
+        jitter = ((jitter + 256) >> 9) << 9;
     }
 
     Pose pose;
@@ -467,50 +492,63 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     const i32 drawn = pose.st > 0 && lead.tilt * pose.st > lean_away * unit ? lean_away * unit / pose.st : lead.tilt;
     pose.sa = sine(drawn);
     pose.ca = sine(drawn + 900);
-    pose.middle = (pose.half * pose.ca >> 10) + (pose.radius * pose.sa >> 10) + jitter;
+    pose.middle = (pose.half * pose.ca >> 10) + (pose.radius * pose.sa >> 10);
     const i32 face = tenths(state.turn);
 
-    // The note's disk: its four outlines.
+    // The note's disk: its four outlines, two a frame. The rim and its edge
+    // must meet, so they go together; the reflection and what is engraved on
+    // the face take the other frames, and while it rolls wait for a whole
+    // pixel's move, as they are fainter.
     const i32 cx = scene::cx * unit, cy = scene::cy * unit;
+    const bool rim_now = fresh || !(state.frames & 1), rest_now = fresh || (state.frames & 1);
+    const i32 fine = 256, coarse = lead.rolling ? 512 : fine;
     Point points[64];
-    for (u32 i = 0; i < 64; ++i) points[i] = lay(pose, static_cast<i32>(i * 225 / 4), pose.half, pose.radius, false);
-    outline(frame, node::disk, points, state.key, fresh);
-    // The edge: the side facing the camera, between its two rims, where the
-    // rim's outward normal turns toward it.
-    const i32 a = -(((pose.ca * pose.st >> 10) * scene::cos_e + pose.sa * scene::sin_e) >> 14);
-    const i32 b = -((pose.ct * scene::cos_e) >> 14);
-    const i32 front = angle_of(a, b);
-    // Where the side meets the upper rim it turns straight back; outline()
-    // drops that corner.
-    for (u32 i = 0; i < 32; ++i) {
-        const i32 phi = front - 900 + static_cast<i32>(i * 1800 / 31);
-        points[i] = lay(pose, phi, -pose.half, pose.radius, false);
-        points[63 - i] = lay(pose, phi, pose.half, pose.radius, false);
+    i32 a = 0, b = 0, front = 0;
+    {
+        // The edge: the side facing the camera, between its two rims, where the
+        // rim's outward normal turns toward it.
+        a = -(((pose.ca * pose.st >> 10) * scene::cos_e + pose.sa * scene::sin_e) >> 14);
+        b = -((pose.ct * scene::cos_e) >> 14);
+        front = angle_of(a, b);
     }
-    outline(frame, node::edge, points, state.key, fresh);
-    // The reflection: the underside's rim, in the mirror.
-    for (u32 i = 0; i < 64; ++i) points[i] = lay(pose, static_cast<i32>(i * 225 / 4), -pose.half, pose.radius, true);
-    outline(frame, node::reflection, points, state.key, fresh);
-    // The face: what is engraved on it; through glass, the underside's rim.
-    for (u32 i = 0; i < 64; ++i)
-        points[i] = material == 2 ? lay(pose, static_cast<i32>(i * 225 / 4), -pose.half, pose.radius, false)
-                                  : lay(pose, plate::face_angle[material][i] + face, pose.half,
-                                        pose.radius * plate::face_radius[material][i] >> 10, false);
-    outline(frame, node::face, points, state.key, fresh);
-    put(frame, node::disk, cx, cy, 2 * unit, brightest, stroke);
-    put(frame, node::edge, cx, cy, 2 * unit, second, stroke);
+    if (rim_now) {
+        for (u32 i = 0; i < 64; ++i) points[i] = lay(pose, static_cast<i32>(i * 225 / 4), pose.half, pose.radius, false);
+        outline(frame, node::disk, points, state.key, fresh, fine);
+        // Where the side meets the upper rim it turns straight back; outline()
+        // drops that corner.
+        for (u32 i = 0; i < 32; ++i) {
+            const i32 phi = front - 900 + static_cast<i32>(i * 1800 / 31);
+            points[i] = lay(pose, phi, -pose.half, pose.radius, false);
+            points[63 - i] = lay(pose, phi, pose.half, pose.radius, false);
+        }
+        outline(frame, node::edge, points, state.key, fresh, fine);
+    }
+    if (rest_now) {
+        // The reflection: the underside's rim, in the mirror.
+        for (u32 i = 0; i < 64; ++i) points[i] = lay(pose, static_cast<i32>(i * 225 / 4), -pose.half, pose.radius, true);
+        outline(frame, node::reflection, points, state.key, fresh, coarse);
+        // The face: what is engraved on it; through glass, the underside's rim.
+        for (u32 i = 0; i < 64; ++i)
+            points[i] = material == 2 ? lay(pose, static_cast<i32>(i * 225 / 4), -pose.half, pose.radius, false)
+                                      : lay(pose, plate::face_angle[material][i] + face, pose.half,
+                                            pose.radius * plate::face_radius[material][i] >> 10, false);
+        outline(frame, node::face, points, state.key, fresh, coarse);
+    }
+    const i32 hop = -jitter;   // up the screen, and down in the mirror at its flattening
+    put(frame, node::disk, cx, cy + hop, 2 * unit, brightest, stroke);
+    put(frame, node::edge, cx, cy + hop, 2 * unit, second, stroke);
     // The face, seen at under 12 degrees, is too thin to draw.
     const i32 open = (pose.ca * scene::sin_e - (pose.sa * pose.st >> 10) * scene::cos_e) >> 14;   // sin, Q10
-    if (open >= face_open) put(frame, node::face, cx, cy, 2 * unit, second, stroke);
+    if (open >= face_open) put(frame, node::face, cx, cy + hop, 2 * unit, second, stroke);
     else conceal(frame, node::face);
-    if (ground == 0) put(frame, node::reflection, cx, cy, 2 * unit, faint, stroke);
+    if (ground == 0) put(frame, node::reflection, cx, cy - (hop * scene::mirrored >> 10), 2 * unit, faint, stroke);
     else conceal(frame, node::reflection);
 
     // The contact point (hidden when the disk is in front of it), and the
     // eccentric weight on the face.
     if (lead.rolling && pose.st < 300) {
         const Point p = lay(pose, 0, -pose.half, pose.radius, false);
-        nudge(frame, node::glint, cx + p.x, cy + p.y, brightest, stroke);
+        nudge(frame, node::glint, cx + p.x, cy + p.y + hop, brightest, stroke);
     } else {
         conceal(frame, node::glint);
     }
@@ -522,7 +560,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     if (wobble > 1300 && facing > 200) {
         const Point p = lay(pose, at, 0, pose.radius, false);
         const i32 heavy = 717 + static_cast<i32>(wobble * 1331u >> 16);   // 0.7 to 2, Q10
-        put(frame, node::weight, cx + p.x, cy + p.y, heavy, second, stroke);
+        nudge_sized(frame, node::weight, cx + p.x, cy + p.y + hop, heavy, second);
     } else {
         conceal(frame, node::weight);
     }
@@ -533,10 +571,10 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     const bool rocking = wobble > 1300 && (lead.rolling || state.poised);
     if (rocking) {
         Pose ghost = pose;
-        const i32 swing = static_cast<i32>(wobble * 100u >> 16), hop = static_cast<i32>(wobble * 12u >> 6);   // tenths, Q10 px
+        const i32 swing = static_cast<i32>(wobble * 100u >> 16), lift = static_cast<i32>(wobble * 12u >> 6);   // tenths, Q10 px
         ghost.sa = sine(lead.tilt + swing);
         ghost.ca = sine(lead.tilt + swing + 900);
-        ghost.middle = (ghost.half * ghost.ca >> 10) + (ghost.radius * ghost.sa >> 10) + hop + jitter;
+        ghost.middle = (ghost.half * ghost.ca >> 10) + (ghost.radius * ghost.sa >> 10) + lift;
         for (u32 j = 0; j < node::ghosts; ++j) {
             if (!fresh && (j + state.frames) % 4) continue;
             const i32 phi = static_cast<i32>(j) * 450;
@@ -544,8 +582,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
                         p1 = lay(ghost, phi + 270, ghost.half, ghost.radius, false);
             const i32 dx = (p1.x - p0.x) >> 2, dy = (p1.y - p0.y) >> 2;
             const i32 length = static_cast<i32>(root(static_cast<u32>(dx * dx + dy * dy))) + 1;
-            const Turn along = {dx * unit / length, dy * unit / length};
-            put_turned(frame, node::ghost + j, cx + ((p0.x + p1.x) >> 1), cy + ((p0.y + p1.y) >> 1),
+            const Turn along = along_of(dx, dy);
+            put_turned(frame, node::ghost + j, cx + ((p0.x + p1.x) >> 1), cy + ((p0.y + p1.y) >> 1) + hop,
                        clamp(4 * length / scene::dash, 64, 2 * unit), along, third);
         }
     } else {
@@ -602,8 +640,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 across = q.x - p.x;   // its radius on screen, Q10 px
         const i32 scale_ = clamp(across / scene::companion, 16, 2 * unit);
         const i32 way_ = tenths(d.precession);
-        const i32 roll = d.tilt * sine(way_ + 900) >> 10;
-        const i32 lift = ((across * sine(d.tilt) >> 10) * scene::cos_e) >> 14;
+        // In whole degrees and pixels: they move when it shows.
+        const i32 roll = ((d.tilt * sine(way_ + 900) >> 10) + 5) / 10 * 10;
+        const i32 lift = (((across * sine(d.tilt) >> 10) * scene::cos_e >> 14) + 512) >> 10 << 10;
         const Turn tipped = rotation(roll), mirror = rotation(-roll);
         put_turned(frame, at, cx + p.x, cy + p.y - lift, scale_, tipped, second);
         put_turned(frame, at + 1, cx + p.x, cy + p.y - lift, scale_, tipped, third);
@@ -618,17 +657,16 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     }
 
     // Air squeezed from under the low edge: long streaks fanning out from the
-    // contact, more and longer as air rises, drifting outward on every sixth
-    // frame while it rolls; still at the throw; gone when it lies flat.
+    // contact, more and longer as air rises, drifting outward while it rolls,
+    // one streak a frame, each on its own sixth; still at the throw; gone when it lies flat.
     const u32 streaks = (air * 5 + 32768) >> 16;
     const i32 gust = 768 + static_cast<i32>(air * 666u >> 16);   // 0.75 to 1.4, Q10
     const bool breathing = lead.rolling && !reduced;
     if (breathing) state.breath += laps * static_cast<u32>(dt) * 2u;
-    const bool step_air = fresh || !breathing || state.frames % 6 == 1;
-    for (u32 j = 0; j < node::airs; ++j) {
+        for (u32 j = 0; j < node::airs; ++j) {
         const u32 n_ = node::air + j;
         if (j >= streaks || (!lead.rolling && !state.poised)) { conceal(frame, n_); continue; }
-        if (!step_air) continue;
+        if (!fresh && breathing && (state.frames + j) % 6) continue;
         const i32 drift = static_cast<i32>(((state.breath >> 16) * 6144u) >> 16);   // 0 to 6 px, round and round
         const i32 out = state.radius + (5 + 6 * static_cast<i32>(j)) * unit + drift;
         const i32 angle = way + (static_cast<i32>(j) - 2) * 190;
@@ -636,8 +674,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         if (s > 300) { conceal(frame, n_); continue; }   // behind the disk
         const Point p = project(out * c >> 10, out * s >> 10, 0);
         const i32 dx = c, dy = -(s * scene::sin_e >> 14);
-        const i32 length = static_cast<i32>(root(static_cast<u32>(dx * dx + dy * dy))) + 1;
-        const Turn outward = {dx * unit / length, dy * unit / length};
+        const Turn outward = along_of(dx, dy);
         put_turned(frame, n_, cx + p.x, cy + p.y, gust, outward, breathing ? second : third);
     }
 
