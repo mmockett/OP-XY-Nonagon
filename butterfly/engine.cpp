@@ -18,6 +18,30 @@ const i32 silence = 1 << 10;        // Q25: below this a partial is skipped
 // beta 5.5): flat to 8 kHz, its image of the bank 58 dB down above 14 kHz.
 const i32 halfband[halfband_taps] = {20556, -6082, 2851, -1374, 597, -205, 38};
 
+// The bank's and the half-band's sample loops, functions of their own so the
+// Blackfin compiler makes them zero-overhead hardware loops.
+__attribute__((noinline)) u32 bank(i32* acc, u32 ph, u32 step_phase, i32 g, i32 slide) {
+    for (u32 i = 0; i < half_frames; ++i) {
+        ph += step_phase;
+        acc[i] += tables::sine[ph >> (32 - tables::sine_bits)] * static_cast<opxy::i16>(static_cast<u32>(g) >> 10);
+        g += slide;
+    }
+    return ph;
+}
+inline i32 tap(const i32* x, i32 t) {
+    const i32 pair = (x[-t] >> 1) + (x[t + 1] >> 1);   // Q29
+    return static_cast<opxy::i16>(static_cast<u32>(pair + 16384) >> 15) * static_cast<opxy::i16>(halfband[t]);        // 16 bits of it, rounded
+}
+__attribute__((noinline)) void upsample(const i32* low, opxy::Output output) {
+    for (u32 j = 0; j < half_frames; ++j) {
+        const i32* x = low + j + halfband_taps - 1;
+        // The seven taps written out: the compiler leaves a 7-step inner loop as a branching loop.
+        const i32 between_samples = tap(x, 0) + tap(x, 1) + tap(x, 2) + tap(x, 3) + tap(x, 4) + tap(x, 5) + tap(x, 6);
+        output[2 * j] = x[0];
+        output[2 * j + 1] = clamp(between_samples, -(1 << 29), (1 << 29) - 1) * 2;
+    }
+}
+
 // Callbacks run serially per voice; owner is a stable nonzero voice ID.
 inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     for (u32 k = 0; k < partials; ++k) {
@@ -80,6 +104,9 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     const i32 slope = tilt(p[TILT]);
     const u32 note = pitch[0];
     bool sounding = false;
+    // The gate's log2, the same for every partial: once a block (partial_gate's own first steps).
+    const u32 light = static_cast<u32>(voice.gate) >> 15;
+    const i32 light_log2 = light ? log2_q16(light) - (15 << 16) : 1;   // 1: a dark gate
     i32* low = voice.low;
     i32* acc = low + 2 * halfband_taps;
     for (u32 i = 0; i < half_frames; ++i) acc[i] = 0;
@@ -101,7 +128,7 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
         }
         i32 target = 0;
         if (!hushing && level > 0 && gain > 0)
-            target = ((((level * partial_gate(voice.gate, slope, place)) >> 15) * gain) >> 15) << 10;   // Q25
+            target = ((((level * partial_gate_at(light_log2, slope, place)) >> 15) * gain) >> 15) << 10;   // Q25
         voice.amplitude[k] = target < silence ? 0 : target;
         const u32 step_phase = increment << 1;   // a half-rate sample
         u32 ph = voice.phase[k];
@@ -111,14 +138,7 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
         }
         if (target >= silence) sounding = true;
         // The bank: 32 samples at half rate, the amplitude ramped across them.
-        i32 g = a;
-        const i32 slide = (target - a) >> 5;
-        for (u32 i = 0; i < half_frames; ++i) {
-            ph += step_phase;
-            acc[i] += tables::sine[ph >> (32 - tables::sine_bits)] * (g >> 10);
-            g += slide;
-        }
-        voice.phase[k] = ph;
+        voice.phase[k] = bank(acc, ph, step_phase, a, (target - a) >> 5);
     }
     voice.sounding = sounding ? 1 : 0;
     if (hushing) {
@@ -129,17 +149,7 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     // value between it and the next. The levels sum to at most 32767 (Q15),
     // so the bank stays within half scale (Q30 here); the filter's sums run
     // at half that.
-    for (u32 j = 0; j < half_frames; ++j) {
-        const i32* x = low + j + halfband_taps - 1;
-        i32 between_samples = 0;
-        for (u32 t = 0; t < halfband_taps; ++t) {
-            const i32 pair = (x[-static_cast<i32>(t)] >> 1) + (x[t + 1] >> 1);   // Q29
-            between_samples += ((pair + 16384) >> 15) * halfband[t];             // 16 bits of it, rounded (truncating would
-                                                                                 // offset these samples: a tone at 22 kHz)
-        }
-        output[2 * j] = x[0];
-        output[2 * j + 1] = clamp(between_samples, -(1 << 29), (1 << 29) - 1) * 2;
-    }
+    upsample(low, output);
     for (u32 i = 0; i < 2 * halfband_taps; ++i) low[i] = low[half_frames + i];
 }
 }
