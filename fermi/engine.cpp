@@ -57,10 +57,10 @@ inline void destroy(Voice&, Shared&, opxy::u32) {}
 // harmonic would pass Nyquist. Levels step four times a block (every 16
 // samples) toward their targets: a ramp a sample cost the loop four
 // registers it could not spare on the Blackfin.
-inline void pair(i32* out, const i16* w1, u32& p1, u32 i1, const i32* g1, const i16* w2, u32& p2, u32 i2, const i32* g2) {
+__attribute__((noinline)) void pair(i32* out, const i16* w1, u32& p1, u32 i1, const i32* g1, const i16* w2, u32& p2, u32 i2, const i32* g2) {
     u32 q1 = p1, q2 = p2;
     for (unsigned quarter = 0; quarter < 4; ++quarter) {
-        const i32 a1 = g1[quarter], a2 = g2[quarter];
+        const i16 a1 = static_cast<i16>(g1[quarter]), a2 = static_cast<i16>(g2[quarter]);
         i32* o = out + 16 * quarter;
         for (unsigned i = 0; i < 16; ++i) {
             o[i] += w1[q1 >> 20] * a1 + w2[q2 >> 20] * a2;
@@ -73,7 +73,7 @@ inline void pair(i32* out, const i16* w1, u32& p1, u32 i1, const i32* g1, const 
 }
 // The same pair with levels ramped every sample, for a note's first block,
 // where a level rises from silence and quartered steps would click.
-inline void pair_ramped(i32* out, const i16* w1, u32& p1, u32 i1, i32 from1, i32 to1,
+__attribute__((noinline)) void pair_ramped(i32* out, const i16* w1, u32& p1, u32 i1, i32 from1, i32 to1,
                         const i16* w2, u32& p2, u32 i2, i32 from2, i32 to2) {
     u32 q1 = p1, q2 = p2;
     i32 a1 = from1 << 15, a2 = from2 << 15;
@@ -87,6 +87,13 @@ inline void pair_ramped(i32* out, const i16* w1, u32& p1, u32 i1, i32 from1, i32
     }
     p1 = q1;
     p2 = q2;
+}
+
+// The output, within half scale: a function of its own, so its loop is a hardware loop.
+__attribute__((noinline)) void held_within(const i32* sum, opxy::Output output) {
+    using sound::ceiling;
+    for (unsigned i = 0; i < opxy::block_frames; ++i)
+        output[i] = sum[i] > ceiling ? ceiling : sum[i] < -ceiling ? -ceiling : sum[i];
 }
 
 inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
@@ -210,7 +217,6 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         else
             pair(sum, wave[k], voice.phase[k], voice.inc[k], gains[k], wave[k + 1], voice.phase[k + 1], voice.inc[k + 1], gains[k + 1]);
     }
-    for (unsigned i = 0; i < opxy::block_frames; ++i)
-        output[i] = sum[i] > ceiling ? ceiling : sum[i] < -ceiling ? -ceiling : sum[i];
+    held_within(sum, output);
 }
 }
