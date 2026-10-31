@@ -7,9 +7,10 @@ permissions:
   contents: read
 env:
   # Ghost and Recur need the sample-overview SDK change still in review
-  # (etcetc000/open-xy#182); move them to staging once it merges.
+  # (etcetc000/open-xy#182); move them to staging once it merges. Held at the
+  # commit before that branch asks for SDK 1.10, until its numbering settles.
   SAMPLE_SDK_REPO: mmockett/open-xy
-  SAMPLE_SDK_REF: sdk/sample-overview
+  SAMPLE_SDK_REF: 8dd236d8f28ebd9738d0ecc38b600219ef9509e3
 jobs:
   # Each machine's records, browser preview, drawing checks and host sound
   # tests. The native compile needs the pinned Blackfin tools, which this Linux
