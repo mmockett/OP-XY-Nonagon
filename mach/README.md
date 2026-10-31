@@ -222,11 +222,12 @@ so nothing steps audibly.
 
 ## CPU
 
-Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, three runs, at
-`v0.1.0`: one voice playing middle C with the first four controls at their
-midpoint costs **4.48%** of the 580,352-cycle audio block, so eight voices
-take about 36%. The OP-XY's own engines measure 1.6–2.7% a voice in the same
-test. It plays one setting; heavier settings cost more.
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, at `v0.4.0`,
+as one capture of its sweep: one voice playing middle C with the first four
+controls at their midpoint costs **3.80%** of the 580,352-cycle audio block, so
+eight voices take about 30%. The heaviest setting in the sweep, Echo at 87.5%,
+costs **5.91%**, so eight voices there take about 47%. The OP-XY's own engines
+measure 1.6–2.7% a voice at the midpoint.
 
 The figures below are host estimates made during development.
 
