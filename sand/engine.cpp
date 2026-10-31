@@ -72,7 +72,7 @@ inline u32 sound(i32* acc, u32 phase, u32 increment, i32 a, i32 b, i32 da, i32 d
     a += da * (kStep / 2);
     b += db * (kStep / 2);
     for (i32* step = acc; step != acc + opxy::block_frames; step += kStep) {
-        const i32 ah = a >> 16, bh = b >> 16;
+        const opxy::i16 ah = static_cast<opxy::i16>(static_cast<u32>(a) >> 16), bh = static_cast<opxy::i16>(static_cast<u32>(b) >> 16);
         for (i32* out = step; out != step + kStep; ++out) {
             const opxy::i16* const at = kSine + (phase >> 22);
             *out += at[0] * ah + at[256] * bh;
@@ -91,7 +91,7 @@ inline u32 sound_bowed(i32* acc, u32 phase, u32 increment, i32 a, i32 b, i32 da,
     b += db * (kStep / 2);
     h += dh * (kStep / 2);
     for (i32* step = acc; step != acc + opxy::block_frames; step += kStep) {
-        const i32 ah = a >> 16, bh = b >> 16, hh = h >> 16;
+        const opxy::i16 ah = static_cast<opxy::i16>(static_cast<u32>(a) >> 16), bh = static_cast<opxy::i16>(static_cast<u32>(b) >> 16), hh = static_cast<opxy::i16>(static_cast<u32>(h) >> 16);
         for (i32* out = step; out != step + kStep; ++out) {
             const opxy::i16* const at = kSine + (phase >> 22);
             *out += at[0] * ah + at[256] * bh + kHarmonicWave[phase >> 22] * hh;
@@ -156,8 +156,8 @@ inline void initialize(Voice& voice, Shared&, u32 owner) {
     voice.seed = owner * 2654435761u | 1u;
     voice.struck = voice.jolted = voice.rounds = 0;
     voice.click1 = voice.click2 = 0;
-    pour(voice.grains, kGrains, voice.seed);
-    forget_shapes(voice);
+    voice.seed = voice.seed * 1723622977u + 786704080u;   // start() replaces the grains: skip this pour's 144 draws
+    for (u32 k = 0; k < kModes; ++k) voice.lost[k] = 0;
 }
 
 namespace {
@@ -188,6 +188,29 @@ inline void start(Voice& voice, Shared& shared, u32 owner) {
 }
 inline void destroy(Voice&, Shared& shared, u32 owner) {
     if (shared.latest == owner) shared.latest = 0;
+}
+
+// The output stage, a function of its own so its loops are hardware loops.
+__attribute__((noinline)) void finish(Voice& voice, const i32* acc, const i32* impulses, bool clicked, i32 c1, i32 c2, opxy::Output output) {
+    i32 y1 = voice.click1, y2 = voice.click2;
+    const i32 limit = kHalf >> 1;  // so c1 y1 cannot overflow
+    if (!clicked && magnitude(y1) + magnitude(y2) < 4096) {
+        // No landing this block and the last click has rung out: the tone alone.
+        y1 = y2 = 0;
+        for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = clamp(acc[i], -kToneLimit, kToneLimit) << 2;
+    } else {
+        for (u32 i = 0; i < opxy::block_frames; ++i) {
+            const i32 y = clamp(impulses[i] + 2 * multiply(y1, c1) - multiply(y2, c2), -limit, limit);
+            y2 = y1;
+            y1 = y;
+            // Each voice's rattle is clamped at a tenth of full scale, so coincident
+            // heavy landings across a chord keep the set's headroom.
+            const i32 rattle = clamp(y, -kRattleLimit, kRattleLimit);
+            output[i] = clamp((clamp(acc[i], -kToneLimit, kToneLimit) << 2) + rattle, -kHalf, kHalf);
+        }
+    }
+    voice.click1 = y1;
+    voice.click2 = y2;
 }
 
 // Controls: Figure, Bow, Sand, Grain; Plate, Settle, Tilt, Shake.
@@ -330,13 +353,20 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
         // The sand on a mode's moving ground damps it; settled on the figure's
         // lines, it lies on the upper modes' moving ground, so more or heavier
         // sand leaves a purer, darker tone.
-        i32 decay = keep(log2_loss) - (k ? weight << 8 : weight << 4);
+        if (log2_loss != voice.lost[k]) {
+            voice.lost[k] = log2_loss;
+            voice.kept[k] = keep(log2_loss);
+            i32 root = (log2_loss + 65536) >> 1;
+            if (root > 0) root = 0;
+            voice.stirs[k] = exp2_q16(root + 50352);
+        }
+        i32 decay = voice.kept[k] - (k ? weight << 8 : weight << 4);
         decay = decay < 0 ? 0 : decay;
         const i32 quiet = weight >> 4 > 16384 ? 16384 : weight >> 4;
         const i32 reach = k ? (mat.halo * kHalo >> 2) * pm.bow >> 15 : 32767 - quiet;
         const i32 target = (drive * reach >> 15) << 16;
         const i32 rate = k ? held >> 2 : held;
-        const i32 noise = stir(log2_loss, shaken + (rosin * pm.bow >> 15));
+        const i32 noise = static_cast<i32>(times(static_cast<u32>(shaken + (rosin * pm.bow >> 15)), voice.stirs[k]));
         seed = seed * 1664525u + 1013904223u;
         const i32 na = (static_cast<i32>(seed) >> 16) * noise * 2;
         seed = seed * 1664525u + 1013904223u;
@@ -390,24 +420,6 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     voice.struck = 0;
     voice.seed = seed;
 
-    i32 y1 = voice.click1, y2 = voice.click2;
-    const i32 limit = kHalf >> 1;  // so c1 y1 cannot overflow
-    if (!clicked && magnitude(y1) + magnitude(y2) < 4096) {
-        // No landing this block and the last click has rung out: the tone alone.
-        y1 = y2 = 0;
-        for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = clamp(acc[i], -kToneLimit, kToneLimit) << 2;
-    } else {
-        for (u32 i = 0; i < opxy::block_frames; ++i) {
-            const i32 y = clamp(impulses[i] + 2 * multiply(y1, c1) - multiply(y2, c2), -limit, limit);
-            y2 = y1;
-            y1 = y;
-            // Each voice's rattle is clamped at a tenth of full scale, so coincident
-            // heavy landings across a chord keep the set's headroom.
-            const i32 rattle = clamp(y, -kRattleLimit, kRattleLimit);
-            output[i] = clamp((clamp(acc[i], -kToneLimit, kToneLimit) << 2) + rattle, -kHalf, kHalf);
-        }
-    }
-    voice.click1 = y1;
-    voice.click2 = y2;
+    finish(voice, acc, impulses, clicked, c1, c2, output);
 }
 }

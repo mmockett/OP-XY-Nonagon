@@ -26,6 +26,9 @@ struct Voice {
     u32 jolted;           // looks left of the strike's jolt
     u32 rounds;           // rounds of looks, for publishing the sand every fourth
     i32 click1, click2;   // the grain click filter's last two outputs
+    i32 lost[kModes];     // each mode's log2 loss its kept and stirs were made for (0: none)
+    i32 kept[kModes];     // keep(lost), Q31
+    u32 stirs[kModes];    // stir()'s factor for lost, Q16
 };
 // The plate's sand as the latest note left it. A note started while another
 // still sounds takes over that sand, so a bowed legato line keeps its figure
