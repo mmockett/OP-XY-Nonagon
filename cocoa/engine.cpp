@@ -79,17 +79,31 @@ inline u32 next(u32& seed) {
 // Adds a mode's block to sum (Q27): its amplitude ramps by `slope` until
 // sample `split`, then by `after`; its increment by `glide` a sample. Two
 // plain loops, so neither tests the split each sample.
-inline void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split) {
+__attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split) {
     u32 p = m.phase;
     i32 a = amp;
+    if (!glide) {   // a steady pitch: the same sums without the glide's add
+        for (u32 i = 0; i < split; ++i) {
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+            a += slope;
+            p += inc;
+        }
+        for (u32 i = split; i < opxy::block_frames; ++i) {
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+            a += after;
+            p += inc;
+        }
+        m.phase = p;
+        return;
+    }
     for (u32 i = 0; i < split; ++i) {
-        sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
         a += slope;
         p += inc;
         inc += static_cast<u32>(glide);
     }
     for (u32 i = split; i < opxy::block_frames; ++i) {
-        sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
         a += after;
         p += inc;
         inc += static_cast<u32>(glide);
@@ -137,6 +151,7 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     voice.share = 32767;
     voice.foam = voice.slosh = 0;
     voice.slosh_phase = 0;
+    voice.rated = 0;
 }
 
 // Each note stirs on its first block, where the controls are known. A note
@@ -161,6 +176,29 @@ inline void destroy(Voice& voice, Shared& shared, opxy::u32) {
     voice.alive = 0;
 }
 
+// The output stage, a function of its own so its loop is a hardware loop.
+__attribute__((noinline)) void finish(Voice& voice, const i32* sum, opxy::Output output) {
+    using namespace sound;
+    using opxy::block_frames;
+    i32 dc_in = voice.dc_in, dc_out = voice.dc_out;
+    for (unsigned i = 0; i < block_frames; ++i) {
+        dc_out = sum[i] - dc_in + dc_out - (dc_out >> 10);
+        dc_in = sum[i];
+        const i32 hi = (1 << 27) - 1;
+        const i32 c = dc_out > hi ? hi : dc_out;
+        const i32 v = c < -hi ? -hi : c;
+        const i32 sign = v >> 31;               // 0 or -1: |v| and the sign restored without a branch
+        i32 o = ((v ^ sign) - sign) << 4;
+        if (o > knee) {
+            const i32 over = o - knee;
+            o = over >= 536870912 ? knee + 268435456 : o - (multiply(over, over) << 1);
+        }
+        output[i] = (o ^ sign) - sign;
+    }
+    voice.dc_in = dc_in;
+    voice.dc_out = dc_out;
+}
+
 inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output output,
                    opxy::Parameters parameters, opxy::Pitch pitch) {
     using namespace sound;
@@ -183,8 +221,13 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     const i32 corner = tables::log2_soft_corner + static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * static_cast<u32>(hard) >> 12);
     // The contact, 4 ms to 75 us, as a power of two of samples: 64 to 4.
     const u32 contact = static_cast<u32>(drink::clamp((tables::log2_soft_samples - (static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * static_cast<u32>(hard) >> 12)) + 32768) >> 16, 2, 6));
-    i32 rate[drink::classes];
-    drink::rates(fill, parameters[FIZZ], rate);
+    i32* const rate = voice.rate;
+    if (!voice.rated || fill != voice.rated_fill || parameters[FIZZ] != voice.rated_fizz) {
+        drink::rates(fill, parameters[FIZZ], rate);
+        voice.rated = 1;
+        voice.rated_fill = fill;
+        voice.rated_fizz = parameters[FIZZ];
+    }
 
     // A new note stirs the drink as the last stir left it, cleared since,
     // and the spoon taps at once.
@@ -229,7 +272,8 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     // The bubbles rise; the column's pitch at the block's end. The drink
     // sloshes at its first sloshing mode, swinging the pitch as it dies away.
     drink::advance(voice.s, rate, 1);
-    const i32 drop = drink::wood_drop(drink::effective(voice.d, voice.s));
+    const i32 void_now = drink::effective(voice.d, voice.s);
+    const i32 drop = drink::wood_drop(void_now);
     voice.drop = drop;
     i32 wobble = 0;
     if (voice.slosh) {
@@ -305,7 +349,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     // away in about 0.7 s) and as fast as the void leaves the column, each a
     // Minnaert ring at its foam bubble's size. Pops sets how often and how loud.
     const i32 popping = static_cast<i32>(drink::q16(parameters[POPS]) >> 1);
-    const bool bubbly = drink::effective(voice.d, voice.s) > 0;
+    const bool bubbly = void_now > 0;
     voice.foam -= (voice.foam >> 9) + 1;
     if (voice.foam < 64) voice.foam = 0;
     if (popping && (bubbly || voice.foam)) {
@@ -367,20 +411,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     // times the eighth, with a soft knee from 0.2 to a ceiling of 0.325: it
     // rounds off only a tap's first peaks, where every mode starts at once,
     // so the ring can sit louder (README.md, Level).
-    i32 dc_in = voice.dc_in, dc_out = voice.dc_out;
-    for (unsigned i = 0; i < block_frames; ++i) {
-        dc_out = sum[i] - dc_in + dc_out - (dc_out >> 10);
-        dc_in = sum[i];
-        const i32 v = drink::clamp(dc_out, -(1 << 27) + 1, (1 << 27) - 1), a = v < 0 ? -v : v;
-        i32 o = a << 4;
-        if (o > knee) {
-            const i32 over = o - knee;
-            o = over >= 536870912 ? knee + 268435456 : o - (multiply(over, over) << 1);
-        }
-        output[i] = v < 0 ? -o : o;
-    }
-    voice.dc_in = dc_in;
-    voice.dc_out = dc_out;
+    finish(voice, sum, output);
     if (!step && !ringing && (!popping || (!bubbly && !voice.foam))) voice.quiet = 1;   // a single tap, rung out
 }
 }
