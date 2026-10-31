@@ -23,14 +23,14 @@ const i32 halfband[halfband_taps] = {20556, -6082, 2851, -1374, 597, -205, 38};
 __attribute__((noinline)) u32 bank(i32* acc, u32 ph, u32 step_phase, i32 g, i32 slide) {
     for (u32 i = 0; i < half_frames; ++i) {
         ph += step_phase;
-        acc[i] += tables::sine[ph >> (32 - tables::sine_bits)] * static_cast<opxy::i16>(static_cast<u32>(g) >> 10);
+        acc[i] += tables::sine[ph >> (32 - tables::sine_bits)] * (g >> 10);
         g += slide;
     }
     return ph;
 }
 inline i32 tap(const i32* x, i32 t) {
     const i32 pair = (x[-t] >> 1) + (x[t + 1] >> 1);   // Q29
-    return static_cast<opxy::i16>(static_cast<u32>(pair + 16384) >> 15) * static_cast<opxy::i16>(halfband[t]);        // 16 bits of it, rounded
+    return ((pair + 16384) >> 15) * halfband[t];        // 16 bits of it, rounded
 }
 __attribute__((noinline)) void upsample(const i32* low, opxy::Output output) {
     for (u32 j = 0; j < half_frames; ++j) {
@@ -63,7 +63,7 @@ inline void start(Voice& voice, Shared&, opxy::u32) {
 }
 inline void destroy(Voice&, Shared&, opxy::u32) {}
 
-inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::Parameters parameters, opxy::Pitch pitch) {
+inline void render(Voice& voice, Shared&, opxy::u32 owner, opxy::Output output, opxy::Parameters parameters, opxy::Pitch pitch) {
     const i32* p = parameters;
     const bool hushing = voice.hush != 0;
     if (voice.struck && !hushing) {
@@ -87,10 +87,17 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     const u32 alpha = warp(flux(p[FLUX]), snap_pull) + static_cast<u32>(wingbeat_flux(p[WINGBEAT], voice.beat));
     const i32 lambda = coupling(p[COUPLING]);
     const i32 at = clamp(site(p[SITE]) + wingbeat_site(p[WINGBEAT], voice.beat_site), 0, 8 << 16);
-    Spectrum spectrum_now;
-    spectrum(alpha, lambda, at, spectrum_now);
-    Notes notes;
-    shape(spectrum_now, lambda, notes);
+    // The spectrum moves only with the wingbeat (a fraction of a hertz) and the
+    // chain's controls: solve it every other block, on alternate blocks for
+    // alternate voices, and at once when a control moves or a note strikes.
+    Notes& notes = voice.notes;
+    const bool moved = p[FLUX] != voice.solved[0] || p[COUPLING] != voice.solved[1] || p[SITE] != voice.solved[2] || p[WINGBEAT] != voice.solved[3];
+    if (!voice.blocks || moved || ((voice.blocks + owner) & 1)) {
+        Spectrum spectrum_now;
+        spectrum(alpha, lambda, at, spectrum_now);
+        shape(spectrum_now, lambda, notes);
+        for (u32 i = 0; i < 4; ++i) voice.solved[i] = p[i == 0 ? FLUX : i == 1 ? COUPLING : i == 2 ? SITE : WINGBEAT];
+    }
     const u32 rate = wingbeat_rate(p[WINGBEAT]);
     voice.beat += rate;
     voice.beat_site += wingbeat_site_rate(rate);
