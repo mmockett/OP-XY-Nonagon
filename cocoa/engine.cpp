@@ -24,7 +24,7 @@ using drink::octave;
 const i32 strike = 480000000;       // the fundamental's tap in a clear drink, Q31 (0.22)
 const i32 most = 1 << 30;           // a mode's amplitude, at most 0.5
 const i32 knee = 429496730;         // 0.2: the soft clip starts here, and stops at 0.325
-const i32 silent = 1 << 14;         // under this (-102 dB) a mode is not rendered
+const i32 silent = 1 << 16;         // under this a mode is not rendered (audit: was 1 << 14)
 const u32 ceiling = 0x80000000u;    // an increment at the Nyquist rate
 const u32 fade_from = 1717986918u;  // 0.40 of the sample rate: modes fade out from here
 const u32 fade_to = 1932735283u;    // to silence at 0.45
@@ -84,12 +84,12 @@ __attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 a
     i32 a = amp;
     if (!glide) {   // a steady pitch: the same sums without the glide's add
         for (u32 i = 0; i < split; ++i) {
-            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+            sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
             a += slope;
             p += inc;
         }
         for (u32 i = split; i < opxy::block_frames; ++i) {
-            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+            sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
             a += after;
             p += inc;
         }
@@ -97,13 +97,13 @@ __attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 a
         return;
     }
     for (u32 i = 0; i < split; ++i) {
-        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+        sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
         a += slope;
         p += inc;
         inc += static_cast<u32>(glide);
     }
     for (u32 i = split; i < opxy::block_frames; ++i) {
-        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+        sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
         a += after;
         p += inc;
         inc += static_cast<u32>(glide);
