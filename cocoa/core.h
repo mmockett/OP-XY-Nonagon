@@ -37,6 +37,9 @@ struct Voice {
     i32 foam;                    // the foam its stir raised, bursting away, Q15
     i32 slosh;                   // how hard the stirred drink sloshes, dying away, Q15
     u32 slosh_phase;             // the sloshing's phase, Q32 cycles
+    i32 rate[drink::classes];    // the clearing rates for rated_fill and rated_fizz
+    i32 rated_fill, rated_fizz;
+    u32 rated;                   // 1 once rate holds them
 };
 // The drink every voice stirs: one mug a track. The latest stir's drink, and
 // a clock (one tick a block while any voice renders) to clear it by.
