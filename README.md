@@ -290,15 +290,15 @@ and a loaded sample takes its place.
 ## CPU
 
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`: three runs
-each at `v0.1.0`, and Mach from one capture at `v0.4.0`. For a synth, one voice plays middle C with the first
+each at `v0.1.0`, Mach from one capture at `v0.4.0`, and Sand and Cocoa from one at `v0.5.0`. For a synth, one voice plays middle C with the first
 four controls at their midpoint; for a sample engine, its sample callback
 plays the SDK's generated two-second test sample at its default settings. Each
 figure is a share of the OP-XY's 580,352-cycle audio block.
 
 | Machine | One voice | Eight voices |
 | --- | ---: | ---: |
-| Sand | 5.4% | ~43% |
-| Cocoa | 5.7% | ~45% |
+| Sand | 4.8% | ~39% |
+| Cocoa | 3.7% | ~30% |
 | Coin | 1.5% | ~12% |
 | Fermi | 3.8% | ~31% |
 | Mach | 3.8% | ~30% |
