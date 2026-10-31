@@ -436,6 +436,13 @@ inline i32 gate_step(i32 g, u32 blocks, i32 struck, i32 glow) {
     }
     return g;
 }
+// partial_gate below with its gate's log2 already taken: e = log2(g >> 15) - 15 (Q16), or 1 for a dark gate.
+inline i32 partial_gate_at(i32 e, i32 slope, i32 place) {
+    if (e == 1) return 0;
+    const i32 tp = mul16(slope, place > 0 ? place : 0);
+    const i32 above = place > 16384 ? (((place - 16384) >> 2) * 87381) >> 14 : 0;
+    return exp2_down(mul16(e, 65536 + tp) - ((mul16(slope, above) * 85) >> 6) + (((slope >> 2) * 21845) >> 15));
+}
 // A partial's share of the gate g (Q30), at its place, Q15.
 inline i32 partial_gate(i32 g, i32 slope, i32 place) {
     const u32 light = static_cast<u32>(g) >> 15;   // Q15
