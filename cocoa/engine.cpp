@@ -110,10 +110,162 @@ __attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 a
     }
     m.phase = p;
 }
+// Sings a mode's block at 1 / 2^R of the sample rate: every 2^R-th sample of
+// the full rate's, with the same phases and amplitudes there. Over 2^R
+// samples the phase moves 2^R increments and the glide's 2^R (2^R - 1) / 2,
+// and the increment 2^R glides; the amplitude ramps by `slope` until sample
+// `split`, then by `after`.
+template <u32 R>
+__attribute__((noinline)) void sing_at(i32* sum, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split) {
+    const u32 steps = 1u << R;
+    u32 p = m.phase;
+    i32 a = amp;
+    const u32 ramped = (split + steps - 1) >> R;   // samples before the split
+    const i32 ramp = slope << R;
+    if (!glide) {
+        const u32 advance = inc << R;
+        for (u32 i = 0; i < ramped; ++i) {
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+            a += ramp;
+            p += advance;
+        }
+        a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << R) - split);
+        if (!after) {
+            const opxy::i16 held = static_cast<opxy::i16>(static_cast<u32>(a) >> 16);
+            for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
+                sum[i] += (held * tables::sine[p >> 20]) >> 3;
+                p += advance;
+            }
+        } else {
+            for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
+                sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+                a += after << R;
+                p += advance;
+            }
+        }
+        m.phase = p;
+        return;
+    }
+    const u32 bend = static_cast<u32>(glide) << R, curve = static_cast<u32>(glide) * ((steps * (steps - 1)) >> 1);
+    u32 advance = (inc << R) + curve;
+    for (u32 i = 0; i < ramped; ++i) {
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+        a += ramp;
+        p += advance;
+        advance += bend << R;
+    }
+    a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << R) - split);
+    for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+        a += after << R;
+        p += advance;
+        advance += bend << R;
+    }
+    m.phase = p;
+}
+
+// The rates' sums for a block: at the full rate, a half, a quarter and an
+// eighth (indexed by r, the rate 1 / 2^r).
+struct Sums {
+    i32* at[4];
+    u32 written;     // bit r: something was sung at rate r (its sum is cleared on the first)
+};
+inline void clear_sum(Sums& sums, u32 r) {
+    if (sums.written & (1u << r)) return;
+    sums.written |= 1u << r;
+    i32* const sum = sums.at[r];
+    for (u32 i = 0; i < (opxy::block_frames >> r); ++i) sum[i] = 0;
+}
+// Sings a mode at rate r.
+inline void sing_rate(Sums& sums, u32 r, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split) {
+    clear_sum(sums, r);
+    if (r == 3) sing_at<3>(sums.at[3], m, inc, glide, amp, slope, after, split);
+    else if (r == 2) sing_at<2>(sums.at[2], m, inc, glide, amp, slope, after, split);
+    else if (r == 1) sing_at<1>(sums.at[1], m, inc, glide, amp, slope, after, split);
+    else sing(sums.at[0], m, inc, glide, amp, slope, after, split);
+}
+
+// A mode's rate, from the highest increment it sings this block. The
+// half-band stages that double each rate pass it flat (within 0.0003 dB) with
+// its images 72 dB down up to 1.385 kHz (an eighth), 2.076 kHz (a quarter) and
+// 4.153 kHz (a half). A mode moves to a faster rate at 0.8 of those and back
+// only below 0.65, so it fades between rates well inside both rates' bands
+// and does not hop to and fro.
+const u32 rate_up[3] = {323573682u, 161747884u, 107909836u};     // 0.8 of 4.153, 2.076, 1.385 kHz: rates 1, 2, 3
+const u32 rate_down[3] = {262903616u, 131420156u, 87676742u};    // 0.65 of them
+inline u32 rate_for(u32 now, u32 top) {
+    // (Counted, not branched: each comparison is a flag the Blackfin adds.)
+    const u32 most = 3u - (top >= rate_up[2]) - (top >= rate_up[1]) - (top >= rate_up[0]);   // the slowest that holds it
+    const u32 least = 3u - (top >= rate_down[2]) - (top >= rate_down[1]) - (top >= rate_down[0]);
+    const u32 r = now > most ? most : now;
+    return r < least ? least : r;
+}
+// Whether a tap's block is sung at the full rate: its strike ramps in over
+// the spoon's contact, as short as 4 samples, whose edge the slower rates
+// would round off.
+const bool taps_at_full_rate = true;
+
+// The half-band stages that double a rate: from n inputs after 2K - 1 of
+// history (low), 2n outputs, each input in turn (K of them late) and the
+// value between it and the next, plus add (a faster path, waiting as long),
+// clamped when they feed another stage. Equiripple half-bands, Q31 taps of the
+// odd phase, doubled: images 72 dB down, flat within 0.0003 dB to 0.126 (K = 4)
+// and 0.094 (K = 3) of the output rate. Inputs are within 2^29, so each pair's
+// sum fits.
+const i32 taps4[4] = {1311826555, -311214238, 88841655, -16251572};
+const i32 taps3[3] = {1279783048, -244845092, 39343291};
+const i32 stage_limit = 1 << 29;
+inline i32 bound(i32 x, i32 low, i32 high) {
+    x = x > high ? high : x;
+    return x < low ? low : x;
+}
+template <u32 K> inline i32 between(const i32* x);
+template <> inline i32 between<4>(const i32* x) {
+    return multiply(x[0] + x[1], taps4[0]) + multiply(x[-1] + x[2], taps4[1]) +
+           multiply(x[-2] + x[3], taps4[2]) + multiply(x[-3] + x[4], taps4[3]);
+}
+template <> inline i32 between<3>(const i32* x) {
+    return multiply(x[0] + x[1], taps3[0]) + multiply(x[-1] + x[2], taps3[1]) + multiply(x[-2] + x[3], taps3[2]);
+}
+// (out is not declared __restrict: the compiler then reads each input afresh
+// rather than sliding them through registers, which costs it the hardware loop.)
+template <u32 K, bool Clamp>
+__attribute__((noinline)) void twice(const i32* low, const i32* add, i32* out, u32 n) {
+    const i32* x = low + K - 1;
+    for (u32 j = 0; j < n; ++j, ++x, add += 2, out += 2) {
+        const i32 even = x[0] + add[0], odd = between<K>(x) + add[1];
+        out[0] = Clamp ? bound(even, -stage_limit, stage_limit) : even;
+        out[1] = Clamp ? bound(odd, -stage_limit, stage_limit) : odd;
+    }
+}
+template <u32 K, bool Clamp>
+__attribute__((noinline)) void twice(const i32* low, i32* out, u32 n) {
+    const i32* x = low + K - 1;
+    for (u32 j = 0; j < n; ++j, ++x, out += 2) {
+        const i32 odd = between<K>(x);
+        out[0] = x[0];
+        out[1] = Clamp ? bound(odd, -stage_limit, stage_limit) : odd;
+    }
+}
+
 // A mode's block: decays it, or on a tap strikes it by `hit` over the
 // spoon's contact (2^contact samples), and sings it gliding from its
 // increment to `to`.
-inline void play(i32* sum, Mode& m, u32 to, i32 loss, bool tap, i32 hit, u32 contact, u32 phase) {
+// One path of a mode's block: from its phase now (keeping the phase it ends at
+// only when told to, so a mode on two paths moves on once).
+inline void path(Sums& sums, u32 r, Mode& m, u32 phase, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split, bool keep) {
+    const u32 was = m.phase;
+    m.phase = phase;
+    sing_rate(sums, r, m, inc, glide, amp, slope, after, split);
+    if (!keep) m.phase = was;
+}
+// The share of what is left to move that a fade moves this block, 1 / left (Q31; left > 1).
+const i32 fade_share[17] = {0, 0, 1073741824, 715827883, 536870912, 429496730, 357913941, 306783378, 268435456,
+                           238609294, 214748365, 195225786, 178956971, 165191050, 153391689, 143165577, 134217728};
+static_assert(fade_blocks >= 2 && fade_blocks <= 16, "fade_share covers 2 to 16 blocks");
+
+inline void play(Sums& sums, Band& band, Mode& m, u32 to, i32 loss, bool tap, i32 hit, u32 contact, u32 phase) {
+    using opxy::block_frames;
     const i32 start = m.out;
     const bool rest = m.ring < silent && start == 0;
     const u32 from = m.inc && !rest ? m.inc : to;
@@ -126,10 +278,62 @@ inline void play(i32* sum, Mode& m, u32 to, i32 loss, bool tap, i32 hit, u32 con
     const i32 end = with_guard(m.ring, guard(to));
     m.inc = to;
     m.out = end < silent ? 0 : end;
-    if (start == 0 && m.out == 0) return;
+    if (start == 0 && m.out == 0) {
+        band.left = 0;
+        return;
+    }
     const i32 glide = static_cast<i32>(to - from) >> 6;
-    if (tap) sing(sum, m, from, glide, start, (m.out - start) >> contact, 0, 1u << contact);
-    else sing(sum, m, from, glide, start, (m.out - start) >> 6, 0, opxy::block_frames);
+    const u32 top = from > to ? from : to;
+    const u32 p = m.phase;
+    if (tap && taps_at_full_rate) {
+        // A tap's strike rings in at the full rate (its contact can be 4
+        // samples), and moves to the mode's own rate over the next blocks.
+        // The mode's own rate holds its share through the block.
+        const i32 strike = (m.out - start) >> contact;
+        const u32 split = 1u << contact;
+        if (!band.left && !start) band.dst = static_cast<opxy::u8>(rate_for(band.dst, top));
+        const i32 own = band.left ? band.kept : start, lent = start - own;
+        const bool moving = band.left && band.src;   // between slower rates: the old one hands its share to the full rate
+        if (moving && lent) path(sums, band.src, m, p, from, glide, lent, (-lent) >> 6, 0, block_frames, false);
+        const i32 handed = moving ? lent >> 6 : 0;
+        if (!band.dst) {   // the mode's own rate is the full rate
+            path(sums, 0, m, p, from, glide, moving ? own : start, strike + handed, handed, split, true);
+            band.left = 0;
+            return;
+        }
+        if (own) path(sums, band.dst, m, p, from, glide, own, 0, 0, block_frames, false);
+        path(sums, 0, m, p, from, glide, moving ? 0 : lent, strike + handed, handed, split, true);
+        band.kept = own;
+        band.src = 0;
+        band.left = static_cast<opxy::u8>(fade_blocks);
+        return;
+    }
+    if (!band.left) {
+        // A mode moving to another rate fades from the old to the new.
+        const u32 r = rate_for(band.dst, top);
+        if (r != band.dst) {
+            if (start) {
+                band.src = band.dst;
+                band.kept = 0;
+                band.left = fade_blocks;
+            }
+            band.dst = static_cast<opxy::u8>(r);
+        }
+    }
+    (void)p;
+    if (!band.left || band.src == band.dst) {
+        band.left = 0;
+        sing_rate(sums, band.dst, m, from, glide, start, (m.out - start) >> 6, 0, block_frames);
+        return;
+    }
+    // Fading: the new rate's share grows to the whole over the fade's blocks;
+    // the two shares sum to the mode's own ramp.
+    const i32 moved = band.left == 1 ? m.out : band.kept + multiply(m.out - band.kept, fade_share[band.left]);
+    const i32 lent = start - band.kept, owed = m.out - moved;
+    if (lent || owed) path(sums, band.src, m, p, from, glide, lent, (owed - lent) >> 6, 0, block_frames, false);
+    path(sums, band.dst, m, p, from, glide, band.kept, (moved - band.kept) >> 6, 0, block_frames, true);
+    band.kept = moved;
+    --band.left;
 }
 }
 
@@ -152,6 +356,13 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     voice.foam = voice.slosh = 0;
     voice.slosh_phase = 0;
     voice.rated = 0;
+    voice.filled = 0;
+    for (u32 k = 0; k < liquid_modes + cup_modes; ++k) voice.band[k].dst = 3, voice.band[k].src = 3, voice.band[k].left = 0, voice.band[k].spare = 0, voice.band[k].kept = 0;
+    voice.live = 0;
+    voice.spare[0] = voice.spare[1] = 0;
+    for (u32 i = 0; i < kHistory4 + kBlock / 8; ++i) voice.eighth[i] = 0;
+    for (u32 i = 0; i < kHistory3 + kBlock / 4; ++i) voice.quarter[i] = 0;
+    for (u32 i = 0; i < kHistory3 + kBlock / 2; ++i) voice.half[i] = 0;
 }
 
 // Each note stirs on its first block, where the controls are known. A note
@@ -177,26 +388,124 @@ inline void destroy(Voice& voice, Shared& shared, opxy::u32) {
 }
 
 // The output stage, a function of its own so its loop is a hardware loop.
-__attribute__((noinline)) void finish(Voice& voice, const i32* sum, opxy::Output output) {
+// The clamp's bound, hi = 2^27 - 1, and the knee's reach, 2^29, are passed in
+// so the compiler keeps the clamps as minimums and maximums rather than
+// branches (which a Blackfin mispredicts at 8 cycles a sample). The knee
+// itself is branchless: over is how far past the knee, at most 2^29, where
+// its curve meets the ceiling.
+inline i32 finish_one(i32 x, i32& dc_in, i32& dc_out, i32 hi, i32 reach) {
     using namespace sound;
-    using opxy::block_frames;
+    dc_out = x - dc_in + dc_out - (dc_out >> 10);
+    dc_in = x;
+    const i32 v = bound(dc_out, -hi, hi);
+    const i32 sign = v >> 31;               // 0 or -1: |v| and the sign restored without a branch
+    const i32 o = ((v ^ sign) - sign) << 4;
+    const i32 over = bound(o - knee, 0, reach);
+    const i32 top = knee + reach;
+    const i32 r = (o < top ? o : top) - (multiply(over, over) << 1);
+    return (r ^ sign) - sign;
+}
+__attribute__((noinline)) void finish(Voice& voice, const i32* sum, opxy::Output output, i32 hi, i32 reach, u32 count) {
     i32 dc_in = voice.dc_in, dc_out = voice.dc_out;
-    for (unsigned i = 0; i < block_frames; ++i) {
-        dc_out = sum[i] - dc_in + dc_out - (dc_out >> 10);
-        dc_in = sum[i];
-        const i32 hi = (1 << 27) - 1;
-        const i32 c = dc_out > hi ? hi : dc_out;
-        const i32 v = c < -hi ? -hi : c;
-        const i32 sign = v >> 31;               // 0 or -1: |v| and the sign restored without a branch
-        i32 o = ((v ^ sign) - sign) << 4;
-        if (o > knee) {
-            const i32 over = o - knee;
-            o = over >= 536870912 ? knee + 268435456 : o - (multiply(over, over) << 1);
-        }
-        output[i] = (o ^ sign) - sign;
-    }
+    for (unsigned i = 0; i < count; ++i) output[i] = finish_one(sum[i], dc_in, dc_out, hi, reach);
+    for (unsigned i = count; i < opxy::block_frames; ++i) output[i] = 0;
     voice.dc_in = dc_in;
     voice.dc_out = dc_out;
+}
+
+// Back to the full rate. The eighth rate's sum, after its history, doubles to
+// the quarter rate and joins the quarter rate's (waiting 8 of its samples, as
+// late as the stage is); that doubles and joins the half rate's (waiting 22),
+// and that the full rate's (waiting 50). A sum not written for a block is all
+// zeros, and a stage whose input and history are all zeros is skipped. Returns
+// the full-rate sum, in tone.
+inline void back_to_full_rate(Voice& voice, sound::Sums& sums, i32* full, i32* half, i32* quarter, opxy::Output output,
+                              u32 count = opxy::block_frames) {
+    using namespace sound;
+    using opxy::block_frames;
+    const u32 wrote = sums.written, last = voice.live;
+    u32 live = wrote & 15u;
+    i32* const waits[3] = {full, half, quarter};
+    i32* const tails[3] = {voice.full_wait, voice.half_wait, voice.quarter_wait};
+    const u32 lengths[3] = {kFullWait, kHalfWait, kQuarterWait};
+    for (u32 r = 0; r < 3; ++r) {
+        const u32 bit = 1u << r, n = block_frames >> r, w = lengths[r];
+        i32* const wait = waits[r];
+        if (wrote & bit) {
+            if (last & bit) for (u32 i = 0; i < w; ++i) wait[i] = tails[r][i];
+            else for (u32 i = 0; i < w; ++i) wait[i] = 0;
+            for (u32 i = 0; i < w; ++i) tails[r][i] = wait[n + i];
+        } else if (last & bit) {   // a tail with nothing after it
+            for (u32 i = 0; i < w; ++i) wait[i] = tails[r][i];
+            for (u32 i = w; i < w + n; ++i) wait[i] = 0;
+        }
+    }
+    const bool to_quarter = (wrote | last) & 4u, to_half = (wrote | last) & 2u, to_full = (wrote | last) & 1u;
+    // Eighth to quarter.
+    i32* const stage4 = voice.quarter + kHistory3;
+    const bool eighth_on = (wrote | last) & 8u;
+    if (eighth_on) {
+        i32* const eighth = sums.at[3];
+        if (!(wrote & 8u)) for (u32 i = 0; i < block_frames / 8; ++i) eighth[i] = 0;
+        for (u32 i = 0; i < block_frames / 8; ++i) eighth[i] = bound(eighth[i], -stage_limit, stage_limit);
+        if (to_quarter) twice<4, true>(voice.eighth, quarter, stage4, block_frames / 8);
+        else twice<4, true>(voice.eighth, stage4, block_frames / 8);
+        for (u32 i = 0; i < kHistory4; ++i) voice.eighth[i] = voice.eighth[block_frames / 8 + i];
+    } else if (to_quarter) {
+        for (u32 i = 0; i < block_frames / 4; ++i) stage4[i] = bound(quarter[i], -stage_limit, stage_limit);
+    }
+    const bool quarter_in = eighth_on || to_quarter;
+    if (quarter_in) live |= 16u;
+    // Quarter to half.
+    i32* const stage3 = voice.half + kHistory3;
+    const bool quarter_on = quarter_in || (last & 16u);
+    if (quarter_on) {
+        if (!quarter_in) for (u32 i = 0; i < block_frames / 4; ++i) stage4[i] = 0;
+        if (to_half) twice<3, true>(voice.quarter, half, stage3, block_frames / 4);
+        else twice<3, true>(voice.quarter, stage3, block_frames / 4);
+        for (u32 i = 0; i < kHistory3; ++i) voice.quarter[i] = voice.quarter[block_frames / 4 + i];
+    } else if (to_half) {
+        for (u32 i = 0; i < block_frames / 2; ++i) stage3[i] = bound(half[i], -stage_limit, stage_limit);
+    }
+    const bool half_in = quarter_on || to_half;
+    if (half_in) live |= 32u;
+    voice.live = static_cast<opxy::u8>(live);
+    // Half to full.
+    const bool half_on = half_in || (last & 32u);
+    // (The output stage's clamp, 2^27 - 1, and its knee's reach, 2^29, are
+    // passed in so the compiler keeps them branchless.)
+    const i32 hi = (1 << 27) - 1, reach = 1 << 29;
+    if (half_on) {
+        if (!half_in) for (u32 i = 0; i < block_frames / 2; ++i) stage3[i] = 0;
+        i32 tone[block_frames];
+        if (to_full) twice<3, false>(voice.half, full, tone, block_frames / 2);
+        else twice<3, false>(voice.half, tone, block_frames / 2);
+        for (u32 i = 0; i < kHistory3; ++i) voice.half[i] = voice.half[block_frames / 2 + i];
+        finish(voice, tone, output, hi, reach, count);
+    } else {
+        if (!to_full) for (u32 i = 0; i < block_frames; ++i) full[i] = 0;
+        finish(voice, full, output, hi, reach, count);
+    }
+}
+
+// A voice that falls silent (it has rung out, or a strum holds it back)
+// stops at once, as it always has: the slower rates' last samples, still on
+// their way up, are played out (kFullWait of them) and the rest let go.
+inline void flush(Voice& voice, opxy::Output output) {
+    using namespace sound;
+    using opxy::block_frames;
+    i32 full[kFullWait + block_frames], half[kHalfWait + block_frames / 2], quarter[kQuarterWait + block_frames / 4];
+    Sums sums;
+    sums.at[0] = full + kFullWait;
+    sums.at[1] = half + kHalfWait;
+    sums.at[2] = quarter + kQuarterWait;
+    sums.at[3] = voice.eighth + kHistory4;
+    sums.written = 0;
+    back_to_full_rate(voice, sums, full, half, quarter, output, kFullWait);   // the last block's samples, then zeros
+    for (u32 i = 0; i < kHistory4 + kBlock / 8; ++i) voice.eighth[i] = 0;
+    for (u32 i = 0; i < kHistory3 + kBlock / 4; ++i) voice.quarter[i] = 0;
+    for (u32 i = 0; i < kHistory3 + kBlock / 2; ++i) voice.half[i] = 0;
+    voice.live = 0;
 }
 
 inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output output,
@@ -209,7 +518,11 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     voice.seen = shared.tick;
     if (voice.quiet || voice.wait) {
         if (voice.wait) --voice.wait;
-        for (unsigned i = 0; i < block_frames; ++i) output[i] = 0;
+        if (voice.live) {
+            flush(voice, output);
+        } else {
+            for (unsigned i = 0; i < block_frames; ++i) output[i] = 0;
+        }
         return;
     }
 
@@ -295,8 +608,15 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     const i32 hit = static_cast<i32>(drink::scale(static_cast<u32>(((strike >> 15) * voice.share >> 15) * (32768 + lean * 20)),
                                                   -drop / 4 - soften, ceiling));
 
-    i32 sum[block_frames];
-    for (unsigned i = 0; i < block_frames; ++i) sum[i] = 0;
+    // The sums at each rate. The faster rates' sums wait for the eighth's:
+    // each starts with the last block's tail still to come.
+    i32 full[kFullWait + block_frames], half[kHalfWait + block_frames / 2], quarter[kQuarterWait + block_frames / 4];
+    Sums sums;
+    sums.at[0] = full + kFullWait;
+    sums.at[1] = half + kHalfWait;
+    sums.at[2] = quarter + kQuarterWait;
+    sums.at[3] = voice.eighth + kHistory4;
+    sums.written = 0;
 
     // The liquid's modes: tuned to the key with no bubbles, falling by the drop.
     const u32 key = pitch[0] ? pitch[0] : 1;
@@ -314,34 +634,65 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     const u32 hard2 = (static_cast<u32>(hard) * static_cast<u32>(hard)) >> 16;
     const i32 upper = 9830 + static_cast<i32>((((static_cast<u32>(hard) + hard2) >> 1) * 55706u) >> 16);   // Q15
     bool ringing = false;
+    // What the fill and the cup alone set, worked out when they change: each
+    // liquid mode's ratio and clear loss, and the wall's pitches and losses.
+    if (!voice.filled || fill != voice.filled_fill || cup != voice.filled_cup) {
+        for (u32 k = 0; k < liquid_modes; ++k) {
+            voice.ratio[k] = drink::along(tables::liquid_ratio[k], fill);
+            voice.liquid_loss[k] = drink::scale(static_cast<u32>(tables::liquid_decay[cup]), voice.ratio[k] / 2 + depth, ceiling);
+        }
+        const i32 lowered = drink::along(tables::cup_lowering, fill);
+        const i32 damped = drink::along(tables::cup_damping, fill);
+        for (u32 k = 0; k < cup_modes; ++k) {
+            voice.cup_log2[k] = tables::cup_pitch[cup][k] + lowered;
+            voice.cup_inc[k] = drink::exp2_int(voice.cup_log2[k]);
+            voice.cup_loss[k] = static_cast<i32>(drink::scale(static_cast<u32>(tables::cup_decay[cup][k]), damped, ceiling));
+        }
+        voice.filled = 1;
+        voice.filled_fill = fill;
+        voice.filled_cup = cup;
+    }
     for (u32 k = 0; k < liquid_modes; ++k) {
         Mode& m = voice.liquid[k];
-        const i32 ratio = drink::along(tables::liquid_ratio[k], fill);
+        const i32 ratio = voice.ratio[k];
         const u32 to = drink::scale(key, ratio + shift, ceiling);
-        const i32 loss = static_cast<i32>((static_cast<u32>(drink::scale(static_cast<u32>(tables::liquid_decay[cup]), ratio / 2 + depth, ceiling)) * static_cast<u32>(damping)) >> 16);
+        // A mode at rest, untapped, has nothing to do but follow the drink's
+        // pitch: its last trace (under silent, -102 dB) is let go rather than
+        // decayed on.
+        if (!tap && m.out == 0 && m.ring < silent) {
+            m.ring = 0;
+            m.inc = to;
+            voice.band[k].left = 0;
+            continue;
+        }
+        const i32 loss = static_cast<i32>((voice.liquid_loss[k] * static_cast<u32>(damping)) >> 16);
         i32 struck = 0;
         const i32 level = k ? (tables::liquid_level[k] * upper) >> 15 : tables::liquid_level[0];
         if (tap) struck = strike_of(hit, level, spoon(log2_key + ratio + shift, tone), make_up);
-        play(sum, m, to, loss, tap, struck, contact, tap ? next(voice.seed) : 0);
+        play(sums, voice.band[k], m, to, loss, tap, struck, contact, tap ? next(voice.seed) : 0);
         ringing = ringing || m.out;
     }
     // The cup's wall, lowered and damped by the drink in it. There is one cup,
     // whatever the chord: only the newest note's taps ring it.
     // A hard spoon rings the wall harder: its clink 0.25 to 1.75 times.
     const i32 clink = 8192 + static_cast<i32>(((static_cast<u32>(hard) * static_cast<u32>(hard) >> 16) * 49152u) >> 16);
-    const i32 lowered = drink::along(tables::cup_lowering, fill);
-    const i32 damped = drink::along(tables::cup_damping, fill);
     for (u32 k = 0; k < cup_modes; ++k) {
         Mode& m = voice.cup[k];
-        const i32 log2_inc = tables::cup_pitch[cup][k] + lowered;
-        const u32 to = drink::exp2_int(log2_inc);
-        const i32 loss = static_cast<i32>(drink::scale(static_cast<u32>(tables::cup_decay[cup][k]), damped, ceiling));
+        if (!tap && m.out == 0 && m.ring < silent) {
+            m.ring = 0;
+            m.inc = voice.cup_inc[k];
+            voice.band[liquid_modes + k].left = 0;
+            continue;
+        }
+        const i32 log2_inc = voice.cup_log2[k];
+        const u32 to = voice.cup_inc[k];
+        const i32 loss = voice.cup_loss[k];
         i32 struck = 0;
         if (tap && shared.leader == owner) {
             const i32 level = (tables::cup_level[cup][k] * clink) >> 15;
             struck = strike_of(hit, level < 32767 ? level : 32767, spoon(log2_inc, corner), make_up);
         }
-        play(sum, m, to, loss, tap, struck, contact, tap ? next(voice.seed) : 0);
+        play(sums, voice.band[liquid_modes + k], m, to, loss, tap, struck, contact, tap ? next(voice.seed) : 0);
         ringing = ringing || m.out;
     }
 
@@ -389,9 +740,12 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
             }
         }
     }
+    // The pops ring out at the full rate: each starts at once, at full strength.
+    i32* const sum = sums.at[0];
     for (u32 k = 0; k < pops; ++k) {
         Pop& p = voice.pop[k];
         if (p.amp < silent) continue;
+        clear_sum(sums, 0);
         u32 ph = p.phase, inc = p.inc;
         i32 a = p.amp;
         const u32 shift = p.shift, chirp = inc >> 13;
@@ -411,7 +765,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     // times the eighth, with a soft knee from 0.2 to a ceiling of 0.325: it
     // rounds off only a tap's first peaks, where every mode starts at once,
     // so the ring can sit louder (README.md, Level).
-    finish(voice, sum, output);
+    back_to_full_rate(voice, sums, full, half, quarter, output);
     if (!step && !ringing && (!popping || (!bubbly && !voice.foam))) voice.quiet = 1;   // a single tap, rung out
 }
 }
