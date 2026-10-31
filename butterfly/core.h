@@ -18,6 +18,8 @@ struct Voice {
     u32 struck;                // 1 when a note has started and not yet sounded
     u32 sounding;              // 1 while any partial is above silence
     u32 hush;                  // 1 while the last note fades in one block before a new strike
+    Notes notes;               // the spectrum as last solved
+    i32 solved[4];             // flux, coupling, site and wingbeat it was solved at
 };
 
 // Voices share nothing: the spectrum is read from the tables.
