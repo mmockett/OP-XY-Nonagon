@@ -2,7 +2,8 @@
 // 0..127 with a note's whole animation at 60 fps, the rest at Euler's, then
 // the settings that load it most: each frame valid, at most two of the four
 // outlines reloaded (the dearest thing this screen does), on average at most
-// 20 nodes changed a frame while it plays, and none at rest. It also walks each
+// 20 nodes changed a frame while it plays, none at rest, and the disk and its
+// ghost always below the header. It also walks each
 // control in steps of 8 at rest and fails if one moves nothing on screen.
 #include "../display.cpp"
 #include <cstdio>
@@ -24,6 +25,29 @@ void prepare(Input& input, const double* c) {
     for (int k = 0; k < 8; ++k) input.slots[k] = q31(c[k]);
     for (int k = 0; k < 4; ++k) { input.parameters[k] = input.slots[k]; input.shown[k] = static_cast<opxy::u8>(k); }
 }
+// The disk and its ghost stay below the header, y 38. Outlines are drawn upright;
+// a ghost's dash reaches 12 px of its scale along its turn.
+int reach = 400 * 1024;
+void stay_on_stage(const char* name, int t) {
+    const int floor = 38 * 1024;
+    int top = 400 * 1024;
+    for (unsigned p = 0; p < coin::Frame::path_count; ++p) {
+        const Node& n = frame.nodes[p];
+        if (n.x >= hidden_x * unit) continue;
+        for (unsigned i = 0; i < coin::Frame::point_count; ++i) {
+            const int y = n.y + ((frame.paths[p].points[i].y * n.scale) >> 10);
+            if (y < top) top = y;
+        }
+    }
+    for (unsigned d = coin::node::ghost; d < coin::node::ghost + coin::node::ghosts; ++d) {
+        const Node& n = frame.nodes[d];
+        if (n.x >= hidden_x * unit) continue;
+        const int along = (12 * n.scale * (n.sin < 0 ? -n.sin : n.sin)) >> 10;
+        if (n.y - along < top) top = n.y - along;
+    }
+    if (top < reach) reach = top;
+    if (top < floor) { std::printf("FAIL %s, frame %d: reaches y %.1f, in the header\n", name, t, top / 1024.0); ++failures; }
+}
 struct Result { double mean; int peak, reloaded, rest; };
 Result play(const double* c, int hold, const char* name) {
     Input input;
@@ -43,6 +67,7 @@ Result play(const double* c, int hold, const char* name) {
         last = frame;
         coin::display(state, input, frame);
         if (!valid(frame)) { std::printf("FAIL %s, frame %d: not valid\n", name, t); ++failures; return r; }
+        stay_on_stage(name, t);
         int changed = 0, outlines = 0;
         for (unsigned i = 0; i < coin::Frame::node_count; ++i) {
             bool c_ = !same(frame.nodes[i], last.nodes[i]);
@@ -96,6 +121,18 @@ int main() {
         if (r.mean > worst) worst = r.mean;
         if (r.peak > peak) peak = r.peak;
     }
+    // The two largest sizes across spin and wobble, the settings that reach highest.
+    const double spins[6] = {0.4, 0.6, 0.8, 0.95, 0.99, 1}, wobbles[4] = {0, 0.5, 0.8, 1}, sizes[2] = {0.7, 0.9};
+    for (double size : sizes)
+        for (double sp : spins)
+            for (double wb : wobbles) {
+                double c[8];
+                std::memcpy(c, euler, sizeof c);
+                c[0] = sp; c[1] = size; c[4] = wb;
+                const Result r = play(c, 400, "large");
+                if (r.mean > worst) worst = r.mean;
+                if (r.peak > peak) peak = r.peak;
+            }
     // Each control moves the drawing.
     for (int k = 0; k < 8; ++k) {
         Input input;
@@ -119,6 +156,6 @@ int main() {
         std::printf("churn: %s moves the drawing in %d of 15 steps\n", names[k], moved);
     }
     if (failures) { std::printf("churn: %d faults\n", failures); return 1; }
-    std::printf("churn: at most %.1f nodes a frame on average, peak %d, two outlines a frame, none at rest\n", worst, peak);
+    std::printf("churn: at most %.1f nodes a frame on average, peak %d, two outlines a frame, none at rest; the highest reach y %.1f\n", worst, peak, reach / 1024.0);
     return 0;
 }

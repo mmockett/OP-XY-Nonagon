@@ -54,6 +54,7 @@ namespace screen {
 using namespace opxy::draw;
 const u32 budget = 4;           // the base's marks swapped a frame, at most
 const i32 lean_away = 110;      // the most the disk leans away from the camera, tenths of a degree
+const i32 stage_top = -94 * unit; // the highest a rim is drawn, about the mirror's centre: y 42, clear of the header with the rattle's 2 px
 const i32 face_open = 213;      // the least the face is drawn open to the camera: sin 12 degrees, Q10
 const i32 fade_step = 5190000;  // spin at hold with no note held: the disks settle in 0.3 s
 // Each size's radius (px) and half its thickness (Q10 of the radius): a thin
@@ -138,6 +139,21 @@ inline Point lay(const Pose& p, i32 phi, i32 s, i32 r, bool mirrored) {
     const i32 y = (along * p.st >> 10) + (rs * p.ct >> 10);
     const i32 z = p.middle + (s * p.ca >> 10) - (rc * p.sa >> 10);
     return project(x, y, mirrored ? -(z * scene::mirrored >> 10) : z);
+}
+// How high a pose's upper rim reaches, Q10 px about the mirror's centre, up negative.
+inline i32 rim_top(const Pose& p) {
+    i32 top = 0;
+    for (i32 phi = 0; phi < 3600; phi += 113) {
+        const i32 y = lay(p, phi, p.half, p.radius, false).y;
+        if (y < top) top = y;
+    }
+    return top;
+}
+// A pose leaning by `tilt`, tenths of a degree, resting on its low edge.
+inline void lean_to(Pose& p, i32 tilt) {
+    p.sa = sine(tilt);
+    p.ca = sine(tilt + 900);
+    p.middle = (p.half * p.ca >> 10) + (p.radius * p.sa >> 10);
 }
 // The OP-XY draws an outline with streaks or slivers where neighbouring
 // points lie within an eighth of a pixel on both axes (its loader merges
@@ -481,10 +497,22 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     // Leaning away from the camera (16 degrees up), the disk leans at most 11
     // degrees, so its face stays open to the camera by 5 and its rim never
     // collapses to a line (which the device draws as a streak).
-    const i32 drawn = pose.st > 0 && lead.tilt * pose.st > lean_away * unit ? lean_away * unit / pose.st : lead.tilt;
-    pose.sa = sine(drawn);
-    pose.ca = sine(drawn + 900);
-    pose.middle = (pose.half * pose.ca >> 10) + (pose.radius * pose.sa >> 10);
+    i32 drawn = pose.st > 0 && lead.tilt * pose.st > lean_away * unit ? lean_away * unit / pose.st : lead.tilt;
+    lean_to(pose, drawn);
+    // A big disk leaning far would reach the header: it leans only as far as the
+    // stage lets it. Smaller disks and smaller leans never get here.
+    const bool capped = rim_top(pose) < stage_top;
+    if (capped) {
+        i32 low = 0, high = drawn;
+        while (high - low > 1) {
+            const i32 middle = (low + high) / 2;
+            lean_to(pose, middle);
+            if (rim_top(pose) < stage_top) high = middle;
+            else low = middle;
+        }
+        drawn = low;
+        lean_to(pose, drawn);
+    }
     const i32 face = tenths(state.turn);
 
     // The note's disk: its four outlines, two a frame. The rim and its edge
@@ -554,9 +582,11 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         Pose ghost = pose;
         const u32 felt = static_cast<u32>(wobble) * (131071u - static_cast<u32>(wobble)) >> 16;   // w(2 - w), Q16
         const i32 swing = static_cast<i32>(felt * 100u >> 16), lift = static_cast<i32>(felt * 12u >> 6);   // tenths, Q10 px
-        ghost.sa = sine(lead.tilt + swing);
-        ghost.ca = sine(lead.tilt + swing + 900);
-        ghost.middle = (ghost.half * ghost.ca >> 10) + (ghost.radius * ghost.sa >> 10) + lift;
+        lean_to(ghost, (capped ? drawn : lead.tilt) + swing);
+        ghost.middle += lift;
+        // The ghost stays on the stage too: it comes down by what it would reach over.
+        for (i32 over = stage_top - rim_top(ghost); over > 64; over = stage_top - rim_top(ghost))
+            ghost.middle -= over + (over >> 3);
         for (u32 j = 0; j < node::ghosts; ++j) {
             if (!fresh && (j + state.frames) % 4) continue;
             const i32 phi = static_cast<i32>(j) * 450;

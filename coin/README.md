@@ -184,8 +184,11 @@ this, and start where both their edges are longest; where the side meets
 the upper rim tangentially, the edge's corner is cut. The camera sits 16°
 up, so a disk leaning away further would turn its face edge-on and its rim
 into a line: it leans away at most 11°, and its face's engraving is left out
-when seen at under 12°. `tests/frames.cpp` checks every outline and node
-through each control's range and a note's animation.
+when seen at under 12°. A big disk thrown far would reach the header, so it
+leans only as far as the stage lets it, and wobble's ghost comes down with it:
+at 1:32 from spin about 65, at 1:16 from about 75. `tests/frames.cpp` checks
+every outline and node through each control's range and a note's animation, and
+`tests/churn.cpp` that the disk and its ghost stay below y 38.
 
 The note's first disk is the four reshaping outlines, projected each frame:
 its face's rim, its edge (the side facing the camera), its reflection (the
@@ -264,7 +267,7 @@ The host estimate in `sdk.py test` reads higher (17,700 to 18,400 on a quiet
 host), because the host's portable Q31 multiply takes about ten instructions
 where the Blackfin takes one: the loops that are cheapest on the Blackfin
 are the ones the host times as dearest. The firmware compile
-(`sdk.py test --firmware`) passes, and Coin takes 47.6 KiB of module memory.
+(`sdk.py test --firmware`) passes, and Coin takes 47.8 KiB of module memory.
 
 ## Files
 
