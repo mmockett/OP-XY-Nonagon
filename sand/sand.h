@@ -234,10 +234,13 @@ inline void shapes_at(const PlateMode* modes, u32 u, u32 v, i16* shapes) {
     for (u32 k = 0; k < kModes; ++k) shapes[k] = static_cast<i16>(shape(modes[k], u, v));
 }
 inline i32 acceleration(const Throw& t, const i16* shapes) {
-    i32 a = 0;
-    for (u32 k = 0; k < kModes; ++k) a += t.weight[k] * (magnitude(shapes[k]) >> 3) >> 12;
-    return a;
+    // The seven modes in one straight run (a loop here is not a hardware loop).
+    return (t.weight[0] * (magnitude(shapes[0]) >> 3) >> 12) + (t.weight[1] * (magnitude(shapes[1]) >> 3) >> 12) +
+           (t.weight[2] * (magnitude(shapes[2]) >> 3) >> 12) + (t.weight[3] * (magnitude(shapes[3]) >> 3) >> 12) +
+           (t.weight[4] * (magnitude(shapes[4]) >> 3) >> 12) + (t.weight[5] * (magnitude(shapes[5]) >> 3) >> 12) +
+           (t.weight[6] * (magnitude(shapes[6]) >> 3) >> 12);
 }
+static_assert(kModes == 7, "acceleration() and gather_shapes() sum seven modes");
 
 // The clamp's washer at the plate's centre (7 px of the drawn 152): no grain
 // lies on it. Compared in 1/16 plate units, so the squares stay in 32 bits.
