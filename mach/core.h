@@ -49,7 +49,6 @@ struct Root {
     i32 part_amp[4];   // bell partial / voice formant amplitudes over the sub-step, Q15 ...
     i32 amp_was[4];    // ... and over the one before
     u32 sweeping;      // 1 while an amplitude or pitch changes fast: ramped sample by sample
-    u32 part_end[4];   // bell: each partial's phase at the end of a period (heard backwards)
     u32 offset[4];     // bell: each partial's phase at a strike, hashed from the key so a chord's strikes don't add up in step
     u32 ratio[3];      // voice: each formant over the fundamental, Q16
     u32 state;         // waiting, fold, tracking, done
@@ -77,6 +76,8 @@ struct Voice {
     i32 boom_gain;     // ... and its level, Q30, made up for what the rise takes away
     i32 period;        // bell strikes, siren wind-ups, the voice's vowel: 1 / period, Q16 per second
     u32 period_samples;   // the bell's first ring (from the flight's start to its pass) in samples
+    i32 inv;           // voice: 97392 / the key's pitch, Q32 (a formant in Hz over the fundamental) ...
+    u32 inv_for;       // ... and the pitch it was worked out for
     i32 ring;          // 1 / the bell's second ring (from the pass to the flight's end), Q16 per second
     i32 boom_low, boom_lower;   // the booms' two low-passes (shock rise, air)
     i32 boom_r;        // the distance the straight boom left from, Q26
