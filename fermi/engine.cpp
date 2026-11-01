@@ -31,6 +31,7 @@ const i32 ceiling = 1 << 30;                // half scale
 
 inline void initialize(Voice& voice, Shared& shared, opxy::u32) {
     shared.key = 0;
+    shared.configured = 0;
     for (u32 k = 0; k < chain::voiced; ++k) {
         voice.phase[k] = 0;
         voice.amp[k] = 0;
@@ -71,6 +72,19 @@ inline void pair(i32* out, const i16* w1, u32& p1, u32 i1, const i32* g1, const 
     p1 = q1;
     p2 = q2;
 }
+// One partial alone, the last of an odd number.
+inline void single(i32* out, const i16* w, u32& p, u32 inc, const i32* g) {
+    u32 q = p;
+    for (unsigned quarter = 0; quarter < 4; ++quarter) {
+        const i32 a = g[quarter];
+        i32* o = out + 16 * quarter;
+        for (unsigned i = 0; i < 16; ++i) {
+            o[i] += w[q >> 20] * a;
+            q += inc;
+        }
+    }
+    p = q;
+}
 // The same pair with levels ramped every sample, for a note's first block,
 // where a level rises from silence and quartered steps would click.
 inline void pair_ramped(i32* out, const i16* w1, u32& p1, u32 i1, i32 from1, i32 to1,
@@ -89,11 +103,30 @@ inline void pair_ramped(i32* out, const i16* w1, u32& p1, u32 i1, i32 from1, i32
     p2 = q2;
 }
 
+// The output, held within half scale: a function of its own so its loop is a
+// hardware loop. The ceiling is passed in, so the compiler keeps the clamp as
+// a minimum and a maximum.
+__attribute__((noinline)) void finish(const i32* sum, opxy::Output output, i32 most) {
+    const i32 least = -most;
+    for (unsigned i = 0; i < opxy::block_frames; ++i) {
+        const i32 x = sum[i] > most ? most : sum[i];
+        output[i] = x < least ? least : x;
+    }
+}
+
 inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
                    opxy::Parameters parameters, opxy::Pitch pitch) {
     using namespace sound;
-    chain::Setup s;
-    chain::configure(s, parameters);
+    // The controls' figures change only with the controls, and every voice
+    // playing the same ones shares them.
+    chain::Setup& s = shared.setup;
+    u32 changed = !shared.configured;
+    for (u32 k = 0; k < 8; ++k) changed |= static_cast<u32>(parameters[k] ^ shared.controls[k]);
+    if (changed) {
+        chain::configure_sound(s, parameters);
+        for (u32 k = 0; k < 8; ++k) shared.controls[k] = parameters[k];
+        shared.configured = 1;
+    }
     chain::Chain& c = voice.chain;
 
     // A new note, or a new chain: masses and the struck mode restart it.
@@ -197,20 +230,25 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
 
     i32 sum[opxy::block_frames];
     for (unsigned i = 0; i < opxy::block_frames; ++i) sum[i] = 0;
-    for (u32 k = 0; k < chain::voiced; k += 2) {
-        // Silent pairs only keep time.
-        if (!gains[k][3] && !gains[k + 1][3] && !moving[k] && !moving[k + 1]) {
-            voice.phase[k] += voice.inc[k] << 6;
-            voice.phase[k + 1] += voice.inc[k + 1] << 6;
-            continue;
-        }
-        if (load)
+    if (load) {
+        for (u32 k = 0; k < chain::voiced; k += 2)
             pair_ramped(sum, wave[k], voice.phase[k], voice.inc[k], was[k], gains[k][3],
                         wave[k + 1], voice.phase[k + 1], voice.inc[k + 1], was[k + 1], gains[k + 1][3]);
-        else
-            pair(sum, wave[k], voice.phase[k], voice.inc[k], gains[k], wave[k + 1], voice.phase[k + 1], voice.inc[k + 1], gains[k + 1]);
+    } else {
+        // Silent partials only keep time; the rest sound two by two, whichever they are.
+        u32 waiting = chain::voiced;
+        for (u32 k = 0; k < chain::voiced; ++k) {
+            if (!gains[k][3] && !moving[k]) {
+                voice.phase[k] += voice.inc[k] << 6;
+            } else if (waiting == chain::voiced) {
+                waiting = k;
+            } else {
+                pair(sum, wave[waiting], voice.phase[waiting], voice.inc[waiting], gains[waiting], wave[k], voice.phase[k], voice.inc[k], gains[k]);
+                waiting = chain::voiced;
+            }
+        }
+        if (waiting != chain::voiced) single(sum, wave[waiting], voice.phase[waiting], voice.inc[waiting], gains[waiting]);
     }
-    for (unsigned i = 0; i < opxy::block_frames; ++i)
-        output[i] = sum[i] > ceiling ? ceiling : sum[i] < -ceiling ? -ceiling : sum[i];
+    finish(sum, output, ceiling);
 }
 }

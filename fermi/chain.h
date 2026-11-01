@@ -152,7 +152,8 @@ inline u32 strength_of(u32 size, u32 m, i32 energy, i32 springs) {
 
 // static: the engine and the screen each keep their own copy, as the
 // firmware's linker does not merge duplicate inline functions.
-static inline void configure(Setup& s, const i32* controls) {
+// All but the coefficients of the tests' twin, which the sound does not read.
+static inline void configure_sound(Setup& s, const i32* controls) {
     s.size = choice(controls[MASSES], tables::sizes);
     s.n = tables::masses[s.size];
     s.m = choice(controls[MODE], 4) + 1;
@@ -174,8 +175,6 @@ static inline void configure(Setup& s, const i32* controls) {
     const u32 widest = 4 * s.alpha + 16 * s.beta;
     const i32 scale = widest ? 28 - static_cast<i32>(32 - leading_zeros(widest)) : 16;
     s.scale = scale < 0 ? 0 : scale > 16 ? 16 : scale;
-    s.a = coefficient(s.alpha, s.scale);
-    s.b = coefficient(s.beta, s.scale);
     // One shift for both, set by the larger: 14 bits for it, fewer for the
     // smaller (whose share of the force is then small too).
     {
@@ -215,6 +214,11 @@ static inline void configure(Setup& s, const i32* controls) {
         const u32 at_m = ((s.smooth >> 4) * ((w * w) >> 15)) >> 11;      // smooth x w_m^2
         s.loss = at_m < share - (share >> 2) ? share - at_m : share >> 2;
     }
+}
+static inline void configure(Setup& s, const i32* controls) {
+    configure_sound(s, controls);
+    s.a = coefficient(s.alpha, s.scale);
+    s.b = coefficient(s.beta, s.scale);
 }
 // The breathing period in chain time units, log2 Q12, from tools/calibrate.py's
 // table (bilinear in springs and energy). In chaos there is no recurrence: the

@@ -24,5 +24,9 @@ struct Voice {
 struct Shared {
     i32 start[chain::most + 2];
     u32 key;                    // the seed, masses and mode it was made for, plus 1 (0: none)
+    // The figures a block's controls make, kept while the controls stay.
+    chain::Setup setup;
+    i32 controls[8];            // the controls they were made from
+    u32 configured;             // 1 once they hold
 };
 }
