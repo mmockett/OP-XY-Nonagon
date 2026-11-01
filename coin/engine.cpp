@@ -49,6 +49,8 @@ const i32 breath_level = 288000000;
 const i32 breath_pole = 751619276;     // 0.35
 const i32 warble_most = 3932;          // wobble's swing of the contact rate, at most 0.06 octave, Q16
 const u32 eighth_most = 241591910u;    // 0.45 of the sample rate, as an eighth of an increment
+// 2^30 / (cut / 4), Q16, for a cut of 1 to 5 octaves.
+const u32 per_octaves[spin::sizes] = {65536, 32768, 21845, 16384, 13107};
 
 // sin(pi x) for x = position / 2^31 in [0, 0.5], Q31.
 inline i32 sine_pi(u32 position) {
@@ -112,161 +114,138 @@ struct Lane {
 inline i32 next(i32 c1, i32 c2, i32 g, i32 y1, i32 y2, i32 in) {
     return clamp(multiply(c1, y1) * 2 - multiply(c2, y2) + multiply(g, in), -ceiling, ceiling);
 }
-// Rolls one disk through a block: its contact strikes, each placed between
-// two samples, until it leaves the surface; then the slap, and its ring alone.
-// Its ring adds a quarter of itself to sum; its strikes add to struck. With
-// Slip, noise also drives the ring. One disk at a time keeps the Blackfin's
-// few registers enough for the loop.
-template <bool Slip>
-inline void roll(const Lane& lane, i32* sum, i32* struck, const i32* noise) {
-    Disk& d = *lane.disk;
-    Mode& m = d.ring;
-    const i32 c1 = m.c1, c2 = m.c2, g = m.gain, slip = lane.slip >> 15;
-    const i32 hit = lane.hit, bounce = lane.bounce, glide = lane.glide;
-    const u32 shift = lane.shift, reciprocal = lane.reciprocal, cut = lane.cut_at;
-    i32 y1 = m.y1, y2 = m.y2, carry = d.carry, inc = lane.inc;
-    u32 phase = d.phase, strikes = d.strikes;
-    // The strike, if one falls in sample i: where it falls between samples.
-    struct Contact {
-        u32& phase; u32& strikes; i32& carry; i32& inc;
-        i32 glide, hit, bounce;
-        u32 shift, reciprocal;
-        i32 at(unsigned i, i32* struck) {
-            i32 x = carry;
-            carry = 0;
-            const u32 before = phase;
-            phase += static_cast<u32>(inc);
-            inc += glide;
-            if ((before ^ phase) & 0x80000000u) {
-                const u32 over = phase & 0x7fffffffu;
-                const bool wrapped = !(phase & 0x80000000u);
-                const i32 amount = wrapped ? hit : bounce;
-                strikes += wrapped;
-                u32 f = over > (0xffffffffu >> shift) ? 0x7fffffffu : ((over << shift) >> 15) * reciprocal;
-                if (f > 0x7fffffffu) f = 0x7fffffffu;
-                const i32 now = multiply(amount, static_cast<i32>(f));
-                x += now;
-                carry = amount - now;
-                // The strike's two parts, for the voice's shared modes: the
-                // next sample's is written now (the block's last carries over).
-                struck[i] += now;
-                if (i + 1 < opxy::block_frames) struck[i + 1] += carry;
-            }
-            return x;
-        }
-    } contact = {phase, strikes, carry, inc, glide, hit, bounce, shift, reciprocal};
-    struck[0] += carry;   // the last block's last strike, carried over
-    // Two samples a pass, so the ring's last two samples trade places.
-    unsigned i = 0;
-    for (; i + 1 < cut; i += 2) {
-        const i32 x0 = contact.at(i, struck), x1 = contact.at(i + 1, struck);
-        y2 = next(c1, c2, g, y1, y2, Slip ? x0 + (noise[i] >> 16) * slip : x0);
-        sum[i] += y2 >> 2;   // a quarter of it, so every voice's parts fit
-        y1 = next(c1, c2, g, y2, y1, Slip ? x1 + (noise[i + 1] >> 16) * slip : x1);
-        sum[i + 1] += y1 >> 2;
-    }
-    if (i < cut) {   // an odd sample before it leaves the surface
-        const i32 x = contact.at(i, struck);
-        const i32 y = next(c1, c2, g, y1, y2, Slip ? x + (noise[i] >> 16) * slip : x);
-        y2 = y1;
-        y1 = y;
-        sum[i] += y >> 2;
-        ++i;
-    }
-    if (i < opxy::block_frames) {   // the slap, then its ring alone
-        const i32 x = carry + lane.slap;
-        struck[i] += lane.slap;   // its carry is written already
-        carry = 0;
-        const i32 y = next(c1, c2, g, y1, y2, x);
-        y2 = y1;
-        y1 = y;
-        sum[i] += y >> 2;
-        ++i;
-        if ((opxy::block_frames - i) & 1) {
-            const i32 z = next(c1, c2, g, y1, y2, 0);
-            y2 = y1;
-            y1 = z;
-            sum[i] += z >> 2;
-            ++i;
-        }
-        for (; i < opxy::block_frames; i += 2) {
-            y2 = next(c1, c2, g, y1, y2, 0);
-            sum[i] += y2 >> 2;
-            y1 = next(c1, c2, g, y2, y1, 0);
-            sum[i + 1] += y1 >> 2;
-        }
-    }
-    m.y1 = y1;
-    m.y2 = y2;
-    d.carry = carry;
-    d.phase = phase;
-    d.strikes = strikes;
-}
-// One resonance, adding a quarter of itself to sum. Two samples a pass, so
-// the last two samples trade places instead of moving.
-inline void one(Mode& a, const i32* in, i32* sum) {
+// One resonance, adding y >> Shift of itself to sum. Two samples a pass, so
+// the last two samples trade places instead of moving. A function of its own,
+// so its loop is a hardware loop with the registers to itself.
+template <u32 Shift>
+__attribute__((noinline)) void one(Mode& a, const i32* in, i32* sum) {
     const i32 c1 = a.c1, c2 = a.c2, g = a.gain;
     i32 y1 = a.y1, y2 = a.y2;
     for (unsigned i = 0; i < opxy::block_frames; i += 2) {
         y2 = next(c1, c2, g, y1, y2, in[i]);
-        sum[i] += y2 >> 2;
+        sum[i] += y2 >> Shift;
         y1 = next(c1, c2, g, y2, y1, in[i + 1]);
+        sum[i + 1] += y1 >> Shift;
+    }
+    a.y1 = y1; a.y2 = y2;
+}
+// The same with nothing coming in, for a disk lying flat: only its ring.
+__attribute__((noinline)) void ring_alone(Mode& a, i32* sum) {
+    const i32 c1 = a.c1, c2 = a.c2;
+    i32 y1 = a.y1, y2 = a.y2;
+    for (unsigned i = 0; i < opxy::block_frames; i += 2) {
+        y2 = clamp(multiply(c1, y1) * 2 - multiply(c2, y2), -ceiling, ceiling);
+        sum[i] += y2 >> 2;
+        y1 = clamp(multiply(c1, y2) * 2 - multiply(c2, y1), -ceiling, ceiling);
         sum[i + 1] += y1 >> 2;
     }
     a.y1 = y1; a.y2 = y2;
 }
-// The voice's last pass: the base rings with the strikes and the rolling
-// noise (`roll`) and the slip hisses, all added to sum (a quarter of the
-// voice); then a DC blocker and a soft knee to the output. Returns the
-// largest sample of the quarter mix.
-inline i32 ring_out(Voice& voice, const i32* sum, const i32* struck, const i32* noise, opxy::Output output,
-                    i32 roll, i32 kr, i32 slipping) {
-    Mode& b = voice.base;
-    const i32 c1 = b.c1, c2 = b.c2, g = b.gain;
-    const i32 kr_ = kr >> 15, roll_ = roll >> 15, slip_ = slipping >> 15;
-    i32 rough = voice.rough, last = voice.last;
-    i32 dc_in = voice.dc_in, dc_out = voice.dc_out;
-    i32 y1 = b.y1, y2 = b.y2;
-    i32 loudest = 0;
-    // One sample, from the base's last two (ya, yb): it returns the new one.
-    struct Out {
-        const i32 *sum, *struck, *noise;
-        opxy::Output output;
-        i32 c1, c2, g, kr, roll, slip;
-        i32 &rough, &last, &dc_in, &dc_out, &loudest;
-        i32 at(unsigned i, i32 ya, i32 yb) {
-            const i32 s = struck[i], n = noise[i] >> 1;
-            rough += ((n - rough) >> 16) * kr;
-            const i32 r = (rough >> 16) * roll;
-            const i32 y = next(c1, c2, g, ya, yb, s + r);
-            const i32 hiss = ((n - last) >> 16) * slip;
-            last = n;
-            // The base at a quarter.
-            const i32 mixed = sum[i] + (y >> 4) + ((r + hiss) >> 2);
-            dc_out = mixed - dc_in + dc_out - (dc_out >> 10);   // DC blocker, 7 Hz
-            dc_in = mixed;
-            // Six times the quarter, with a soft knee from 0.375 to a ceiling of 0.5.
-            const i32 v = clamp(dc_out, -(5 << 25), 5 << 25), a = v < 0 ? -v : v;
-            i32 o = a * 6;
-            if (o > 805306368) {   // 0.375
-                const i32 over = o - 805306368;
-                o = over >= 536870912 ? 1073741824 : o - (multiply(over, over) << 1);
-            }
-            output[i] = v < 0 ? -o : o;
-            loudest = a > loudest ? a : loudest;
-            return y;
+// Rolls one disk through a block: its contact strikes, each placed between
+// two samples, until it leaves the surface; then the slap, and its ring alone.
+// Its ring adds a quarter of itself to sum; its strikes add to struck. With
+// Slip, noise also drives the ring. The contact first, then the ring from what
+// it made: a loop each keeps the Blackfin's few registers enough for both.
+template <bool Slip>
+__attribute__((noinline)) void roll(const Lane& lane, i32* sum, i32* struck, const i32* noise) {
+    Disk& d = *lane.disk;
+    const i32 slip = lane.slip >> 15;
+    const i32 hit = lane.hit, bounce = lane.bounce, glide = lane.glide;
+    const u32 shift = lane.shift, reciprocal = lane.reciprocal, cut = lane.cut_at;
+    i32 carry = d.carry, inc = lane.inc;
+    u32 phase = d.phase, strikes = d.strikes;
+    i32 in[opxy::block_frames];
+    struck[0] += carry;   // the last block's last strike, carried over
+    unsigned i = 0;
+    for (; i < cut; ++i) {
+        // The strike, if one falls in sample i: where it falls between samples.
+        i32 x = carry;
+        carry = 0;
+        const u32 before = phase;
+        phase += static_cast<u32>(inc);
+        inc += glide;
+        if ((before ^ phase) & 0x80000000u) {
+            const u32 over = phase & 0x7fffffffu;
+            const bool wrapped = !(phase & 0x80000000u);
+            const i32 amount = wrapped ? hit : bounce;
+            strikes += wrapped;
+            u32 f = over > (0xffffffffu >> shift) ? 0x7fffffffu : ((over << shift) >> 15) * reciprocal;
+            if (f > 0x7fffffffu) f = 0x7fffffffu;
+            const i32 now = multiply(amount, static_cast<i32>(f));
+            x += now;
+            carry = amount - now;
+            // The strike's two parts, for the voice's shared modes: the
+            // next sample's is written now (the block's last carries over).
+            struck[i] += now;
+            if (i + 1 < opxy::block_frames) struck[i + 1] += carry;
         }
-    } out = {sum, struck, noise, output, c1, c2, g, kr_, roll_, slip_, rough, last, dc_in, dc_out, loudest};
-    for (unsigned i = 0; i < opxy::block_frames; i += 2) {
-        y2 = out.at(i, y1, y2);
-        y1 = out.at(i + 1, y2, y1);
+        in[i] = Slip ? x + (noise[i] >> 16) * slip : x;
+    }
+    if (i < opxy::block_frames) {   // the slap, then its ring alone
+        in[i] = carry + lane.slap;
+        struck[i] += lane.slap;   // its carry is written already
+        carry = 0;
+        for (++i; i < opxy::block_frames; ++i) in[i] = 0;
+    }
+    one<2>(d.ring, in, sum);
+    d.carry = carry;
+    d.phase = phase;
+    d.strikes = strikes;
+}
+// The rolling noise, which rings the base with the strikes (it adds to struck,
+// the base's input) and, with the slip's hiss, adds to sum (a quarter of the
+// voice). With no noise or hiss to sound, only the noise's filter moves on.
+__attribute__((noinline)) void rub(Voice& voice, i32* sum, i32* struck, const i32* noise, i32 roll, i32 kr, i32 slipping) {
+    const i32 k = kr >> 15, level = roll >> 15, slip = slipping >> 15;
+    i32 rough = voice.rough, last = voice.last;
+    if (slip) {
+        for (unsigned i = 0; i < opxy::block_frames; ++i) {
+            const i32 n = noise[i] >> 1;
+            rough += ((n - rough) >> 16) * k;
+            const i32 r = (rough >> 16) * level;
+            struck[i] += r;
+            sum[i] += (r + ((n - last) >> 16) * slip) >> 2;
+            last = n;
+        }
+    } else if (level) {
+        for (unsigned i = 0; i < opxy::block_frames; ++i) {
+            rough += (((noise[i] >> 1) - rough) >> 16) * k;
+            const i32 r = (rough >> 16) * level;
+            struck[i] += r;
+            sum[i] += r >> 2;
+        }
+    } else {
+        for (unsigned i = 0; i < opxy::block_frames; ++i) rough += (((noise[i] >> 1) - rough) >> 16) * k;
     }
     voice.rough = rough;
-    voice.last = last;
+    voice.last = noise[opxy::block_frames - 1] >> 1;
+}
+// The voice's last pass: a DC blocker and a soft knee to the output. Six times
+// the quarter, with the knee from 0.375 to a ceiling of 0.5. The clamp's bound
+// and the knee are passed in, so the compiler keeps the clamp as a minimum and
+// a maximum, and the sign is put back without a branch (either would cost a
+// Blackfin a branch a sample). Returns the largest sample of the quarter mix.
+__attribute__((noinline)) i32 finish(Voice& voice, const i32* sum, opxy::Output output, i32 most, i32 knee) {
+    i32 dc_in = voice.dc_in, dc_out = voice.dc_out;
+    i32 loudest = 0;
+    const i32 least = -most;
+    for (unsigned i = 0; i < opxy::block_frames; ++i) {
+        const i32 mixed = sum[i];
+        dc_out = mixed - dc_in + dc_out - (dc_out >> 10);   // DC blocker, 7 Hz
+        dc_in = mixed;
+        i32 v = dc_out > most ? most : dc_out;
+        v = v < least ? least : v;
+        const i32 sign = v >> 31, a = (v ^ sign) - sign;
+        i32 o = a * 6;
+        if (o > knee) {
+            const i32 over = o - knee;
+            o = over >= 536870912 ? 1073741824 : o - (multiply(over, over) << 1);
+        }
+        output[i] = (o ^ sign) - sign;
+        loudest = a > loudest ? a : loudest;
+    }
     voice.dc_in = dc_in;
     voice.dc_out = dc_out;
-    b.y1 = y1;
-    b.y2 = y2;
     return loudest;
 }
 }
@@ -318,7 +297,6 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
     const i32 n = spin::exponent(parameters[AIR]);
     const i32 below = spin::below(parameters[SIZE]);
     const i32 cut = spin::top(parameters[SIZE]);
-    const i32 cut_life = spin::life_at_cut(cut, n);
     const u32 material = spin::choice(parameters[DISK], 4);
     const i32 after = spin::after_loss(parameters[RING], material);
     const u32 ground = spin::choice(parameters[BASE], 3);
@@ -398,6 +376,8 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
              any ? tables::disk_loss[material][m + 1] * base_damping[ground] / 16 : after * static_cast<i32>(m + 2));
     damp(voice.partner, voice.partner_cosine,
          voice.disk[0].rolling ? tables::disk_loss[material][0] * base_damping[ground] / 16 : after);
+    // The life at which each disk leaves the surface, while one rolls unheld.
+    const i32 cut_life = any && !keep ? spin::life_at_cut(cut, n) : 0;
     // The disk's turn moves its strikes between its ring and the partner.
     const i32 share_ = 11469 + ((8192 * wave(voice.disk[0].turn * 2u + 0x40000000u)) >> 15);   // 0.1 to 0.6, Q15
     voice.partner.gain = multiply(voice.partner_level, share_ << 16);
@@ -420,21 +400,26 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
     // The hand: it keeps the disks spinning at a slowly wobbling rate.
     voice.hand += ((keep ? 32767 : 0) - voice.hand) / 16;
     voice.sway += sway_step;
-    const i32 depth = 197 + (multiply(wobble, 786 << 16) >> 16);   // 0.003 to 0.015 octave
-    const i32 sway = ((depth * voice.hand >> 15) * wave(voice.sway)) >> 15;
 
-    // Strikes louder as the held rate is sparser, so every key and size plays
-    // at about the same level: by 3/4 of an octave for each octave lower in
-    // key and 0.9 for each step of size (sparser strikes ring less together).
-    const i32 lower = (reference + 3 * spin::octave - spin::log2_q16(key)) * 3 / 4
-                    + (below - 3 * spin::octave) / 16 * 14745 / 1024;
-    i32 loudness = scale(static_cast<u32>(multiply(strike, material_level[material] << 14) << 2),
+    // What only a rolling disk needs: the hand's sway, and its strikes' strength.
+    i32 sway = 0, loudness = 0;
+    if (any) {
+        const i32 depth = 197 + (multiply(wobble, 786 << 16) >> 16);   // 0.003 to 0.015 octave
+        sway = ((depth * voice.hand >> 15) * wave(voice.sway)) >> 15;
+
+        // Strikes louder as the held rate is sparser, so every key and size plays
+        // at about the same level: by 3/4 of an octave for each octave lower in
+        // key and 0.9 for each step of size (sparser strikes ring less together).
+        const i32 lower = (reference + 3 * spin::octave - spin::log2_q16(key)) * 3 / 4
+                        + (below - 3 * spin::octave) / 16 * 14745 / 1024;
+        loudness = scale(static_cast<u32>(multiply(strike, material_level[material] << 14) << 2),
                          clamp(lower, -3 * spin::octave, 3 * spin::octave));
-    // Kept spinning, the strikes fall in step with the ring and it swells, so
-    // the hand strikes 5 dB softer.
-    loudness -= multiply(loudness, voice.hand * 28000);
-    if (loudness > 1 << 28) loudness = 1 << 28;   // a strike (with its swing) stays under 0.21,
-                                                  // so four disks' strikes and carries fit
+        // Kept spinning, the strikes fall in step with the ring and it swells, so
+        // the hand strikes 5 dB softer.
+        loudness -= multiply(loudness, voice.hand * 28000);
+        if (loudness > 1 << 28) loudness = 1 << 28;   // a strike (with its swing) stays under 0.21,
+                                                      // so four disks' strikes and carries fit
+    }
 
     i32 sum[block_frames], struck[block_frames];
     for (unsigned i = 0; i < block_frames; ++i) sum[i] = struck[i] = 0;
@@ -443,7 +428,7 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
 
     Lane lanes[spin::most];
     u32 active = 0;
-    const u32 per_cut = 0x40000000u / static_cast<u32>(cut >> 2);   // for slip's growth, once a block
+    const u32 per_cut = per_octaves[(cut >> 16) - 1];   // for slip's growth
     for (u32 k = 0; k < spin::most; ++k) {
         Disk& d = voice.disk[k];
         if (d.silent) continue;
@@ -537,9 +522,10 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
     // Each disk in turn.
     for (u32 l = 0; l < active; ++l) {
         const Lane& lane = lanes[l];
-        if (lane.slip) roll<true>(lane, sum, struck, noise);
-        else roll<false>(lane, sum, struck, noise);
         Disk& d = *lane.disk;
+        if (!d.rolling) ring_alone(d.ring, sum);
+        else if (lane.slip) roll<true>(lane, sum, struck, noise);
+        else roll<false>(lane, sum, struck, noise);
         if (d.rolling && lane.cut_at < block_frames) {
             d.rolling = 0;
             d.carry = 0;
@@ -560,14 +546,16 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
 
     // The voice: the disks' upper modes and the partner ring with every
     // strike; then the base, the slip, the DC blocker and the knee.
-    one(voice.upper[0], struck, sum);
-    one(voice.upper[1], struck, sum);
-    if (count == 1) one(voice.partner, struck, sum);   // several disks beat among themselves
+    one<2>(voice.upper[0], struck, sum);
+    one<2>(voice.upper[1], struck, sum);
+    if (count == 1) one<2>(voice.partner, struck, sum);   // several disks beat among themselves
     // Air pushed from under the disk breathes, louder and brighter as air rises.
     const i32 roll = multiply(rough_level[ground], rolling_noise)
                    + multiply(static_cast<i32>((breath_level >> 16) * airy), breath);
     const i32 pole = rough_pole[ground] + static_cast<i32>(((breath_pole - rough_pole[ground]) >> 16) * airy);
-    const i32 loudest = ring_out(voice, sum, struck, noise, output, roll, pole, slipping);
+    rub(voice, sum, struck, noise, roll, pole, slipping);
+    one<4>(voice.base, struck, sum);   // the base, at a quarter
+    const i32 loudest = finish(voice, sum, output, 5 << 25, 805306368);
     if (!sounding && loudest < rung_out) {   // rung out: clear what is left, under -84 dB
         voice.quiet = 1;
         for (u32 m = 0; m < 2; ++m) voice.upper[m].y1 = voice.upper[m].y2 = 0;
