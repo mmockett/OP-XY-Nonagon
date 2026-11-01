@@ -284,6 +284,12 @@ inline i32 amplitude_at(const Grid& g, u32 k, u32 d) {
     return mix(low, high, g.up);
 }
 
+// The same with the grid's across coupling at 0: its lower row alone.
+inline i32 amplitude_on_row(const Grid& g, u32 k, u32 d) {
+    const u8* a = tables::amplitude + (g.corner * partials + k) * half_chain + d;
+    return mix(a[0] << 7, a[tables::couplings * partials * half_chain] << 7, g.across);
+}
+
 // The spectrum of the chain at flux alpha (Q32 turns) and coupling lambda
 // (Q12), struck at distance `site` from its middle (Q16).
 inline void spectrum(u32 alpha, i32 lambda, i32 site, Spectrum& out) {
@@ -294,7 +300,14 @@ inline void spectrum(u32 alpha, i32 lambda, i32 site, Spectrum& out) {
     const u32 d0 = static_cast<u32>(clamp(site >> 16, 0, static_cast<i32>(half_chain) - 1));
     const u32 d1 = d0 + 1 < half_chain ? d0 + 1 : d0;
     const i32 between = d0 + 1 < half_chain ? (site >> 1) & 0x7fff : 0;
-    for (u32 k = 0; k < partials; ++k) {
+    // On a stored coupling (the self-dual detent is one) the upper row's share is exactly nothing.
+    if (!g.up) {
+        for (u32 k = 0; k < partials; ++k) {
+            out.energy[k] = mix(e[k], e[nf + k], g.across);
+            const i32 a = mix(amplitude_on_row(g, k, d0), amplitude_on_row(g, k, d1), between);   // Q15
+            out.weight[k] = (a * a) >> 14;                                                         // Q16
+        }
+    } else for (u32 k = 0; k < partials; ++k) {
         out.energy[k] = mix(mix(e[k], e[nf + k], g.across), mix(e[nc + k], e[nf + nc + k], g.across), g.up);
         const i32 a = mix(amplitude_at(g, k, d0), amplitude_at(g, k, d1), between);   // Q15
         out.weight[k] = (a * a) >> 14;                                                   // Q16
@@ -436,16 +449,22 @@ inline i32 gate_step(i32 g, u32 blocks, i32 struck, i32 glow) {
     }
     return g;
 }
-// A partial's share of the gate g (Q30), at its place, Q15.
-inline i32 partial_gate(i32 g, i32 slope, i32 place) {
-    const u32 light = static_cast<u32>(g) >> 15;   // Q15
-    if (!light) return 0;
-    const i32 e = log2_q16(light) - (15 << 16);    // <= 0
+// What a partial's share of the gate takes from the gate and the tilt alone, once a block.
+inline i32 gate_log2(u32 light) { return log2_q16(light) - (15 << 16); }      // of the light (Q15, not 0): <= 0
+inline i32 tilt_makeup(i32 slope) { return ((slope >> 2) * 21845) >> 15; }    // tilt x 1 dB
+// A partial's share of a gate of log2 e, at its place, Q15.
+inline i32 partial_share(i32 e, i32 makeup, i32 slope, i32 place) {
     const i32 tp = mul16(slope, place > 0 ? place : 0);   // tilt x place, Q16
     // And darker by tilt x 8 dB at the top, from nothing a quarter of the
     // span up, so the low partials that carry the note's loudness keep it,
     // made up by tilt x 1 dB, never above the partial's own level.
     const i32 above = place > 16384 ? (((place - 16384) >> 2) * 87381) >> 14 : 0;   // 0 to 1 over the upper 3/4, Q16
-    return exp2_down(mul16(e, 65536 + tp) - ((mul16(slope, above) * 85) >> 6) + (((slope >> 2) * 21845) >> 15));
+    return exp2_down(mul16(e, 65536 + tp) - ((mul16(slope, above) * 85) >> 6) + makeup);
+}
+// A partial's share of the gate g (Q30), at its place, Q15.
+inline i32 partial_gate(i32 g, i32 slope, i32 place) {
+    const u32 light = static_cast<u32>(g) >> 15;   // Q15
+    if (!light) return 0;
+    return partial_share(gate_log2(light), tilt_makeup(slope), slope, place);
 }
 }

@@ -79,7 +79,9 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     const i32 octaves = static_cast<i32>(exp2_q16(spread_log2(p[SPREAD])));
     const i32 slope = tilt(p[TILT]);
     const u32 note = pitch[0];
-    bool sounding = false;
+    const u32 light = hushing ? 0 : static_cast<u32>(voice.gate) >> 15;   // Q15; 0: every partial's target is
+    const i32 gate_log = light ? gate_log2(light) : 0, makeup = tilt_makeup(slope);
+    bool sounding = false, rendered = false;
     i32* low = voice.low;
     i32* acc = low + 2 * halfband_taps;
     for (u32 i = 0; i < half_frames; ++i) acc[i] = 0;
@@ -100,8 +102,8 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
             gain = increment <= ceiling_fade ? 32768 : static_cast<i32>((((ceiling - increment) >> 16) * 112978u) >> 12);   // 32768 / 1188
         }
         i32 target = 0;
-        if (!hushing && level > 0 && gain > 0)
-            target = ((((level * partial_gate(voice.gate, slope, place)) >> 15) * gain) >> 15) << 10;   // Q25
+        if (light && level > 0 && gain > 0)
+            target = ((((level * partial_share(gate_log, makeup, slope, place)) >> 15) * gain) >> 15) << 10;   // Q25
         voice.amplitude[k] = target < silence ? 0 : target;
         const u32 step_phase = increment << 1;   // a half-rate sample
         u32 ph = voice.phase[k];
@@ -109,6 +111,7 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
             voice.phase[k] = ph + (step_phase << 5);
             continue;
         }
+        rendered = true;
         if (target >= silence) sounding = true;
         // The bank: 32 samples at half rate, the amplitude ramped across them.
         i32 g = a;
@@ -124,6 +127,15 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     if (hushing) {
         voice.hush = 0;
         voice.sounding = 0;
+    }
+    // Nothing played and no tail of the last block left: the filter would give zeros.
+    if (!rendered) {
+        u32 tail = 0;
+        for (u32 i = 0; i < 2 * halfband_taps; ++i) tail |= static_cast<u32>(low[i]);
+        if (!tail) {
+            for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = 0;
+            return;
+        }
     }
     // Back to the full rate: each half-rate sample, then the half-band's
     // value between it and the next. The levels sum to at most 32767 (Q15),
