@@ -273,10 +273,11 @@ The figures below are host estimates made during development.
   them alternately 20 times, keeping the fastest of each: 11,100 Blackfin
   instructions per voice block at Drop's heaviest setting, on a busy host
   (a load of 7). `sdk.py test`'s single runs read 10,500.
-- The pipe and filters take 16-bit products; there is one division a block
-  (the allpass) and none a sample.
-- **Memory.** Compiled for the Blackfin (`--firmware`), Drop takes 80.6 KiB
-  of module memory, eight voices of 4,300 bytes.
+- The pipe and filters take 16-bit products. No sample divides; the allpass's
+  division comes only when the key or the vapour moves, and two small ones
+  remain a block.
+- **Memory.** Compiled for the Blackfin (`--firmware`), Drop takes about 81 KiB
+  of module memory, eight voices of 4,348 bytes.
 
 ## Tests
 

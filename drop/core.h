@@ -42,6 +42,15 @@ struct Voice {
     i32 period;         // log2 of the delay, samples Q16
     i32 length;         // the delay, Q16 samples, before the jet's lag is taken off
     u32 tuned;          // the pitch increment the pipe was tuned for, or 0
+    // What the key and the vapour set (figure() in engine.cpp), kept between blocks.
+    i32 figured;        // the vapour they were worked out for, or -1 after a tuning
+    i32 lost;           // the loop's loss at the key, Q15
+    i32 loop, b, c;     // the pipe's ring and its loop filter, Q15
+    i32 jet_k, under8;  // the jet's answer and the low end taken out of it, Q15
+    i32 soft, under;    // the jet's low-passes into the pipe, Q15
+    i32 drive;          // the pipe's input gain, Q10
+    i32 breath_heard;   // the jet heard directly
+    i32 tone_gain;      // the tone as heard, Q12
     i32 crack_last;     // the crackle's previous sample (it is heard through a difference)
     i32 hiss_last;      // the frying hiss, low-passed noise
     i32 dc_in, dc_out;

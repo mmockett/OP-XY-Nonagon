@@ -51,6 +51,8 @@ inline u32 lcg(u32& s) {
 }
 inline i32 clamp(i32 v, i32 low, i32 high) { return v < low ? low : v > high ? high : v; }
 inline i32 magnitude(i32 v) { return v < 0 ? -v : v; }
+// v / 3, truncating as C does, for |v| < 32768, without the Blackfin's divide call.
+inline i32 third(i32 v) { return ((v * 21846) >> 16) - (v >> 31); }
 
 // Tunes the pipe to a pitch increment: a delay of one period. The loop's
 // filter delays a sample and the allpass the fraction left, 0.5 to 1.5.
@@ -66,6 +68,7 @@ inline void tune(Voice& voice, u32 key) {
     voice.length = period;
     voice.period = physics::log2_q16(static_cast<u32>(period)) - 16 * physics::octave;
     voice.tuned = key;
+    voice.figured = -1;
 }
 // Sets the delay each block: the period less what the jet's answer lags,
 // which grows with the loop's loss (lost, Q15): its slow, low-passed push
@@ -75,6 +78,62 @@ inline void delay(Voice& voice, i32 lost) {
     voice.whole = (period - 98304) >> 16;
     const i32 fraction = period - 65536 - (voice.whole << 16);
     voice.eta = (65536 - fraction) * 32768 / (65536 + fraction);   // (1 - f) / (1 + f), Q15
+}
+// Works out what the key and the vapour set, which no block's life changes:
+// the pipe's ring, its filter, the delay and the gains in and out of it.
+inline void figure(Voice& voice, i32 vapour) {
+    // The pipe's ring: 60 dB in 0.9 s under thin vapour, a glass's singing
+    // fundamental, to 0.09 s under thick, a breathy pipe; at least 48 periods,
+    // so a low note's jet need not drive it hard (which would pull it flat).
+    i32 loss = physics::exp2_q16(voice.period - 793744 + 9962 + vapour * 68 / 10 + 16 * physics::octave);
+    if (loss > 13607) loss = 13607;   // 48 periods
+    const i32 loop = static_cast<i32>(physics::exp2_q16(15 * physics::octave - loss));
+    // The vapour's jet blows the pipe as a flute's does: it feeds the pipe's
+    // own sound back through a soft limit, so a floating drop sings a steady
+    // tone at the key whose strength follows the star's.
+    // The pipe's loop filter: thin vapour is dark, thick bright and breathy.
+    const i32 b = 8192 - (vapour * 7537 >> 15);
+    voice.b = b;
+    voice.c = full - 2 * b;
+    voice.loop = loop;
+    // The loop's loss at the key: its ring's, and its filter's, 4 b sin^2(pi f / fs).
+    const i32 half_turn = static_cast<i32>((static_cast<u32>(voice.tuned) >> 10) * 804u >> 15);   // sin(pi f / fs), Q15
+    const i32 lost = (full - loop) + (((b * (half_turn * half_turn >> 15) >> 15) * 4) * loop >> 15);
+    voice.lost = lost;
+    voice.jet_k = clamp(static_cast<i32>((static_cast<u32>(voice.tuned) >> 16) * 32170u >> 12), 64, 30000);   // 2 pi 2.5 f / fs, Q15
+    voice.under8 = static_cast<i32>((static_cast<u32>(voice.tuned) >> 12) * 25736u >> 20);   // 2 pi (f / 8) / fs, Q15
+    const i32 breath = 150 + (vapour * 1800 >> 15);    // the jet heard directly
+    // The jet into the pipe through two one-pole low-passes at 2 to 16 times
+    // the key (thicker vapour blows brighter), less what lies under half the
+    // key: the pipe's loop passes its low end too, and an open pipe has no
+    // resonance there.
+    const i32 key_log = physics::log2_q16(voice.tuned) - 17 * physics::octave;
+    const i32 soft = clamp(static_cast<i32>(physics::exp2_q16(key_log + 239276 + vapour * 6)), 64, 20000);
+    voice.soft = soft;
+    voice.under = clamp(static_cast<i32>(physics::exp2_q16(key_log + 108232)), 16, 30000);
+    // The pipe's input gain, Q10: the low-passes pass more of the jet as they
+    // open, so it falls 0.85 of an octave for each octave they open over A3's
+    // with no vapour; under A3 the loop rings 8 periods, so a little less.
+    const i32 key = physics::log2_q16(voice.tuned) - a3;
+    const i32 opened = physics::log2_q16(static_cast<u32>(soft)) - (a3 - 17 * physics::octave + 239276);
+    // Thick vapour's bright loop rings high notes longer: a quarter octave
+    // less an octave of key at full vapour.
+    // A longer ring holds more of the jet: less input as the square root of
+    // the ring's length, against thick vapour's 0.09 s.
+    const i32 ring = voice.period - 793744 - (physics::log2_q16(static_cast<u32>(loss)) - 16 * physics::octave);   // log2 T60, s Q16
+    const i32 lift = pipe_lift - opened / 20 * 17 + (key < 0 ? key * 14 / 64 : 0) - ((key >> 4) * (vapour >> 2) >> 11) -
+                     (ring + 232781) / 2 + ((key < 0 ? -key : key / 4) >> 4) * ((full - vapour) >> 4) / 384 - vapour;
+    voice.drive = clamp(static_cast<i32>(physics::exp2_q16(lift + 10 * physics::octave)), 1, 1 << 16);
+    // The jet heard directly is white: above A3 it falls an octave of level
+    // for each octave of key, or it would hiss over high notes.
+    voice.breath_heard = key > 0 ? static_cast<i32>(physics::exp2_q16(physics::log2_q16(static_cast<u32>(breath)) - key)) : breath;
+    delay(voice, lost);
+    // The tone as heard, Q12: its level is the jet's, the same at every key,
+    // but low notes sound weaker: 0.3 octave more for each octave under A3,
+    // 0.09 less for each over.
+    voice.tone_gain = static_cast<i32>(physics::exp2_q16(12 * physics::octave + tone_level -
+                                                          (key > 0 ? key * 6 / 64 : key * 19 / 64)));
+    voice.figured = vapour;
 }
 }
 
@@ -94,6 +153,7 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     voice.write = 0;
     voice.ap_in = voice.ap_out = voice.f1 = voice.f2 = voice.e1 = voice.e2 = voice.e3 = 0;
     voice.tuned = 0;
+    voice.figured = -1;
     voice.crack_last = voice.hiss_last = 0;
     voice.dc_in = voice.dc_out = 0;
     for (u32 i = 0; i < pipe_length; ++i) voice.pipe[i] = 0;
@@ -200,57 +260,15 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     const i32 frying = (boil_hiss * (boil * sinking >> 15) >> 15) +
                        (alive ? vapour_hiss * (p.vapour * p.floating >> 15) >> 15 : 0);
 
-    // The pipe's ring: 60 dB in 0.9 s under thin vapour, a glass's singing
-    // fundamental, to 0.09 s under thick, a breathy pipe; at least 48 periods,
-    // so a low note's jet need not drive it hard (which would pull it flat).
-    i32 loss = physics::exp2_q16(voice.period - 793744 + 9962 + p.vapour * 68 / 10 + 16 * physics::octave);
-    if (loss > 13607) loss = 13607;   // 48 periods
-    const i32 loop = static_cast<i32>(physics::exp2_q16(15 * physics::octave - loss));
-    // The vapour's jet blows the pipe as a flute's does: it feeds the pipe's
-    // own sound back through a soft limit, so a floating drop sings a steady
-    // tone at the key whose strength follows the star's. Fed back at `blowing`
-    // times the loop's loss it settles at a fixed level, whatever the key or ring.
-    // The pipe's loop filter: thin vapour is dark, thick bright and breathy.
-    const i32 b = 8192 - (p.vapour * 7537 >> 15);
-    const i32 c = full - 2 * b;
-    // The loop's loss at the key: its ring's, and its filter's, 4 b sin^2(pi f / fs).
-    const i32 half_turn = static_cast<i32>((static_cast<u32>(voice.tuned) >> 10) * 804u >> 15);   // sin(pi f / fs), Q15
-    const i32 lost = (full - loop) + (((b * (half_turn * half_turn >> 15) >> 15) * 4) * loop >> 15);
-    const i32 blowing = lost * (strength * sing >> 15) >> 13;   // Q15
-    const i32 jet_k = clamp(static_cast<i32>((static_cast<u32>(voice.tuned) >> 16) * 32170u >> 12), 64, 30000);   // 2 pi 2.5 f / fs, Q15
-    const i32 under8 = static_cast<i32>((static_cast<u32>(voice.tuned) >> 12) * 25736u >> 20);   // 2 pi (f / 8) / fs, Q15
-    const i32 breath = 150 + (p.vapour * 1800 >> 15);    // the jet heard directly
-    // The jet into the pipe through two one-pole low-passes at 2 to 16 times
-    // the key (thicker vapour blows brighter), less what lies under half the
-    // key: the pipe's loop passes its low end too, and an open pipe has no
-    // resonance there.
-    const i32 key_log = physics::log2_q16(voice.tuned) - 17 * physics::octave;
-    const i32 soft = clamp(static_cast<i32>(physics::exp2_q16(key_log + 239276 + p.vapour * 6)), 64, 20000);
-    const i32 under = clamp(static_cast<i32>(physics::exp2_q16(key_log + 108232)), 16, 30000);
-    // The pipe's input gain, Q10: the low-passes pass more of the jet as they
-    // open, so it falls 0.85 of an octave for each octave they open over A3's
-    // with no vapour; under A3 the loop rings 8 periods, so a little less.
-    const i32 key = physics::log2_q16(voice.tuned) - a3;
-    const i32 opened = physics::log2_q16(static_cast<u32>(soft)) - (a3 - 17 * physics::octave + 239276);
-    // Thick vapour's bright loop rings high notes longer: a quarter octave
-    // less an octave of key at full vapour.
-    // A longer ring holds more of the jet: less input as the square root of
-    // the ring's length, against thick vapour's 0.09 s.
-    const i32 ring = voice.period - 793744 - (physics::log2_q16(static_cast<u32>(loss)) - 16 * physics::octave);   // log2 T60, s Q16
-    const i32 lift = pipe_lift - opened / 20 * 17 + (key < 0 ? key * 14 / 64 : 0) - ((key >> 4) * (p.vapour >> 2) >> 11) -
-                     (ring + 232781) / 2 + ((key < 0 ? -key : key / 4) >> 4) * ((full - p.vapour) >> 4) / 384 - p.vapour;
-    const i32 drive = clamp(static_cast<i32>(physics::exp2_q16(lift + 10 * physics::octave)), 1, 1 << 16);
-    // The jet heard directly is white: above A3 it falls an octave of level
-    // for each octave of key, or it would hiss over high notes.
-    const i32 breath_heard = key > 0 ? static_cast<i32>(physics::exp2_q16(physics::log2_q16(static_cast<u32>(breath)) - key)) : breath;
-    delay(voice, lost);
+    // What the key and the vapour set: unchanged until either moves.
+    if (p.vapour != voice.figured) figure(voice, p.vapour);
+    const i32 loop = voice.loop, b = voice.b, c = voice.c;
+    // Fed back at `blowing` times the loop's loss the jet settles at a fixed level, whatever the key or ring.
+    const i32 blowing = voice.lost * (strength * sing >> 15) >> 13;   // Q15
+    const i32 jet_k = voice.jet_k, under8 = voice.under8, soft = voice.soft, under = voice.under, drive = voice.drive;
+    const i32 breath_heard = voice.breath_heard, tone_gain = voice.tone_gain;
     if (voice.kick == 0xffffffffu) voice.kick = static_cast<u32>(voice.whole / 2 + 1);
     const i32 eta = voice.eta;
-    // The tone as heard, Q12: its level is the jet's, the same at every key,
-    // but low notes sound weaker: 0.3 octave more for each octave under A3,
-    // 0.09 less for each over.
-    const i32 tone_gain = static_cast<i32>(physics::exp2_q16(12 * physics::octave + tone_level -
-                                                              (key > 0 ? key * 6 / 64 : key * 19 / 64)));
     // A chord's drops land and pulse together, so its pulses add up: from
     // three sounding voices on, each plays as the square root of 2 / voices.
     const u32 many = shared.sounding < 8 ? shared.sounding : 8;
@@ -338,7 +356,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         lowest += ((filtered * 1024 - lowest) >> 7) * under8 >> 8;
         const i32 u = clamp((filtered - (lowest >> 10)) * 4, -32767, 32767);
         // The jet answers slowly, so it blows the fundamental, not the octave.
-        jet_lp += ((u - ((u * u >> 15) * u >> 15) / 3) - jet_lp) * jet_k >> 15;
+        jet_lp += ((u - third((u * u >> 15) * u >> 15)) - jet_lp) * jet_k >> 15;
         const i32 limited = jet_lp >> 2;
         const i32 y = clamp(push + ((e2 - e3) * drive >> 10) + ((loop * filtered + 16384) >> 15) + ((blowing * (16384 + (pulse >> 1)) >> 15) * limited >> 15),
                             -ceiling, ceiling);
