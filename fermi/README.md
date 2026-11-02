@@ -315,11 +315,12 @@ velocity: stock applies both after `render`.
 
 ## CPU
 
-Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, three runs, at
-`v0.1.0`: one voice playing middle C with the first four controls at their
-midpoint costs **3.82%** of the 580,352-cycle audio block, so eight voices
-take about 31%. The OP-XY's own engines measure 1.6–2.7% a voice in the same
-test. It plays one setting; heavier settings cost more.
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, at `v0.6.0`,
+as one capture of its sweep: one voice playing middle C with the first four
+controls at their midpoint costs **2.98%** of the 580,352-cycle audio block, so
+eight voices take about 24%. The heaviest setting in the sweep costs **6.44%**,
+about 52% for eight. The OP-XY's own engines measure 1.6–2.7% a voice at the
+midpoint.
 
 The figures below are host estimates made during development. They are
 counted from the compiled Blackfin code (`sdk.py compile`), since the SDK's
@@ -344,7 +345,7 @@ masses or mode change). Ten voiced partials are what fit this budget.
 - `sdk.py test --firmware` compiles for the Blackfin: Fermi is 89.6 KiB of
   the 2040 KiB module region.
 - There is no division per sample, and one per block (the tilt's gain).
-- **Memory:** a voice is 556 bytes, the voices' shared starting shape 140
+- **Memory:** a voice is 556 bytes, the voices' shared starting shape and setup 288
   and the screen state 1,060.
 
 ## Tests
