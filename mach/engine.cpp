@@ -407,6 +407,7 @@ inline i32 knee(i32 y) {
 struct Block {
     u32 f;            // the key's pitch, a phase increment a sample
     i32 inv;          // voice: 97392 / f, Q32 (a formant in Hz over the fundamental)
+    u32 part_end[4];  // bell: each partial's phase at the end of a strike period
     i32 air;          // the air's corner at the closest pass as w = 2 pi f / fs, Q16 (-1: open) ...
     i32 thick;        // ... and how fast it takes the level with distance: (d / r)^thick, Q16 (0.5 .. 1)
 };
@@ -523,7 +524,7 @@ inline void solve(Voice& v, Root& root, const Block& block) {
         root.sweeping = 0;
         for (u32 k = 0; k < 3; ++k) {
             const i32 hz = vowel[from][k] + mul30(vowel[from + 1][k] - vowel[from][k], glide);
-            if (!k || !root.image) root.ratio[k] = shr(umul(static_cast<u32>(hz), static_cast<u32>(inv)), 16);   // the ground's keeps the first
+            root.ratio[k] = shr(umul(static_cast<u32>(hz), static_cast<u32>(inv)), 16);
             const i32 heard = wide::shr_within(umul(static_cast<u32>(hz * 97392), static_cast<u32>(fastest)), 24, max31);
             const i32 a = mul15(formant_strength[k], alias(heard));
             root.amp_was[k] = fresh ? a : root.part_amp[k];
@@ -561,12 +562,11 @@ inline void solve(Voice& v, Root& root, const Block& block) {
             // fast (at the fold) or a clock that jumped ramps sample by sample.
             if (magnitude(a - root.amp_was[k]) > 512 || magnitude((to >> 6) - (root.part_inc[k] >> 6)) > magnitude(to >> 12)) root.sweeping = 1;
         }
-        if (struck) {
-            // Forward, from the strike's phases; heard backwards, from each partial's phase at the ring's end (mod 2^32).
-            for (u32 k = 0; k < 4; k += 2)
-                root.part[k] = root.offset[k] + (travel >= 0 ? 0u : shr(umul(f, static_cast<u32>(bell_ratio[k])), 8) * v.period_samples);
-            root.gain = 0;
+        for (u32 k = 0; k < 4; k += 2) {
+            root.part_end[k] = block.part_end[k] + root.offset[k];
+            if (struck) root.part[k] = travel >= 0 ? root.offset[k] : root.part_end[k];
         }
+        if (struck) root.gain = 0;
         amp = closing ? 0 : tables::bell_low[at];
     } else {
         if (v.source == SIREN) {
@@ -867,9 +867,7 @@ inline void sound(Voice& v, Root& root, i32* out) {
         const i32 mean = held(root.inc, root.inc_to, 1, 0, true);
         i32 incs[3], amp[3];
         u32 f[3];
-        f[1] = f[2] = 0;
-        incs[1] = incs[2] = 0;
-        for (u32 j = 0; j < (root.image ? 1u : 3u); ++j) {
+        for (u32 j = 0; j < 3; ++j) {
             f[j] = shr(umul(root.phase, root.ratio[j]), 16);
             incs[j] = static_cast<i32>(shr(mul(mean, static_cast<i32>(root.ratio[j])), 16));
         }
@@ -932,40 +930,22 @@ inline void sound(Voice& v, Root& root, i32* out) {
     root.mix = root.mix_to;
 }
 
-// The booms' two low-passes with nothing going in.
-MACH_LOOP void boom_tail(i32* out, i32& boom_low, i32& boom_lower, i32 rise, i32 k) {
-    i32 low = boom_low, lower = boom_lower;
-    for (u32 i = 0; i < opxy::block_frames; ++i) {
-        low += opxy::q31::multiply(-low, rise);
-        lower += opxy::q31::multiply(low - lower, k);
-        out[i] += lower;
-    }
-    boom_low = low;
-    boom_lower = lower;
-}
-
 // The booms: each image's N-wave, through a shock's rise and the air (its
 // corner at the closest pass as w, Q16; -1 open).
 inline void booms(Voice& v, Shared& shared, opxy::Output out, i32 air) {
-    const i32 first = static_cast<i32>(v.samples), last = first + static_cast<i32>(opxy::block_frames);
-    bool any = false;
-    for (u32 m = 0; m < 2; ++m) {
-        const Image& im = v.image[m];
-        if (im.boom_at >= 0 && im.boom_at < last && im.boom_at + (im.boom_length > 0 ? im.boom_length : 1) > first) any = true;
-    }
     // Nothing to play this block (before a boom, with both low-passes at rest):
     // the loop below would add zeros and leave every state as it is.
-    if (!any && !v.boom_low && !v.boom_lower) return;
+    if (!v.boom_low && !v.boom_lower) {
+        const i32 first = static_cast<i32>(v.samples), last = first + static_cast<i32>(opxy::block_frames);
+        bool any = false;
+        for (u32 m = 0; m < 2; ++m) {
+            const Image& im = v.image[m];
+            if (im.boom_at >= 0 && im.boom_at < last && im.boom_at + (im.boom_length > 0 ? im.boom_length : 1) > first) any = true;
+        }
+        if (!any) return;
+    }
     const i32 rise = v.boom_rise;
     const i32 k = air < 0 ? max31 : absorb(mul30(air, v.boom_near));
-    i32 low = v.boom_low, lower = v.boom_lower;
-    // No N-wave this block: only the two low-passes ring on.
-    if (!any) {
-        boom_tail(out, low, lower, rise, k);
-        v.boom_low = low;
-        v.boom_lower = lower;
-        return;
-    }
     for (u32 i = 0; i < opxy::block_frames; ++i) {
         const i32 n = static_cast<i32>(v.samples + i);
         i32 x = 0;
@@ -989,12 +969,10 @@ inline void booms(Voice& v, Shared& shared, opxy::Output out, i32 air) {
                 im.boom_value -= im.boom_drop;
             }
         }
-        low += opxy::q31::multiply(x - low, rise);
-        lower += opxy::q31::multiply(low - lower, k);
-        out[i] += lower;
+        v.boom_low += opxy::q31::multiply(x - v.boom_low, rise);
+        v.boom_lower += opxy::q31::multiply(v.boom_low - v.boom_lower, k);
+        out[i] += v.boom_lower;
     }
-    v.boom_low = low;
-    v.boom_lower = lower;
 }
 
 // A DC blocker (a pole at 6 Hz), then twice, within half scale; its state in
@@ -1025,11 +1003,11 @@ inline void render(Voice& voice, Shared& shared, u32, opxy::Output output,
     const i32 air = flight::air_w(a);
     Block block;
     block.f = pitch[0];
-    if (voice.source == VOICE && (block.f != voice.inv_for || !voice.inv)) {
-        voice.inv = quotient(97392, pitched(voice, block.f), 32);
-        voice.inv_for = block.f;
+    block.inv = voice.source == VOICE ? quotient(97392, pitched(voice, block.f), 32) : 0;
+    if (voice.source == BELL) {
+        // Where each partial's phase is at a ring's end (mod 2^32).
+        for (u32 k = 0; k < 4; ++k) block.part_end[k] = shr(umul(block.f, static_cast<u32>(bell_ratio[k])), 8) * voice.period_samples;
     }
-    block.inv = voice.inv;
     block.air = air < 0 ? -1 : static_cast<i32>(shr(mul(air, voice.air_near), 16));
     block.thick = 32768 + a;
     u32 live = 0;
