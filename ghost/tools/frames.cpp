@@ -26,7 +26,8 @@ i32 at(double v) { return i32(v * 2147483647.0); }
 // A sample loaded, its overview's peaks a breathy phrase.
 void load() {
     overview.assigned = overview.loaded = 1; overview.frames = 264600; overview.rate = 44100; overview.end = 264600;
-    for (u32 i = 0; i < 64; ++i) overview.peaks[i] = opxy::u8(60 + (i * 53 % 29) * 4 + ((i / 8) % 2) * 50);
+    overview.generation = 1;
+    for (u32 i = 0; i < 96; ++i) { const opxy::i16 peak = opxy::i16((60 + (i * 53 % 29) * 4 + ((i / 8) % 2) * 50) << 7); overview.high[i] = peak; overview.low[i] = opxy::i16(-peak); }
 }
 
 // What the OP-XY does with a shown reshaping outline, beyond the SDK's rules

@@ -296,6 +296,13 @@ u32 root(u32 n) {
     return r;
 }
 
+// An overview bin's largest magnitude, 0..255.
+u32 bin_peak(const SampleOverview& o, u32 b) {
+    const i32 low = o.low[b], high = o.high[b];
+    const u32 scaled = u32(high > -low ? high : -low) >> 7;
+    return scaled > 255 ? 255 : scaled;
+}
+
 // The tape: a bar for each stretch of the sample, as tall as the root of its
 // peak against the loudest (so quiet stretches still show); the window's bars
 // lit solid, the rest of the region dim and what lies outside it dark.
@@ -306,7 +313,7 @@ void place_tape(const Input& input, Frame& frame, const SampleOverview& overview
     const bool wraps = to <= from;
     const i32 width = (rule_x1 - rule_x0) * unit;
     u32 loudest = 1;
-    for (u32 i = 0; i < overview_bins; ++i) if (overview.peaks[i] > loudest) loudest = overview.peaks[i];
+    for (u32 i = 0; i < overview_bins; ++i) if (bin_peak(overview, i) > loudest) loudest = bin_peak(overview, i);
     for (u32 i = 0; i < bar_count; ++i) {
         const u32 b0 = scaled(sample.frames, i, bar_count), b1 = scaled(sample.frames, i + 1, bar_count);
         u32 shade = bar_outside;
@@ -318,7 +325,7 @@ void place_tape(const Input& input, Frame& frame, const SampleOverview& overview
         }
         u32 peak = 0;
         for (u32 b = i * overview_bins / bar_count; b < ((i + 1) * overview_bins + bar_count - 1) / bar_count; ++b)
-            if (overview.peaks[b] > peak) peak = overview.peaks[b];
+            if (bin_peak(overview, b) > peak) peak = bin_peak(overview, b);
         const i32 tall = i32(root(peak * unit * unit / loudest)), scale = tall > 300 ? tall : 300;
         const Paint paint = lit ? fill_and_stroke : stroke;
         const u32 node = bar_first + i;

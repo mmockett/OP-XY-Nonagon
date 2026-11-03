@@ -50,6 +50,19 @@ inline bool turns_back(const Point& a, const Point& b, const Point& c) {
     return dot < 0 && (cross < 0 ? -cross : cross) * 20 < -dot;
 }
 
+// The robe's 64 peaks from the overview's 96 min/max bins: each one's largest
+// magnitude, 0..255.
+i32 peak_of(const SampleOverview& o, u32 column) {
+    i32 most = 0;
+    for (u32 b = column * 3 / 2; b < (column + 1) * 3 / 2; ++b) {
+        const i32 low = o.low[b], high = o.high[b];
+        const i32 size = high > -low ? high : -low;
+        if (size > most) most = size;
+    }
+    const i32 scaled = most >> 7;
+    return scaled > 255 ? 255 : scaled;
+}
+
 // The apparition and its twin: posed by voice (bowed at breath, singing at
 // ee); trembling all round by beat, the tremble running at beat's rate while
 // held; its robe frayed as bed rises, into the sample's own waveform or,
@@ -58,18 +71,18 @@ inline bool turns_back(const Point& a, const Point& b, const Point& c) {
 void shape_figure(Frame& frame, u32 voice, u32 beat, u32 tremble, u32 bed, const SampleOverview& overview, u32 step, bool held) {
     const u32 pose = (voice + 1024) >> 11, shake = (beat + 1024) >> 11, fray = (bed + 1024) >> 11;   // 33 steps each
     const bool sampled = fray && overview.assigned && overview.loaded;
-    u32 peaks_key = sampled ? 1 : 0;
-    if (sampled) for (u32 i = 0; i < 64; i += 4) peaks_key = peaks_key * 31 + overview.peaks[i];
+    const u32 peaks_key = sampled ? overview.generation : 0;
     const u32 key = hash((pose | shake << 6 | tremble << 12 | fray << 16 | (held ? step : 0) << 22 | u32(held) << 30) ^ peaks_key) | 1;
     if (frame.paths[apparition].key == key) return;
     // The bed's peaks about their mean, scaled so the widest reaches the fray;
     // without a sample, gusts of 0..31 about 16.
     i32 mean = 16, widest = 16;
+    i32 peaks[64];
     if (sampled) {
         mean = 0; widest = 1;
-        for (u32 i = 0; i < 64; ++i) mean += overview.peaks[i];
+        for (u32 i = 0; i < 64; ++i) { peaks[i] = peak_of(overview, i); mean += peaks[i]; }
         mean >>= 6;
-        for (u32 i = 0; i < 64; ++i) widest = widest > i32(overview.peaks[i]) - mean ? (widest > mean - i32(overview.peaks[i]) ? widest : mean - i32(overview.peaks[i])) : i32(overview.peaks[i]) - mean;
+        for (u32 i = 0; i < 64; ++i) widest = widest > peaks[i] - mean ? (widest > mean - peaks[i] ? widest : mean - peaks[i]) : peaks[i] - mean;
     }
     const i32 t = i32(pose * 1024);                                            // Q15
     const i32 shake_q10 = i32(shake) * 6 * unit / 32;                          // up to 6 px
@@ -97,7 +110,7 @@ void shape_figure(Frame& frame, u32 voice, u32 beat, u32 tremble, u32 bed, const
             if (fray) {
                 const u32 at = (i + step * 3) & 63;
                 // Without a sample, gusts: random strengths, each the mean of two.
-                const i32 peak = sampled ? i32(overview.peaks[at]) : i32((hash(at * 0x9e3779b9u + 7) >> 27) + (hash(((at + 1) & 63) * 0x9e3779b9u + 7) >> 27)) >> 1;
+                const i32 peak = sampled ? peaks[at] : i32((hash(at * 0x9e3779b9u + 7) >> 27) + (hash(((at + 1) & 63) * 0x9e3779b9u + 7) >> 27)) >> 1;
                 push += (peak - mean) * fray_q10 / widest;
             }
             if (push < 0) push /= 2;
@@ -114,7 +127,8 @@ void shape_figure(Frame& frame, u32 voice, u32 beat, u32 tremble, u32 bed, const
         frame.paths[apparition].points[i].x = clamp(x, -63 * unit, 63 * unit);
         frame.paths[apparition].points[i].y = clamp(y, -63 * unit, 63 * unit);
     }
-    // Where pushes bring a point within an eighth of a pixel of the last, or
+    // Where pushes bring a point within an eighth of a screen pixel of the last
+    // (7/32 px here, since the figure draws as small as 0.6 scale), or
     // make the outline turn back on itself at it, it and its neighbours return
     // to their places in the pose, whose points are all a pixel or more apart
     // and whose turns are all wide. Each pass returns at least one point, so
@@ -126,7 +140,8 @@ void shape_figure(Frame& frame, u32 voice, u32 beat, u32 tremble, u32 bed, const
             const u32 before = (i + 63) & 63, after = (i + 1) & 63;
             const Point& a = p[before], &b = p[i], &c = p[after];
             const i32 dx = b.x - a.x, dy = b.y - a.y;
-            const bool merged = dx > -unit / 8 && dx < unit / 8 && dy > -unit / 8 && dy < unit / 8;
+            const i32 apart = unit * 7 / 32;
+            const bool merged = dx > -apart && dx < apart && dy > -apart && dy < apart;
             if (!merged && !turns_back(a, b, c)) continue;
             const u32 near[3] = {before, i, after};
             for (u32 k = 0; k < 3; ++k)

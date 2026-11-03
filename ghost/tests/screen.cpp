@@ -63,7 +63,8 @@ void load(bool sampled) {
     overview.frames = 264600;
     overview.rate = 44100;
     overview.end = 264600;
-    for (u32 i = 0; i < 64; ++i) overview.peaks[i] = opxy::u8(60 + (i * 53 % 29) * 4 + ((i / 8) % 2) * 50);
+    overview.generation = 1;
+    for (u32 i = 0; i < 96; ++i) { const opxy::i16 peak = opxy::i16((60 + (i * 53 % 29) * 4 + ((i / 8) % 2) * 50) << 7); overview.high[i] = peak; overview.low[i] = opxy::i16(-peak); }
 }
 i32 q31(double v) { return v >= 1 ? 0x7fffffff : i32(v * 2147483647.0); }
 void play(const double* c, u32 notes, int frames, const char* when) {

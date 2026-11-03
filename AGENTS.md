@@ -4,10 +4,9 @@ This repository holds the Nonagon Suite: nine machines, one per folder
 (`sand`, `cocoa`, `ghost`, `coin`, `recur`, `fermi`, `mach`, `butterfly`,
 `drop`). Read README.md and each machine's own README first.
 
-The seven synths build against the [Open-XY SDK](https://github.com/etcetc000/open-xy)
-on `staging`. Ghost and Recur are sample engines with their own screens and need
-the sample-overview change in review (etcetc000/open-xy#182): build them from
-the `sdk/sample-overview` branch of mmockett/open-xy until it merges. Do not
+All nine build against the [Open-XY SDK](https://github.com/etcetc000/open-xy)
+on `staging`; Ghost and Recur are sample engines with their own screens, on SDK
+1.8. Do not
 edit the SDK to make a machine work; propose an SDK change separately.
 
 Follow the SDK's [machine API](https://github.com/etcetc000/open-xy/blob/staging/docs/api.md)

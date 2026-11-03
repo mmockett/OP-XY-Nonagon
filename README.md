@@ -319,11 +319,8 @@ sampler's own mixing, so they don't compare directly with the synths.
 
 The seven synths need SDK 1.4 (the two-page header), on the `staging` branch
 of [etcetc000/open-xy](https://github.com/etcetc000/open-xy). Ghost and Recur
-are sample engines with their own screens, which need a change still in
-review ([etcetc000/open-xy#182](https://github.com/etcetc000/open-xy/pull/182)):
-build them from the `sdk/sample-overview` branch of
-[mmockett/open-xy](https://github.com/mmockett/open-xy/tree/sdk/sample-overview)
-until it merges.
+are sample engines with their own screens, which need SDK 1.8, also on
+`staging`.
 
 Check the SDK out beside this repository as `../open-xy`, fetch its
 toolchain (`python sdk.py toolchain fetch`), then:
@@ -333,8 +330,7 @@ python ../open-xy/sdk.py test --machine sand --machine cocoa --machine coin --ma
 python ../open-xy/sdk.py build --machine sand --machine cocoa --machine coin --machine fermi --machine mach --machine butterfly --machine drop --stock-os <your stock-1.2.1>/os.ldr --layout <your last build's layout.json> --out <folder outside this checkout>
 ```
 
-and the same for `--machine ghost --machine recur` from the sample-overview
-branch. Then install the build's `candidate/` files as the SDK's
+and the same for `--machine ghost --machine recur`. Then install the build's `candidate/` files as the SDK's
 [build guide](https://github.com/etcetc000/open-xy/blob/staging/docs/build.md#5-install)
 describes. Pass your last build's `layout.json` so the machines already on
 your OP-XY keep their numbers.

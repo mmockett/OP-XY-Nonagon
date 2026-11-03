@@ -23,10 +23,9 @@ Pepper in London in 1862: a pane of glass leaning over the stage reflects an
 actor hidden from the audience, so a transparent figure seems to stand among
 the cast. Ghost's screen is that stage.
 
-Ghost is an OP-XY sample engine with stereo output, id `ghost`. It needs the
-SDK's sample-overview change, which gives sample engines their own screen and
-is still in review as
-[etcetc000/open-xy pull request 182](https://github.com/etcetc000/open-xy/pull/182).
+Ghost is an OP-XY sample engine with stereo output, id `ghost`. It targets
+Open-XY SDK 1.8, which gives a sample engine its own screen and the sample's
+overview.
 It plays without a sample, on breath and hum alone. A loaded sample sets the
 resonators ringing in its share of what excites them, bed's value: none at
 0%, half at the 50% default, all of it at 100%, so the ghost takes on the
@@ -255,7 +254,7 @@ Every control acts on the apparition or the stage:
 | beat | The apparition's outline trembles, up to 6 px, the tremble running at the beat's rate while held. |
 | orbit | The chalk path on the floor where it can walk: a mark at the front at 0, an arc as the notes spread, the whole circle once they circle. The apparition walks it while held. |
 | near | Its size and depth, from small at the back wall to large behind the footlights. The chalk path follows it. |
-| bed | Its robe frays, up to 8 px with its share: into the sample's own waveform (the 64 peaks of its overview), or with no sample into the whisper's ragged gusts. The fray scrolls while held. |
+| bed | Its robe frays, up to 8 px with its share: into the sample's own waveform (64 peaks from its overview's 96 bins), or with no sample into the whisper's ragged gusts. The fray scrolls while held. |
 
 A second and third held note bring two more apparitions, each where its
 own note began.

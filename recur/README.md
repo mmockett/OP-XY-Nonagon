@@ -29,10 +29,8 @@ where it started. Recur's square of slices is such a picture.
 
 ![Recur's screen: the puzzle at rest; one iteration in; the baker's map on 8 x 8 with a chord; hiss](docs/screen.png)
 
-Recur is an OP-XY sample engine, id `recur`. It needs the SDK's
-sample-overview change, which gives sample engines their own screen and the
-sample's overview, and is still in review as
-[etcetc000/open-xy pull request 182](https://github.com/etcetc000/open-xy/pull/182).
+Recur is an OP-XY sample engine, id `recur`. It targets Open-XY
+SDK 1.8, which gives a sample engine its own screen and the sample's overview.
 With no sample loaded, its screen shows a cover reading "load a sample ·
 shift +" and the Sample key's icon.
 

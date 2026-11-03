@@ -175,7 +175,8 @@ int main() {
     if (!read_artwork()) { std::printf("FAIL: can't read panel.svg.fragment\n"); return 1; }
     overview.assigned = overview.loaded = 1;
     overview.frames = 176400; overview.rate = 44100; overview.begin = 0; overview.end = 176400;
-    for (u32 b = 0; b < 64; ++b) overview.peaks[b] = opxy::u8(40 + (b * 37) % 200);
+    overview.generation = 1;
+    for (u32 b = 0; b < 96; ++b) { const opxy::i16 peak = opxy::i16((40 + (b * 37) % 200) << 7); overview.high[b] = peak; overview.low[b] = opxy::i16(-peak); }
     static recur::DisplayState state;
     static recur::Frame frame;
     const double defaults[8] = {0, 0.5, 0.583333, 0.083333, 0, 0.4375, 0.7, 0.071429};

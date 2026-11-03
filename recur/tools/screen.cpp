@@ -32,12 +32,12 @@ bool load(const char* path) {
         if (!std::memcmp(&bytes[at], "data", 4)) {
             const opxy::i16* data = reinterpret_cast<const opxy::i16*>(&bytes[at + 8]);
             const u32 frames = length / 2;
-            overview.assigned = overview.loaded = 1;
+            overview.assigned = overview.loaded = overview.generation = 1;
             overview.frames = frames; overview.rate = 44100; overview.begin = 0; overview.end = frames;
-            for (u32 b = 0; b < 64; ++b) {
+            for (u32 b = 0; b < 96; ++b) {
                 i32 peak = 0;
-                for (u32 i = b * frames / 64; i < (b + 1) * frames / 64; ++i) peak = data[i] < 0 ? (-data[i] > peak ? -data[i] : peak) : (data[i] > peak ? data[i] : peak);
-                overview.peaks[b] = opxy::u8(peak * 255 / 32768);
+                for (u32 i = b * frames / 96; i < (b + 1) * frames / 96; ++i) peak = data[i] < 0 ? (-data[i] > peak ? -data[i] : peak) : (data[i] > peak ? data[i] : peak);
+                overview.high[b] = opxy::i16(peak > 32767 ? 32767 : peak); overview.low[b] = opxy::i16(-overview.high[b]);
             }
             return true;
         }
