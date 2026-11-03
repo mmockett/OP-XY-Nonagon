@@ -324,8 +324,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
 
     // --- the instruments: the pointer on the data strip's Mach scale (0.3 at
     // its foot, 3 at its top), and a spark every quarter second where the
-    // projectile was. Idle, its last four behind it; flying, each spark since
-    // it entered the field, once the projectile is clear of it. Spark j keeps
+    // projectile was. Idle, the four nearest behind it; flying, each spark since
+    // it entered the field; each only once it lies behind the tail. Spark j keeps
     // node j mod 8, so only the newest moves ---
     {
         const i32 m = clamp(sc.mach, slowest, quickest);
@@ -335,15 +335,17 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 t_ms = state.flying ? ((now >> 6) * 1000) >> 10 : 0;
         const i32 first_ms = state.flying ? -(((before >> 6) * 1000) >> 10) : -(1 << 20);
         const i32 newest = state.flying ? (t_ms >= 0 ? t_ms / spark_ms : -((-t_ms + spark_ms - 1) / spark_ms)) : -1;
-        const i32 count = state.flying ? static_cast<i32>(node::sparks) : 4;
+        const u32 count = state.flying ? node::sparks : 4;
         bool used[node::sparks] = {};
-        for (i32 j = newest; j > newest - count; --j) {
+        u32 shown = 0;
+        for (i32 j = newest; j > newest - static_cast<i32>(node::sparks) && shown < count; --j) {
             if (j * spark_ms < first_ms || !state.bullet.r) continue;
             const i32 x = cx + clamp(((j * spark_ms) * speed) >> 4, -800 * unit, 800 * unit);
-            if (!inside(x, ly, 0, 4) || x > state.bullet.x - 12 * unit) continue;
+            if (!inside(x, ly, 0, 4) || x > state.bullet.x + plate::tail[shape] - 3 * unit) continue;   // clear of its tail
             const u32 n = static_cast<u32>(((j % 8) + 8) % 8);
             place(frame, node::spark + n, x & ~511, ly, unit, spark_grey, stroke);
             used[n] = true;
+            ++shown;
         }
         for (u32 n = 0; n < node::sparks; ++n)
             if (!used[n]) hide(frame, node::spark + n);

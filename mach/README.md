@@ -171,8 +171,8 @@ and time through `flight.h`, which the engine shares.
 
 | Scenario | average | while a flight shows | peak |
 | --- | --- | --- | --- |
-| One supersonic flight | 2.5 | 4.8 | 18 |
-| A session of turns and notes | 4.2 | 5.7 | 18 |
+| One supersonic flight | 2.5 | 4.8 | 17 |
+| A session of turns and notes | 4.2 | 5.7 | 17 |
 | Echo | 2.6 | 3.8 | 15 |
 | Subsonic | 2.2 | 5.4 | 16 |
 | The GIF's tour | 4.7 | 7.3 | 18 |
@@ -258,7 +258,7 @@ The figures below are host estimates made during development.
 
 ## Tests
 
-`sdk.py test` passes, with 44 sound checks and 9 screen checks
+`sdk.py test` passes, with 44 sound checks and 10 screen checks
 (`tests/sound.cpp`, `tests/screen.cpp`).
 
 - **Subsonic:** one root, within 50 ns of the exact retarded time; its heard
@@ -278,7 +278,8 @@ The figures below are host estimates made during development.
   sessions and a flight at every control's setting (each in twentieths, also
   below Mach 1 and at Mach 3); and every outline it reshapes draws cleanly on
   the OP-XY: none without area or turning straight back, no neighbouring
-  points within an eighth of a pixel, no closing edge under a quarter.
+  points within an eighth of a pixel, no closing edge under a quarter. No
+  spark is drawn over the projectile.
   Every header caption, each control swept in 400ths and all of them at
   their ends and middles together, fits its column in the OP-XY's font
   (a value at most 53 px at 20 px, a title 56 at 10).

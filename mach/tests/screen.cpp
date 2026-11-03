@@ -3,7 +3,7 @@
 // a flight at every control's setting (each swept in twentieths, also below
 // Mach 1 and at Mach 3), every outline it reshapes is one the OP-XY draws
 // cleanly, every header caption fits its column in the OP-XY's font, and its churn (nodes whose transform or paint changed, outlines
-// re-keyed) stays within budget. With arguments it measures one scenario and
+// re-keyed) stays within budget, and no spark is drawn over the projectile. With arguments it measures one scenario and
 // prints chosen frames as JSON for tools/frame2svg.py:
 //   c++ -std=c++11 -O2 -I<sdk>/sdk/include tests/screen.cpp -o screen
 //   ./screen <flight|session|echo|subsonic|tour|gallery|still:<control>:<value>|sweep:<control>:<value>[:<mach>]> [fps] [snapshot seconds ...]
@@ -41,6 +41,21 @@ static void dump(const mach::Frame& f, double t) {
 }
 
 struct Churn { double mean, flying, peak; bool valid; };
+
+// A spark marks where the projectile was: one drawn ahead of its tail would
+// sit on the projectile itself.
+static int spark_faults = 0;
+static void sparks(const mach::Frame& f) {
+    const opxy::i32 off = opxy::draw::hidden_x * opxy::draw::unit;
+    for (unsigned s = 0; s < mach::node::projectiles; ++s) {
+        const opxy::draw::Node& p = f.nodes[mach::node::projectile + s];
+        if (p.x >= off) continue;
+        for (unsigned k = 0; k < mach::node::sparks; ++k) {
+            const opxy::draw::Node& m = f.nodes[mach::node::spark + k];
+            if (m.x < off && m.x > p.x + mach::plate::tail[s] - 2 * opxy::draw::unit) ++spark_faults;
+        }
+    }
+}
 
 // What the OP-XY draws as streaks or slivers, beyond the SDK's own rules: a
 // reshaping outline with no area, or turning straight back at a point (a line
@@ -163,6 +178,10 @@ int main(int argc, char** argv) {
                 clean ? "ok  " : "FAIL", outline_faults, 8 * 21 * 3);
     (void)before;
     ok = ok && clean;
+    const bool apart = spark_faults == 0;
+    std::printf("%s sparks: none drawn over the projectile, over the sessions and sweeps (%d were)\n",
+                apart ? "ok  " : "FAIL", spark_faults);
+    ok = ok && apart;
     const bool fit = captions_fit();
     std::printf("%s captions: every one fits its column (%d too wide; the widest value %.1f px of 53)\n",
                 fit ? "ok  " : "FAIL", caption_faults, widest_value);
@@ -264,6 +283,7 @@ static Churn run(const char* scenario, double fps, const std::vector<double>& sn
         mach::display(state, input, frame);
         if (!opxy::draw::valid(frame)) { std::printf("FAIL invalid frame in %s at %.3f s\n", scenario, t); return Churn{0, 0, 0, false}; }
         outlines(frame, scenario, t);
+        sparks(frame);
         int churn = 0;
         if (n) {
             for (unsigned i = 0; i < mach::Frame::node_count; ++i) {
