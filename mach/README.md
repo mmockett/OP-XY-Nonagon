@@ -112,10 +112,12 @@ and Init sits about 3 dB under Hexagon's melodies at its loudest.
 
 ## Screen
 
-The whole screen is one object: a photograph after Ernst Mach and Peter
-Salcher's 1887 schlieren images of a bullet in flight. Its round field, a
-200 px circle, shows as two tapering arcs framing the left and right, while
-its middle fills the screen.
+The whole screen is one object: a glass negative after Ernst Mach and Peter
+Salcher's 1887 schlieren images of a bullet in flight, filling the screen,
+marked as a capture instrument marks it. A data strip down its left edge
+holds a Mach scale and a pointer; the photograph lies right of it, so
+nothing in the picture crosses the instruments. Sparks along the line of
+flight, one every quarter second, time the projectile.
 
 ![The screen through a session: a supersonic bell, the organ's rifle bullet with a full crack and the plate, a subsonic pass](docs/mach.gif)
 
@@ -127,10 +129,11 @@ each change reads at a glance on the screen itself
 ![Each control at 0, 50 and 100, the others at Init's, at 1:1](docs/controls-1x.png)
 
 It is drawn for 480 x 222 pixels seen at 1:1, in three greys and few
-weights: the projectile (solid) and a crack's shocks brightest; the field's
-edge, the listener, the plate and a thump's shocks a step down; the wake and
-the sound waves dimmer. No lines closer than about 3 px, nothing finer than
-a pixel, no text under 8 px, and nothing fainter than grey 5 of 15. The
+weights: the projectile (solid), a crack's shocks and the Mach scale's
+pointer brightest; the plate's edge, the listener, the plate, a thump's
+shocks and the sparks a step down; the wake and the sound waves dimmer. No
+lines closer than about 3 px, nothing finer than a pixel, no text under
+10 px, and nothing fainter than grey 5 of 15. The
 shocks and the wake are the device's reshaping outlines, which it draws
 unfilled, so a shock is a ribbon thin enough to read as one line. Each sound
 wave is a circle authored near the size it is drawn at (the k-th newest at
@@ -138,21 +141,22 @@ wave is a circle authored near the size it is drawn at (the k-th newest at
 
 | Control | In the photograph |
 | --- | --- |
-| mach | The cone: the bow and tail shocks at asin(1/M). Below Mach 1 there is none: the sound waves nest ahead of the projectile, and with boom on a bow wave stands off its nose, wider toward Mach 1 |
+| mach | The cone: the bow and tail shocks at asin(1/M), their arms running to the field's edge, and the pointer on the data strip's Mach scale (0.3 at its foot, 3 at its top). The cone holds every ring: one shows only while it touches the drawn arm. Below Mach 1 there is no cone: the sound waves nest ahead of the projectile, and with boom on a bow wave stands off its nose, wider toward Mach 1 |
 | pass | The listener, an ear trumpet on a post hung up into the field: its mouth 10 px under the line of flight at 3 m, 80 px at 300 m, on a scale of the distance's logarithm |
 | source | The projectile, solid, one a 19th-century range might fire: a rifle bullet (organ), a round-nose bullet (pad), a Minié ball (voice), a musket ball (bell), a spitzer (siren). The blunter its nose, the further its bow shock stands off |
-| dur | The turbulent wake: from a 30 px wisp to a 126 px trail, 2 to 7 px wide, its two edges billowing |
+| dur | The turbulent wake, from a 30 px wisp to a 126 px trail, 2 to 7 px wide, its two edges billowing; and the sparks, a quarter second apart, so their spacing is the projectile's speed on the plate: 160 px at 0.5 s, 32 at 2.5 s, 10 at 8 s |
 | boom | The shocks: a dim hairline when off; as a thump dim, with a broad, rounded front standing up to 16 px off; as the crack bright, sharp and crisp |
-| air | The sound waves: the thicker the air, the dimmer they fade and the nearer they stop (it absorbs the outer waves, from 58 px out to 21) |
+| air | The sound waves: the thicker the air, the dimmer they fade and the nearer they stop (it absorbs the outer waves, from 84 px out to 30) |
 | tune | The sound waves' spacing, the source's pitch: 20 px apart at tune's start, 10 at its end |
 | echo | A polished plate under the listener, and the shock it reflects |
 
 **Idle,** the photograph is still: the projectile at its closest pass, with
-the waves it sent out behind it. A control change eases in over about 0.15 s.
+the waves it sent out and its last four sparks behind it. A control change eases in over about 0.15 s.
 
 **A note** launches the flight, fixed at its note-on as the engine fixes it,
 on a scale where the whole flight spans the field and sound crosses it on the
-same scale. Waves spread from where the projectile was and its wake churns.
+same scale. Waves spread from where the projectile was, its wake churns, and
+a spark marks where it was every quarter second.
 A thin ring flashes at the listener's ear as each boom (or, below Mach 1,
 the pass's pulse) is heard. Two marks
 on the line of flight show where the sound you hear now left the projectile;
@@ -167,17 +171,19 @@ and time through `flight.h`, which the engine shares.
 
 | Scenario | average | while a flight shows | peak |
 | --- | --- | --- | --- |
-| One supersonic flight | 2.1 | 4.2 | 11 |
-| A session of turns and notes | 3.6 | 5.0 | 11 |
-| Echo | 2.4 | 3.5 | 12 |
-| Subsonic | 1.8 | 4.6 | 9 |
-| The GIF's tour | 4.2 | 6.7 | 12 |
+| One supersonic flight | 2.5 | 4.8 | 18 |
+| A session of turns and notes | 4.2 | 5.7 | 18 |
+| Echo | 2.6 | 3.8 | 15 |
+| Subsonic | 2.2 | 5.4 | 16 |
+| The GIF's tour | 4.7 | 7.3 | 18 |
 
-The peaks fall at a note-on. The screen uses 34 nodes, eight of them the
-header, and four reshaping outlines of 64 points (the bow and tail shocks,
+The peaks fall at a note-on, when the idle sparks clear as the flight
+starts. The screen uses 43 nodes, eight of them the header, nine the
+pointer and the sparks (each spark keeps its node, so only the newest
+moves), and four reshaping outlines of 64 points (the bow and tail shocks,
 the reflected shock and the wake), re-keyed only when they change. Fills are
 kept to the small solid parts (the projectile, the listener, the plate) and
-the field's static edge.
+the plate's static edge and engraving.
 
 ## How it works
 

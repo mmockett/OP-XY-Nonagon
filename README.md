@@ -204,8 +204,10 @@ pass.
 **Page 1:** mach, pass, source, dur<br>
 **Page 2:** boom, air, tune, echo
 
-The screen is the pass seen from above, like Mach's photographs: the source,
-its wavefronts and the cone, and the listener below the line of flight.
+The screen is the pass on a glass plate, like Mach's photographs: the
+source, its wavefronts inside the cone, and the listener below the line of
+flight, with a Mach scale down the plate's edge and sparks that time the
+flight.
 *Shown: Flyby Pad, four flybys, then mach turned up.* [More about Mach](mach/README.md)
 
 </td>

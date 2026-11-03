@@ -3,16 +3,17 @@
 geometry display.cpp draws from: run it after changing a shape here, and
 commit all three.
 
-The whole screen is one object: a photograph after Ernst Mach and Peter
-Salcher's 1887 schlieren images of a bullet in flight, its round field a
-200 px circle, so its edge frames the left and right as two arcs while its
-middle fills the screen. Drawn for the screen at 1:1 (480 x 222), in three
-greys and few weights: the projectile (solid) and a crack's shocks
-brightest and boldest (grey 15), the field's edge, the listener and the
-plate (solid) and a thump's shocks a step down (grey 9 to 10), the wake and
-the sound waves dimmer still. No
-lines closer than about 3 px, nothing finer than a pixel, no small text. In
-the field, under the SDK's two-page header:
+The whole screen is one object: a glass negative after Ernst Mach and Peter
+Salcher's 1887 schlieren images of a bullet in flight, filling the body,
+annotated as a capture instrument would mark it: a data strip down its left
+edge holds a Mach scale and the sparks' legend, and the photograph's field
+lies right of it, so nothing in the picture crosses the instruments. Drawn
+for the screen at 1:1 (480 x 222), in three greys and few weights: the
+projectile (solid) and a crack's shocks brightest and boldest (grey 15),
+the plate's edge, the listener and the plate (solid) and a thump's shocks a
+step down (grey 9 to 10), the wake and the sound waves dimmer still. No
+lines closer than about 3 px, nothing finer than a pixel, no text under
+10 px. On the plate, under the SDK's two-page header:
   - the projectile, one of five a 19th-century range might fire (one for
     each source): a rifle bullet, a round-nose bullet, a Minie ball, a
     musket ball and a spitzer, each with its own shock stand-off;
@@ -22,7 +23,10 @@ the field, under the SDK's two-page header:
   - the sound waves it has sent out, thin rings;
   - an ear trumpet on a post hung up into the field: the listener;
   - with echo, a polished plate under the listener and the shock it reflects;
-  - two marks on the line of flight: where the sound heard now left.
+  - two marks on the line of flight: where the sound heard now left;
+  - a spark mark every quarter second where the projectile was, so their
+    spacing is its speed on the plate;
+  - in the data strip, a pointer beside the Mach scale (0.3 to 3).
 Node numbers are display.h's."""
 import math
 import pathlib
@@ -44,13 +48,17 @@ RING, RINGS = 12, 12
 PROJECTILE, PROJECTILES = 24, 5                   # organ, pad, voice, bell, siren
 WIRE, GLOW, PLATE = 29, 30, 31
 HEARD, HEARDS = 32, 2
-NODES = HEARD + HEARDS                            # 34
+POINTER, SPARK, SPARKS = 34, 35, 8                # the Mach scale's pointer, the sparks
+NODES = SPARK + SPARKS                            # 43
 POINTS = 64
 
-# The photograph (display.cpp's plate namespace).
-CENTRE, RADIUS = (240, 129), 200                  # the schlieren field's circle
-BAND = (44, 216)                                  # the field's window, top and bottom
-LINE_Y = 108                                      # the line of flight
+# The plate (display.cpp's plate namespace).
+EDGE = (12, 44, 468, 216)                         # the glass's edge: left, top, right, bottom
+STRIP = 56                                        # the data strip's divider
+FIELD = (STRIP + 4, 44, 468, 216)                 # where the photograph draws, right of the strip
+CENTRE_X = 288                                    # the closest pass, right of the field's middle: the cone opens left
+LINE_Y = 130                                      # the line of flight, the field's middle
+SCALE = (40, 176, 66)                             # the Mach scale: its line's x, M 0.3's y, M 3's y
 RING_RADIUS = 10                                  # wave k is authored at 10 (k + 1) px, drawn at up to twice
 GLOW_RADIUS = 10
 
@@ -195,18 +203,35 @@ for i, (x, y, ink, size) in enumerate(texts):
     out.append(f'<text id="{ID}_text_{i}" transform="matrix(1 0 0 1 {num(x)} {num(y)})" fill="{ink}" {FONT} '
                f'font-size="{size}px">-</text>')
 
-# The photograph's round field: its edge where it shows, a solid 2 px band
-# on either side, tapering to a point at each end.
-cx, cy = CENTRE
-for side in (-1, 1):
-    left, right = [], []
-    for k in range(33):
-        y = BAND[0] - 4 + (BAND[1] - BAND[0] + 8) * k / 32
-        x = cx + side * math.sqrt(RADIUS ** 2 - (y - cy) ** 2)
-        w = 1.0 * math.sin(math.pi * k / 32) ** 0.35        # half the band's width
-        left.append((x - side * w, y))
-        right.append((x + side * w, y))
-    out.append(f'<path d="{outline(left + right[::-1][1:-1], 2)}" fill="{G(10)}" stroke="{G(10)}" stroke-width="0.4"/>')
+# A glass negative: four thin strips square at the corners, its edge, and
+# a hairline of emulsion edge 4 px inside along the top and bottom.
+L, T, R, B = EDGE
+for x0, y0, x1, y1 in ((L, T, R, T + 1.2), (L, B - 1.2, R, B), (L, T, L + 1.2, B), (R - 1.2, T, R, B)):
+    out.append(f'<path d="{outline([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], 2)}" fill="{G(9)}" stroke="{G(9)}" stroke-width="0.3"/>')
+for y in (T + 4, B - 4.6):
+    out.append(f'<path d="{outline([(L + 4, y), (R - 4, y), (R - 4, y + 0.6), (L + 4, y + 0.6)], 2)}" fill="{G(6)}" stroke="{G(6)}" stroke-width="0.3"/>')
+
+# The capture's data strip, down the plate's left edge (static): a divider,
+# a vertical Mach scale (M 0.3 at the foot, 3 at the top, a longer tick at
+# Mach 1) and, at its foot, the sparks' legend.
+out.append(f'<path d="{outline([(STRIP, T + 4.6), (STRIP + 0.6, T + 4.6), (STRIP + 0.6, B - 4.6), (STRIP, B - 4.6)], 2)}" fill="{G(6)}" stroke="{G(6)}" stroke-width="0.3"/>')
+
+
+def scale_y(m):
+    return SCALE[1] + (SCALE[2] - SCALE[1]) * (m - 0.3) / 2.7
+
+
+out.append(f'<path d="{outline(ribbon([(SCALE[0], SCALE[1]), (SCALE[0], SCALE[2])], 0.8), 2)}" fill="{G(9)}" stroke="{G(9)}" stroke-width="0.3"/>')
+for m in (0.5, 1.0, 1.5, 2.0, 2.5, 3.0):
+    y, tall = scale_y(m), (8 if m == 1.0 else 5 if m in (2.0, 3.0) else 3)
+    out.append(f'<path d="{outline([(SCALE[0] - tall, y - 0.5), (SCALE[0], y - 0.5), (SCALE[0], y + 0.5), (SCALE[0] - tall, y + 0.5)], 2)}" fill="{G(9)}" stroke="{G(9)}" stroke-width="0.3"/>')
+for m, label in ((1.0, "1"), (2.0, "2"), (3.0, "3")):
+    out.append(text(SCALE[0] - 17, scale_y(m) + 3.5, 10, 10, label))
+out.append(text(SCALE[0] - 3.5, SCALE[2] - 6, 10, 10, "M"))
+# The sparks' legend: a sample mark, and its interval in two lines.
+out.append(f'<path d="{outline([(L + 6, 191), (L + 7.6, 191), (L + 7.6, 200), (L + 6, 200)], 2)}" fill="none" stroke="{G(9)}" stroke-width="0.5"/>')
+out.append(text(L + 12, 199, 10, 10, "spark"))
+out.append(text(L + 6, 210, 10, 10, "0.25 s"))
 
 # --- the nodes ---------------------------------------------------------------
 out.append(node(BOW, outline(placeholder(POINTS)), 15, HIDDEN))
@@ -217,14 +242,14 @@ for i in range(RINGS):
     out.append(f'<circle id="{ID}_node_{RING + i}" transform="matrix(1 0 0 1 {HIDDEN[0]} {HIDDEN[1]})" cx="0" cy="0" '
                f'r="{RING_RADIUS * (i + 1)}" fill="none" stroke="{G(10)}" stroke-width="{num(LINE)}"/>')
 for i, shape in enumerate(SHAPES):
-    out.append(node(PROJECTILE + i, outline(shape), 15, (CENTRE[0], LINE_Y) if i == 0 else HIDDEN, solid=True))
+    out.append(node(PROJECTILE + i, outline(shape), 15, (CENTRE_X, LINE_Y) if i == 0 else HIDDEN, solid=True))
 # The listener: an ear trumpet on a post, hung up into the field from below
-# the card; its mouth (the origin) is where the listener is. The post runs
-# 112 px, past the screen's edge from any height.
+# the plate; its mouth (the origin) is where the listener is. The post runs
+# 90 px, past the screen's edge from any height and at most 78 px beyond it.
 mouth = [(-5.5 + 11 * k / 6, -0.6 * math.sin(math.pi * k / 6)) for k in range(7)]
-horn = [(5.5, 0.0), (4.2, 1.6), (2.4, 3.6), (1.2, 5.8), (0.75, 7.5), (0.75, 112.0),
-        (-0.75, 112.0), (-0.75, 7.5), (-1.2, 5.8), (-2.4, 3.6), (-4.2, 1.6)]
-out.append(node(WIRE, outline(mouth[:-1] + horn), 10, (CENTRE[0], LINE_Y + 40), solid=True))
+horn = [(5.5, 0.0), (4.2, 1.6), (2.4, 3.6), (1.2, 5.8), (0.75, 7.5), (0.75, 90.0),
+        (-0.75, 90.0), (-0.75, 7.5), (-1.2, 5.8), (-2.4, 3.6), (-4.2, 1.6)]
+out.append(node(WIRE, outline(mouth[:-1] + horn), 10, (CENTRE_X, LINE_Y + 40), solid=True))
 out.append(f'<circle id="{ID}_node_{GLOW}" transform="matrix(1 0 0 1 {HIDDEN[0]} {HIDDEN[1]})" cx="0" cy="0" '
            f'r="{GLOW_RADIUS}" fill="none" stroke="{G(14)}" stroke-width="{num(LINE)}"/>')
 # The plate: a polished bar seen edge on, 300 px and 4 thick, bevelled.
@@ -233,6 +258,12 @@ out.append(node(PLATE, outline(plate), 10, HIDDEN, solid=True))
 heard = ring_points(4.0, 24)
 for i in range(HEARDS):
     out.append(node(HEARD + i, outline(heard), 13, HIDDEN))
+
+# The pointer beside the Mach scale: an open triangle pointing left at the speed.
+out.append(node(POINTER, outline([(0.0, 0.0), (6.0, -3.5), (6.0, 3.5)]), 13, (SCALE[0] + 3, SCALE[1])))
+# A spark: a short mark across the line of flight where the projectile was.
+for i in range(SPARKS):
+    out.append(node(SPARK + i, outline([(-0.8, -4.5), (0.8, -4.5), (0.8, 4.5), (-0.8, 4.5)]), 9, HIDDEN))
 
 for i, grey in enumerate(GREYS):
     out.append(f'<circle id="{ID}_palette_{i}" cx="640" cy="0" r="1" fill="{grey}" stroke="{grey}" '
@@ -257,9 +288,11 @@ plate_h = ["// Written by tools/make_panel.py: do not edit.",
            "",
            "namespace mach {",
            "namespace plate {",
-           "// The photograph's round field (pixels) and the card's window it shows through.",
-           f"const opxy::i32 centre_x = {CENTRE[0]}, centre_y = {CENTRE[1]}, radius = {RADIUS};",
-           f"const opxy::i32 top = {BAND[0]}, bottom = {BAND[1]};",
+           "// The photograph's field (pixels), right of the data strip, and the closest pass.",
+           f"const opxy::i32 left = {FIELD[0]}, top = {FIELD[1]}, right = {FIELD[2]}, bottom = {FIELD[3]};",
+           f"const opxy::i32 centre_x = {CENTRE_X};",
+           "// The data strip's Mach scale: its line, and where M 0.3 and M 3 fall on it.",
+           f"const opxy::i32 scale_x = {SCALE[0]}, scale_bottom = {SCALE[1]}, scale_top = {SCALE[2]};",
            "// The line of flight; the rings' authored radii (wave k's is (k + 1) times it) and the glow's.",
            f"const opxy::i32 line_y = {LINE_Y}, ring_radius = {RING_RADIUS}, glow_radius = {GLOW_RADIUS};",
            "// Each projectile's nose and tail (Q10 pixels ahead of its middle) and its bow shock's stand-off.",

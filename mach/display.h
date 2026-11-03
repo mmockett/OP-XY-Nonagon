@@ -4,7 +4,7 @@
 
 namespace mach {
 // Matches resources.display in definition.json: paths, points, nodes, texts, palette.
-using Frame = opxy::draw::Frame<4, 64, 34, 16, 16>;
+using Frame = opxy::draw::Frame<4, 64, 43, 16, 16>;
 
 // Nodes, as tools/make_panel.py writes them into panel.svg.fragment.
 namespace node {
@@ -13,7 +13,8 @@ const u32 bow = 0, tail = 1, reflected = 2, wake = 3,    // the reshaping outlin
           ring = 12, rings = 12,                         // the sound waves
           projectile = 24, projectiles = 5,              // one for each source
           wire = 29, glow = 30, plate = 31,
-          heard = 32, heards = 2;                        // where the sound heard now left
+          heard = 32, heards = 2,                        // where the sound heard now left
+          pointer = 34, spark = 35, sparks = 8;          // the Mach scale's pointer; a spark every quarter second
 }
 
 // What the photograph is drawn from: the controls, eased, or a flight's,

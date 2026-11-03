@@ -1,19 +1,25 @@
 #include "display.h"
 #include "plate.h"
 
-// Mach's screen is one object: a photograph after Mach and Salcher's 1887
-// schlieren images of a bullet in flight, its round field's edge framing it
-// (tools/make_panel.py). Every control acts on something in it:
+// Mach's screen is one object: a glass negative after Mach and Salcher's 1887
+// schlieren images of a bullet in flight, marked as a capture instrument
+// marks it: a data strip down its left edge holds a Mach scale, and the
+// photograph's field lies right of it (tools/make_panel.py). Every control
+// acts on something in it:
 //
-//   mach    the cone: the bow and tail shocks' half-angle, asin(1/M); none
-//           below Mach 1, where the sound waves nest ahead of the projectile
+//   mach    the cone: the bow and tail shocks' half-angle, asin(1/M), its
+//           arms running to the field's edge and holding every ring; none
+//           below Mach 1, where the sound waves nest ahead of the projectile;
+//           and the pointer on the strip's Mach scale
 //   pass    the listener: an ear trumpet on a post, its mouth under the line
 //           of flight, from just under it (3 m) to near the field's lower
 //           edge (300 m), on a scale of the distance's logarithm
 //   source  the projectile: rifle bullet (organ), round-nose bullet (pad),
 //           Minie ball (voice), musket ball (bell), spitzer (siren); the
 //           blunter the nose, the further its bow shock stands off
-//   dur     the turbulent wake: from a short wisp to a long, broad trail
+//   dur     the turbulent wake, from a short wisp to a long, broad trail;
+//           and the sparks, one every quarter second where the projectile
+//           was, so their spacing is its speed on the plate
 //   boom    the shocks: off a faint hairline; a soft thump a broad, dim
 //           band; the full crack a crisp, bright line; below Mach 1 a bow
 //           wave ahead of the nose (the pass's pressure pulse), drawn alike
@@ -24,12 +30,14 @@
 //   echo    the polished plate under the listener, and the shock it reflects
 //
 // Idle, the photograph is still: the projectile at its closest pass with the
-// sound waves it sent out at equal steps behind it. Turning a control eases it
+// sound waves it sent out at equal steps behind it and its last four sparks.
+// Turning a control eases it
 // there in about 0.15 s. A note launches a flight, fixed at its note-on as the
 // engine fixes it: the projectile crosses the field at its Mach number (the
 // whole flight spans the field, and sound crosses it on the same scale, so the
 // cone reaches the wire as the boom is heard and a thin ring flashes there);
-// waves spread from where it was; its wake churns; and two marks on the line
+// waves spread from where it was; its wake churns; a spark marks where it
+// was every quarter second; and two marks on the line
 // of flight show where the sound heard now left it, parting forwards and
 // backwards after the cone. Releasing every note eases the photograph back.
 // The screen cannot hear the engine: it derives the flight from the controls
@@ -38,14 +46,18 @@ namespace mach {
 namespace screen {
 using opxy::draw::unit;
 const i32 settle = 154;              // Q10 seconds: the eases settle
-const i32 radius = 58;               // the largest sound wave, pixels
+const i32 radius = 84;               // the largest sound wave, pixels
+const i32 arm_reach = 126;            // the furthest a shock's arm runs across or down: its node at twice its points' size
+const i32 spark_ms = 250;            // a spark every quarter second
+const i32 slowest = 19661, quickest = 196608;   // the Mach scale's ends, M 0.3 and 3, Q16
 const i32 fastest = 11200;           // the photograph's scale at most 700 px a sound-second, Q4
 const i32 flash = 358;               // Q10 seconds a boom's ring takes to spread
 // Palette greys (make_panel.py: GREYS).
-// Three steps: the projectile and a crack brightest, the field's edge, the
-// listener, the plate and a thump a step down, the wake and the waves dimmer.
+// Three steps: the projectile, a crack and the Mach scale's pointer brightest,
+// the listener, the plate, a thump and the sparks a step down, the wake and
+// the waves dimmer.
 const u32 bright = 15, metal = 15, ring_near = 10, wire_grey = 10, plate_grey = 10,
-          wake_grey = 8, reflected_grey = 9;
+          wake_grey = 8, reflected_grey = 9, pointer_grey = 13, spark_grey = 9;
 
 // Exponential approach to a target, as the SDK's header eases (halving every
 // 21 ms); snaps when the remaining step rounds away.
@@ -83,31 +95,23 @@ inline Scene scene_of(const opxy::draw::Input& in) {
     return s;
 }
 
-// Is a ring of radius r (Q10) about (x, y) whole inside the photograph's field
-// and the card's window, `margin` pixels in?
+// Is a ring of radius r (Q10) about (x, y) whole inside the photograph's
+// rectangular field, `margin` pixels in?
 inline bool inside(i32 x, i32 y, i32 r, i32 margin) {
-    const i32 px = (x >> 10) - plate::centre_x, py = (y >> 10) - plate::centre_y, pr = (r >> 10) + margin;
-    if ((y - r) >> 10 < plate::top + margin || (y + r) >> 10 > plate::bottom - margin) return false;
-    const i32 room = plate::radius - pr;
-    return room > 0 && px * px + py * py <= room * room;
+    const i32 pr = (r >> 10) + margin;
+    return (x >> 10) - pr >= plate::left && (x >> 10) + pr <= plate::right &&
+           (y >> 10) - pr >= plate::top && (y >> 10) + pr <= plate::bottom;
 }
 
 // How far (whole pixels, at most `most`) a line from (x, y) Q10 runs along the
-// unit direction (dx, dy) Q16 before it leaves the field or the window.
+// unit direction (dx, dy) Q16 before it leaves the field.
 inline i32 reach_edge(i32 x, i32 y, i32 dx, i32 dy, i32 most) {
     i32 best = most;
-    const i32 py = y >> 10;
+    const i32 px = x >> 10, py = y >> 10;
     if (dy < -64) { const i32 t = ((py - plate::top) << 16) / -dy; if (t < best) best = t; }
     if (dy > 64) { const i32 t = ((plate::bottom - py) << 16) / dy; if (t < best) best = t; }
-    // The circle: t = -(p.d) + sqrt((p.d)^2 - (|p|^2 - R^2)), pixels.
-    const i32 px = (x >> 10) - plate::centre_x, qy = py - plate::centre_y;
-    const i32 pd = (px * (dx >> 4) + qy * (dy >> 4)) >> 12;
-    const i32 c = px * px + qy * qy - plate::radius * plate::radius;
-    const i32 disc = pd * pd - c;
-    if (disc > 0) {
-        const i32 t = -pd + static_cast<i32>(flight::isqrt(static_cast<u32>(disc)));
-        if (t < best) best = t;
-    }
+    if (dx < -64) { const i32 t = ((px - plate::left) << 16) / -dx; if (t < best) best = t; }
+    if (dx > 64) { const i32 t = ((plate::right - px) << 16) / dx; if (t < best) best = t; }
     return best < 0 ? 0 : best;
 }
 
@@ -318,10 +322,45 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         else hide(frame, node::projectile + i);
     }
 
-    // --- the sound waves: thick air absorbs the outer ones (from 58 px out
-    // to 21 at full air) and dims the rest ---
+    // --- the instruments: the pointer on the data strip's Mach scale (0.3 at
+    // its foot, 3 at its top), and a spark every quarter second where the
+    // projectile was. Idle, its last four behind it; flying, each spark since
+    // it entered the field, once the projectile is clear of it. Spark j keeps
+    // node j mod 8, so only the newest moves ---
+    {
+        const i32 m = clamp(sc.mach, slowest, quickest);
+        const i32 py = plate::scale_bottom * unit -
+                       (((m - slowest) >> 6) * ((plate::scale_bottom - plate::scale_top) * unit)) / ((quickest - slowest) >> 6);
+        place(frame, node::pointer, (plate::scale_x + 3) * unit, py & ~255, unit, pointer_grey, stroke);
+        const i32 t_ms = state.flying ? ((now >> 6) * 1000) >> 10 : 0;
+        const i32 first_ms = state.flying ? -(((before >> 6) * 1000) >> 10) : -(1 << 20);
+        const i32 newest = state.flying ? (t_ms >= 0 ? t_ms / spark_ms : -((-t_ms + spark_ms - 1) / spark_ms)) : -1;
+        const i32 count = state.flying ? static_cast<i32>(node::sparks) : 4;
+        bool used[node::sparks] = {};
+        for (i32 j = newest; j > newest - count; --j) {
+            if (j * spark_ms < first_ms || !state.bullet.r) continue;
+            const i32 x = cx + clamp(((j * spark_ms) * speed) >> 4, -800 * unit, 800 * unit);
+            if (!inside(x, ly, 0, 4) || x > state.bullet.x - 12 * unit) continue;
+            const u32 n = static_cast<u32>(((j % 8) + 8) % 8);
+            place(frame, node::spark + n, x & ~511, ly, unit, spark_grey, stroke);
+            used[n] = true;
+        }
+        for (u32 n = 0; n < node::sparks; ++n)
+            if (!used[n]) hide(frame, node::spark + n);
+    }
+
+    // --- the sound waves: thick air absorbs the outer ones (from 84 px out
+    // to 30 at full air) and dims the rest. Above Mach 1 a ring shows only
+    // while its tangent point lies on the cone's drawn arm, r sqrt(M^2 - 1)
+    // within its reach, so the cone holds every ring ---
     const i32 air = flight::amount(input.slots[AIR]);
     const i32 extent = radius * unit - ((radius * unit) >> 10) * ((air * 655) >> 15);
+    i32 contain = 1 << 20;                                                     // the largest ring the cone holds, pixels
+    if (sc.mach > flight::one + 256) {
+        const i32 rt = static_cast<i32>(flight::isqrt(static_cast<u32>(flight::mul16(sc.mach, sc.mach) - flight::one) << 12)) << 2;   // sqrt(M^2 - 1), Q16
+        const i32 cm = flight::div16(rt, sc.mach), sm = static_cast<i32>((1u << 31) / static_cast<u32>(sc.mach >> 1));               // cos mu, sin mu
+        if (rt > 4096) contain = ((arm_reach << 16) / (cm > sm ? cm : sm) << 16) / rt;
+    }
     for (u32 i = 0; i < node::rings; ++i) {
         i32 x = 0, r = 0;
         if (state.flying) {
@@ -344,7 +383,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             r = (static_cast<i32>(i) + 1) * sc.wave;
             x = cx - ((r * (sc.mach >> 4)) >> 12);
         }
-        if (r > extent || (r && !inside(x, ly, r, 1))) r = 0;
+        if (r > extent || (r >> 10) > contain || (r && !inside(x, ly, r, 1))) r = 0;
         Mark& m = state.ring[i];
         if (state.flying || snap || !m.r || !r) { m.x = x; m.r = r; }
         else { m.x = ease(m.x, x, dt); m.r = ease(m.r, r, dt); }
@@ -380,7 +419,9 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 ax = state.bullet.x + offset;
         i32* last = state.shock[which];
         if (!(cone || (bow_wave && !which)) || !state.bullet.r || !inside(ax, ly, 0, 2)) { hide(frame, n); last[2] = -1; continue; }
-        const i32 most = bow_wave ? 10 + ((18 * sc.mach) >> 16) : which ? 100 : 124;
+        // the arms run to the field's edge, as far as the node reaches; the tail's a fifth shorter
+        const i32 span = (arm_reach << 16) / (cos_mu > sin_mu ? cos_mu : sin_mu);
+        const i32 most = bow_wave ? 10 + ((18 * sc.mach) >> 16) : which ? (span * 4) / 5 : span;
         const i32 up = reach_edge(ax, ly, -cos_mu, -sin_mu, most) & ~3, down = reach_edge(ax, ly, -cos_mu, sin_mu, most) & ~3;
         if (up < 8 || down < 8) { hide(frame, n); last[2] = -1; continue; }
         if (last[2] != up || last[3] != down || state.shock_mach != shape_mach || state.shock_look != look) {
