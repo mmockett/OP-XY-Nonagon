@@ -291,9 +291,9 @@ and contact sheets come from `tools/frames.cpp` on the host.
 
 ## CPU
 
-Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, three runs, at
-`v0.1.0`: Ghost's sample callback at its default settings, playing the SDK's
-generated two-second test sample, costs **3.05%** of the 580,352-cycle audio
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, as one capture, at
+`v0.7.0`: Ghost's sample callback at its default settings, playing the SDK's
+generated two-second test sample, costs **3.07%** of the 580,352-cycle audio
 block. This test plays one setting; heavier settings cost more.
 
 The figures below are host estimates made during development.

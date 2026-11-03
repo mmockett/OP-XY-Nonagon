@@ -229,8 +229,8 @@ contact sheets come from `tools/screen.cpp` on the host.
 
 ## CPU
 
-Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, three runs, at
-`v0.1.0`: Recur's sample callback at its default settings, playing the SDK's
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, as one capture, at
+`v0.7.0`: Recur's sample callback at its default settings, playing the SDK's
 generated two-second test sample, costs **1.16%** of the 580,352-cycle audio
 block. This test plays one setting; heavier settings cost more.
 

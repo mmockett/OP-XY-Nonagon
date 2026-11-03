@@ -290,7 +290,7 @@ and a loaded sample takes its place.
 ## CPU
 
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`: three runs
-each for the rest at `v0.1.0`, Mach from one capture at `v0.4.0`, Sand from one at `v0.5.0`, and Cocoa, Coin, Fermi, Butterfly and Drop from one at `v0.6.0`. For a synth, one voice plays middle C with the first
+each for the rest at `v0.1.0`, Mach from one capture at `v0.4.0`, Sand from one at `v0.5.0`, and Cocoa, Coin, Fermi, Butterfly and Drop from one at `v0.6.0`, and Ghost and Recur from one at `v0.7.0`. For a synth, one voice plays middle C with the first
 four controls at their midpoint; for a sample engine, its sample callback
 plays the SDK's generated two-second test sample at its default settings. Each
 figure is a share of the OP-XY's 580,352-cycle audio block.
@@ -304,7 +304,7 @@ figure is a share of the OP-XY's 580,352-cycle audio block.
 | Mach | 3.8% | ~30% |
 | Butterfly | 5.0% | ~40% |
 | Drop | 2.7% | ~22% |
-| Ghost (sample callback) | 3.0% | n/a |
+| Ghost (sample callback) | 3.1% | n/a |
 | Recur (sample callback) | 1.2% | n/a |
 
 The OP-XY's own engines measure 1.6–2.7% a voice in the same test, and
