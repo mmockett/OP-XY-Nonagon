@@ -13,7 +13,7 @@ struct Slide { opxy::u8 from, to; opxy::u16 ms; };
 const opxy::u16 at_rest = 0xffff;
 
 // The amp envelope's level as the screen follows it (display.cpp, follow()).
-struct Swell { opxy::u32 level, from, stage; };   // level and from (the release's start) Q16; stage 0 idle, 1 attack, 2 decay, 3 release
+struct Swell { opxy::u32 level, from, stage; };   // level Q16; from spare (0); stage 0 idle, 1 attack, 2 decay, 3 release, 4 sustain
 
 struct DisplayState {
     opxy::draw::PageHeader header;
