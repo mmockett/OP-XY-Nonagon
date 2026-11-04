@@ -414,6 +414,26 @@ void place_cuts(Frame& frame, const Sample& sample, u32 bits, bool hiss, bool sn
     }
 }
 
+// The frame round the stretch read, width (Q10 px, 3 to 120) wide: a
+// rectangle of 64 points round it, 16 a side, the slot's height, about its
+// middle, so its points stay within the 64 px a path may reach either side of
+// its node. Reshaped only when the width changes; every frame gives it a
+// shape (the SDK rejects a frame with a path never shaped).
+void shape_reading(Frame& frame, i32 width) {
+    Frame::path_type& path = frame.paths[reading];
+    const u32 key = u32(width) | 1u << 31;
+    if (path.key == key) return;
+    const i32 h = 9 * unit, half = width / 2;
+    for (u32 i = 0; i < 16; ++i) {
+        const i32 along = width * i32(i) / 16, down = 2 * h * i32(i) / 16;
+        path.points[i] = Point{along - half, -h};
+        path.points[16 + i] = Point{width - half, -h + down};
+        path.points[32 + i] = Point{width - along - half, h};
+        path.points[48 + i] = Point{-half, h - down};
+    }
+    path.key = key;
+}
+
 // The stretch the slot playing reads, frames: from its slice's cut, a slot
 // at the note's pitch at fit 0 (more than the slice, running on past its end,
 // or less, cropped), exactly the slice at fit 100, geometrically between, as
@@ -438,21 +458,8 @@ void place_reading(Frame& frame, const Sample& sample, const Input& input, u32 b
     i32 width = tape_x(sample, from + length) - x0;
     if (from + length > sample.frames) width = tape_x(sample, sample.frames) - x0;
     width = width < 3 * unit ? 3 * unit : width > 120 * unit ? 120 * unit : width;
-    Frame::path_type& path = frame.paths[reading];
-    const u32 key = u32(width) | 1u << 31;
-    if (path.key != key) {
-        // A rectangle of 64 points round it, 16 a side, the slot's height.
-        const i32 h = 9 * unit;
-        for (u32 i = 0; i < 16; ++i) {
-            const i32 along = width * i32(i) / 16, down = 2 * h * i32(i) / 16;
-            path.points[i] = Point{along, -h};
-            path.points[16 + i] = Point{width, -h + down};
-            path.points[32 + i] = Point{width - along, h};
-            path.points[48 + i] = Point{0, h - down};
-        }
-        path.key = key;
-    }
-    place(frame, reading, x0, rule_y * unit, unit, bright, stroke);
+    shape_reading(frame, width);
+    place(frame, reading, x0 + width / 2, rule_y * unit, unit, bright, stroke);
 }
 
 // The pendulum, the lever and the comb.
@@ -550,6 +557,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         hide(frame, cover_hint);
         for (u32 n = 0; n < cover_stage; ++n)
             if (n < header_first || n >= header_first + 8) hide(frame, n);
+        if (!frame.paths[reading].key) shape_reading(frame, 3 * unit);   // hidden, but shaped
         sample_view::place_swap_hint(frame, swap_first, swap_text, swap_x * unit, swap_y * unit, false, sample_view::sample_hint_stacked);
         state.bits = 0;
         state.fresh = 1;

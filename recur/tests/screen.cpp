@@ -224,6 +224,7 @@ int main() {
         recur::display_reset(state);
         for (u32 f = 0; f < 5; ++f, ++frames) recur::display(state, input, frame);
         outlines_ok(frame, "with no sample");
+        if (!opxy::draw::valid(frame)) { std::printf("FAIL: a frame with no sample is invalid\n"); ++failures; }
         overview.assigned = 1;
     }
     for (u32 map = 0; map < recur::map_count; ++map)
@@ -542,7 +543,7 @@ int main() {
             frame = recur::Frame();
             recur::display_reset(state);
             for (u32 f = 0; f < 30; ++f) recur::display(state, input, frame);
-            widths[fit] = frame.paths[recur::reading].points[16].x / 1024.0;
+            widths[fit] = (frame.paths[recur::reading].points[16].x - frame.paths[recur::reading].points[48].x) / 1024.0;
         }
         const double slice_px = 88200.0 / 16 * 312 / 352800;
         if (std::fabs(widths[0] - 2 * slice_px) > 0.6 || std::fabs(widths[1] - slice_px) > 0.3) {
@@ -551,6 +552,52 @@ int main() {
             ++failures;
         }
         std::printf("fit on the tape: the stretch read %.1f px at fit 0, %.1f at fit 100\n", widths[0], widths[1]);
+        overview.frames = 176400; overview.begin = 0; overview.end = 176400;
+    }
+    {   // Every reshaping point stays within the 64 px a path may reach from its
+        // node, and every frame is valid (the OP-XY drops an invalid one), over
+        // a sweep of grid, slice and fit, on samples from a tenth of a second to
+        // eight seconds, whole and trimmed to a bar, at rest and while a note
+        // plays: the frame round the stretch read is up to 120 px wide.
+        const u32 lengths[] = {4410, 44100, 176400, 352800};
+        u32 runs = 0, outside = 0, invalid_frames = 0;
+        double widest = 0;
+        for (u32 length : lengths)
+            for (u32 trimmed = 0; trimmed < 2; ++trimmed)
+                for (u32 g = 0; g < recur::grid_count; ++g)
+                    for (u32 sl = 0; sl < recur::slice_count; ++sl)
+                        for (u32 fit = 0; fit <= 10; ++fit) {
+                            overview.frames = length; overview.begin = 0;
+                            overview.end = trimmed && length > 88200 ? 88200 : length;
+                            opxy::draw::Input input = {};
+                            for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
+                            input.slots[recur::kGrid] = choice_of(g, recur::grid_count);
+                            input.slots[recur::kSlice] = choice_of(sl, recur::slice_count);
+                            input.slots[recur::kFit] = at(fit / 10.0);
+                            input.track = 1;
+                            input.elapsed = 17;
+                            frame = recur::Frame();
+                            recur::display_reset(state);
+                            for (u32 f = 0; f < 90; ++f) {
+                                if (f == 30) { input.note_serial = 1; input.held_notes = 1; }
+                                recur::display(state, input, frame);
+                                invalid_frames += !opxy::draw::valid(frame);
+                                for (u32 p = 0; p < recur::paths; ++p) {
+                                    i32 lo = 0, hi = 0;
+                                    for (const opxy::draw::Point& q : frame.paths[p].points) {
+                                        const i32 reach = std::max(std::abs(q.x), std::abs(q.y));
+                                        outside += reach > 64 * 1024;
+                                        lo = std::min(lo, q.x); hi = std::max(hi, q.x);
+                                    }
+                                    widest = std::max(widest, (hi - lo) / 1024.0);
+                                }
+                            }
+                            ++runs;
+                        }
+        std::printf("reshaping points: %u runs, the widest outline %.1f px, %u points past 64 px, %u invalid frames\n", runs, widest, outside,
+                    invalid_frames);
+        if (outside || invalid_frames) { std::printf("FAIL: a reshaping point reaches past 64 px or a frame is invalid\n"); ++failures; }
+        if (widest < 119) { std::printf("FAIL: the sweep never reached the widest frame (%.1f px)\n", widest); ++failures; }
         overview.frames = 176400; overview.begin = 0; overview.end = 176400;
     }
     {   // The amp envelope (input.amp, SDK 1.10): the scramble and the pendulum
