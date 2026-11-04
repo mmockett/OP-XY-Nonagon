@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """How much each control changes the sound across its travel, from tools/render.cpp's
-sweep in steps of 5% (sweep-<control>-<percent>.wav, over the Recur preset on the drums):
+sweep in steps of 5% (sweep-<control>-<percent>.wav, over the Recur preset on the drums' first
+bar; fit at 90 BPM, where it matters):
   python tools/travel.py <folder>
 
 change   the RMS difference between the render at that setting and at 0, over their
@@ -15,7 +16,7 @@ import wave
 import numpy as np
 
 folder = pathlib.Path(sys.argv[1])
-names = ["pos", "grid", "slice", "map", "step", "rate", "depth", "chrd"]
+names = ["fit", "grid", "slice", "map", "step", "rate", "depth", "chrd"]
 
 
 def load(path):

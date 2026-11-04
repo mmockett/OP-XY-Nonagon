@@ -21,7 +21,7 @@
       }
     },
     "params": [
-      3277,
+      0,
       16384,
       2731,
       2731,
@@ -90,14 +90,14 @@
       "gain": 0,
       "hikey": 60,
       "loop.crossfade": 0,
-      "loop.end": 352800,
+      "loop.end": 123070,
       "loop.onrelease": true,
-      "loop.start": 0,
+      "loop.start": 34870,
       "pitch.keycenter": 60,
       "reverse": false,
       "sample": "content/samples/recur/break.wav",
-      "sample.end": 352800,
-      "sample.start": 0,
+      "sample.end": 123070,
+      "sample.start": 34870,
       "tune": 0
     }
   ],

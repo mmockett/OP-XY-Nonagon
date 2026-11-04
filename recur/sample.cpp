@@ -1,7 +1,8 @@
-// Recur: a window of the sample cut into a square of slices and permuted by
-// an area-preserving map, one iteration a step: re-sequenced, stuttered and
-// glitched, then after the map's period, the recording again exactly. At
-// slice's hiss end the cells are single samples and it shreds into noise.
+// Recur: the trim (the stock sampler's start and end) cut into a square of
+// slices and permuted by an area-preserving map, one iteration a step:
+// re-sequenced, stuttered and glitched, then after the map's period, the
+// recording again exactly. At slice's hiss end the cells are single samples
+// and it shreds into noise.
 #include "core.h"
 #include "tables.h"
 
@@ -16,6 +17,9 @@ const u32 segment = 16, settle = 8192;
 const u32 presence_full = 128;
 // A region shorter than this is silent.
 const u32 shortest = 256;
+// fit's fastest read, a slice's frames to its slot's samples, and any reader's
+// fastest step, Q16: 32 and 64 times the root.
+const u32 most_fill = 32, most_step = 64u << 16;
 
 // Each chrd's readers, in cents from the note: off, dtun, oct, 5th, maj, min, harm.
 const i32 chord_cents[chord_count][most_taps] = {
@@ -54,6 +58,19 @@ u32 cents_ratio(i32 cents) {
     return octave >= 0 ? r << octave : r >> -octave;
 }
 
+// 1200 log2(r / 65536), cents, for r in Q16: cents_ratio's inverse, linear
+// within each semitone as it is, so the two agree.
+i32 cents_of(u32 r) {
+    if (!r) return -9600;
+    i32 octave = 0;
+    while (r >= 131072) { r >>= 1; ++octave; }
+    while (r < 65536) { r <<= 1; --octave; }
+    u32 s = 0;
+    while (s < 11 && semitone_table[s + 1] <= r) ++s;
+    const u32 low = semitone_table[s], high = s < 11 ? semitone_table[s + 1] : 131072u;
+    return octave * 1200 + i32(s * 100 + (r - low) * 100 / (high - low));
+}
+
 // a * b >> 14 for 16-bit a and b: the Blackfin's single-cycle 16 by 16 multiply.
 inline i32 mul16(i32 a, i32 b) { return (i32(opxy::i16(a)) * opxy::i16(b)) >> 14; }
 
@@ -76,7 +93,7 @@ struct Settings {
     u32 bits, mask, size;   // the square: 2^bits a side, size samples
     u32 map, period, cycle; // the map, its period, and the period Q20
     u32 tail_bits;          // the loop's crossfade is 2^tail_bits samples
-    u32 home;               // pos: the window's start, frames into the region
+    u32 home;               // the window's start, frames into the region: the trim's start
     u32 room;               // the latest start that fits the window
     u32 step;               // step's start in the period, Q20
     u32 advance;            // rate, Q20 a segment
@@ -119,7 +136,7 @@ Settings decode(const Voice& voice, const opxy::SampleBlock& block, u32 bits, u3
     s.cycle = s.period << iteration_bits;
     s.tail_bits = 2 * bits - 3 < 10 ? 2 * bits - 3 : 10;
     s.room = s.span > s.size ? s.span - s.size : 0;
-    s.home = times(level(p[kPos]), s.room + 1);
+    s.home = 0;
     s.step = step_position(p[kStep], s.period);
     const u32 bpm = block.transport.bpm_x10 ? block.transport.bpm_x10 : 1200;
     s.advance = (rate256(rate64[choice(p[kRate], rate_count)], bpm) * 97391u) >> 16;   // (it/s Q8) * 16 / 44100 * 2^20 / 256
@@ -135,7 +152,7 @@ Settings decode(const Voice& voice, const opxy::SampleBlock& block, u32 bits, u3
     return s;
 }
 
-// Where the window starts for a pass: pos, scattered by spry.
+// Where the window starts for a pass: the trim's start, scattered by spry.
 u32 place(Tap& t, const Settings& s) {
     if (!s.spray) return s.home;
     const i32 off = i32(times(next_random(t) >> 16, 2 * s.spray + 1)) - i32(s.spray);
@@ -373,8 +390,7 @@ struct Slices {
     u32 map, period;
     u32 length;             // a slice, output samples, Q8: a 1/16 at 120 BPM is 5512.5
     u32 fade, reciprocal;   // its crossfade, samples, and 65536 / fade
-    u32 source;             // a slice of the recording at the sample's root, frames, Q8
-    u32 home;               // pos: the window's start, frames into the region
+    u32 fill;               // a slice's frames over its slot's samples, Q16: the read rate that fills the slot
     u32 step;               // step's iteration
     u32 ahead;              // and its fraction toward the next, Q16
     u32 rate;               // 64ths an iteration, 0 to hold
@@ -399,13 +415,10 @@ Slices decode_slices(Voice& voice, const opxy::SampleBlock& block, u32 bits, u32
     s.length = s.sixty_fourths * ((1653750u << 8) / bpm);   // 44100 * 600 / 16 samples a 64th at bpm / 10
     s.fade = s.length >> 10 < 256 ? s.length >> 10 : 256;
     s.reciprocal = 65536 / s.fade;
-    s.source = times(s.length, voice.root);
-    // pos runs from the window at the region's start to the window ending at
-    // its end; a window longer than the region wraps round it, and pos turns
-    // it, to a slice short of a whole turn.
-    const u32 window = (s.cells * s.source) >> 8, slice = s.source >> 8;
-    const u32 room = s.span > window ? s.span - window : s.span > slice ? s.span - slice : 0;
-    s.home = times(level(p[kPos]), room + 1);
+    // The trim is the loop: grid² equal slices of it, one to a slot. A pass of
+    // slots lasts cells slots; a slice read at fill's rate lasts exactly one.
+    const u32 pass = (s.cells * s.length) >> 8;   // output samples (64 slots of a 1/4 at 40 BPM fit 32 bits in Q8)
+    s.fill = !pass ? 65536 : s.span / pass >= most_fill ? most_fill << 16 : ratio(s.span, pass);
     const u32 position = step_position(p[kStep], s.period) >> 4;   // Q16 iterations
     s.step = position >> 16;
     s.ahead = position & 0xffff;
@@ -418,6 +431,33 @@ Slices decode_slices(Voice& voice, const opxy::SampleBlock& block, u32 bits, u32
         voice.ahead_key = s.ahead;
     }
     return s;
+}
+
+// Where slice c begins, frames into the trim: c of the cells equal parts of
+// it, exactly (span * c / cells, rounded down, without a 64-bit product).
+inline u32 cut(const Slices& s, u32 c) {
+    const u32 shift = 2 * s.bits;
+    return (s.span >> shift) * c + (((s.span & (s.cells - 1)) * c) >> shift);
+}
+
+// fit: each reader's step this block, from the note's own rate (0), which
+// plays a slice at its pitch until its slot ends, to the rate that reads the
+// slice through in its slot exactly (1), so the trim fits the loop;
+// geometrically between, so the pitch moves evenly along fit's travel.
+void fitted(const Voice& voice, const Slices& s, i32 parameter, u32 (&steps)[most_taps]) {
+    const u32 f = level(parameter);
+    u32 factor = 65536;
+    if (f) {
+        // fit 1 reads at fill frames an output sample at the root; fit 0 at the sample's own rate.
+        const u32 own = ratio(voice.sample.rate, 44100);
+        const u32 toward = own && s.fill / own < most_fill ? ratio(s.fill, own) : most_fill << 16;
+        factor = f >= 65535 ? toward : cents_ratio(i32(i32(cents_of(toward)) * i32(f) / 65536));
+    }
+    for (u32 i = 0; i < most_taps; ++i) {
+        if (factor == 65536) { steps[i] = voice.steps[i]; continue; }
+        const u32 step = times(voice.steps[i] < most_step ? voice.steps[i] : most_step, factor);
+        steps[i] = step > most_step ? most_step : step ? step : 1;
+    }
 }
 
 // The recording's slice that slot plays at iteration k: where the map's
@@ -440,8 +480,7 @@ u32 source_slot(Voice& voice, const Slices& s, u32 k, u32 slot) {
 // was, unless it is already there (a slice that follows on in the recording).
 void begin_slice(Voice& voice, const Slices& s, bool fresh) {
     const u32 k = (s.step + voice.iteration) % s.period;
-    const u32 from = (s.home + ((source_slot(voice, s, k, voice.slot) * s.source) >> 8)) % s.span;
-    const u32 frame = s.begin + from;
+    const u32 frame = s.begin + cut(s, source_slot(voice, s, k, voice.slot));
     for (u32 i = 0; i < most_taps; ++i) {
         Reader& r = voice.readers[i];
         if (fresh || (r.frame == frame && r.fraction == 0)) { r.crossing = false; r.frame = frame; r.fraction = 0; continue; }
@@ -509,6 +548,8 @@ void render_slices(Voice& voice, const opxy::SampleBlock& block, i32* mix, u32 b
     }
     voice.slot %= s.cells;
     voice.iteration %= s.period;
+    u32 steps[most_taps];
+    fitted(voice, s, block.parameters[kFit], steps);
     const bool stereo = voice.sample.channels == 2;
     for (u32 at = 0; at < opxy::block_frames;) {
         if (voice.into >= voice.length) {
@@ -535,8 +576,8 @@ void render_slices(Voice& voice, const opxy::SampleBlock& block, i32* mix, u32 b
             // Levels move across the block a sample at a time.
             const i32 slope = (aim_level - from_level) * 1024;   // a 64th of the change, Q16
             const i32 level = from_level * 65536 + slope * i32(at);
-            if (stereo) read_slice<true>(r, s, voice.sample.data, mix + at, n, voice.into, voice.steps[i], level, slope);
-            else read_slice<false>(r, s, voice.sample.data, mix + at, n, voice.into, voice.steps[i], level, slope);
+            if (stereo) read_slice<true>(r, s, voice.sample.data, mix + at, n, voice.into, steps[i], level, slope);
+            else read_slice<false>(r, s, voice.sample.data, mix + at, n, voice.into, steps[i], level, slope);
         }
         voice.into += n;
         at += n;

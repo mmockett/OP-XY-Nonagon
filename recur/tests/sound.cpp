@@ -14,7 +14,7 @@ using opxy::u32;
 const u32 c4 = 25480119u, frames = 12 * 44100, slice = 5512, pass = 88200;   // a 1/16 at 120 BPM is 5512.5 samples
 // Where slot n of the window starts, in the recording and in the output: 1/16s at 120 BPM.
 u32 slot_start(u32 n) { return n * 11025 / 2; }
-opxy::i16 voice_like[frames], square[frames], dc[frames], sine[frames];
+opxy::i16 voice_like[frames], square[frames], dc[frames], sine[frames], ramp[frames];
 int failures = 0;
 
 void check(bool ok, const char* what) {
@@ -38,6 +38,8 @@ struct Rig {
     opxy::SampleBlock block;
     recur::Voice voice;
     std::vector<i32> heard;
+    // The region is the trim Recur loops: a bar at 120 BPM from the start, as
+    // the presets have it, or the whole of a shorter sample.
     Rig(const opxy::i16* data, u32 count) {
         // definition.json's defaults: 4 x 4 slices of 1/16, the cat, an iteration a bar.
         const double defaults[8] = {0, 0.5, 0.583333, 0.083333, 0, 0.4375, 0.7, 0.071429};
@@ -45,7 +47,7 @@ struct Rig {
         for (u32 i = 0; i < opxy::block_frames; ++i) pitch[i] = c4;
         block = opxy::SampleBlock();
         block.output = out; block.parameters = parameters; block.pitch = pitch;
-        block.region.begin = 0; block.region.end = count; block.region.level = opxy::sample_unity_level;
+        block.region.begin = 0; block.region.end = count < pass ? count : pass; block.region.level = opxy::sample_unity_level;
         block.transport.bpm_x10 = 1200;
         block.output_channels = 1;
         const opxy::SampleView view = {data, count, 44100, 1};
@@ -119,6 +121,7 @@ int main() {
         square[i] = (i / 50) & 1 ? 32767 : -32768;
         dc[i] = 12000;
         sine[i] = opxy::i16(20000 * std::sin(2 * M_PI * 220.0 * i / 44100));
+        ramp[i] = opxy::i16(i / 4 < 32767 ? i / 4 : 32767);   // where a reader is, a quarter of its frame
     }
 
     // --- The maps ---------------------------------------------------------------
@@ -210,25 +213,68 @@ int main() {
         for (u32 i = 0; i < pass; ++i) exact = exact && r.heard[i] == played(voice_like[i]);
         check(exact, "the unscrambled window is the recording, bit for bit");
     }
-    {   // Shift's start and end (stockShift) trim the region pos ranges over: at
-        // pos 0 the window starts on the start marker, at pos 1 it ends on the end.
-        const u32 begin = 3 * 44100 + 123, end = begin + 2 * pass + 777;
-        for (u32 far = 0; far < 2; ++far) {
+    {   // The trim is the loop: Shift's start and end (stockShift) bound what is
+        // sliced. A bar trimmed anywhere, at another tempo, is cut on its own
+        // hits: at 100 BPM a slot is 6615 samples, and slot n plays slice F^-k(n)
+        // from its cut point, begin + n * 5512.5, at the note's pitch (fit 0),
+        // running on past the slice's end until the slot ends.
+        const u32 begin = 3 * 44100 + 123, slot = 6615;
+        for (u32 map = 0; map < recur::map_count; ++map) {
             Rig r(voice_like, frames);
             r.block.region.begin = begin;
-            r.block.region.end = end;
+            r.block.region.end = begin + pass;
+            r.block.transport.bpm_x10 = 1000;
             r.set(recur::kRate, off, recur::rate_count);
-            r.parameters[recur::kPos] = at(far);
-            r.run(pass / opxy::block_frames + 2);
-            // pos's top is a 16-bit fraction of the room, so the window may end a frame or two short.
-            bool exact = false;
-            for (u32 short_by = 0; short_by <= (far ? 3u : 0u) && !exact; ++short_by) {
-                const u32 from = far ? end - pass - short_by : begin;
-                exact = true;
-                for (u32 i = 0; i < pass; ++i) exact = exact && r.heard[i] == played(voice_like[from + i]);
+            r.set(recur::kMap, map, recur::map_count);
+            r.parameters[recur::kDepth] = at(1);
+            r.parameters[recur::kStep] = step_at(1, recur::period(map, 2));   // iteration 1
+            r.run(16 * slot / opxy::block_frames + 2);
+            const recur::Mat g = recur::power(map, recur::period(map, 2) - 1, 2);
+            bool exact = true;
+            for (u32 n = 0; n < 16; ++n) {
+                u32 x = n % 4, y = n / 4;
+                recur::send(g, map, 2, x, y);
+                const u32 cut = slot_start(y * 4 + x);   // floor(source * 5512.5)
+                for (u32 i = 256; i < slot; ++i)
+                    exact = exact && r.heard[n * slot + i] == played(voice_like[begin + (cut + i) % pass]);
             }
-            check(exact, far ? "pos 1 plays the window ending on the end marker" : "pos 0 plays the window from the start marker");
+            check(exact, "a trimmed bar at 100 BPM: each slot plays its slice from the cut point, at the note's pitch");
         }
+    }
+    {   // fit 1 reads each slice through in its slot exactly: at 100 BPM the
+        // bar's slices are read at 5512.5 / 6615 of the note's rate, so each slot
+        // ends a step short of the next cut; fit 0 runs on to the cut plus 6615.
+        // A ramp source tells where the reader is (a quarter of its frame).
+        const u32 slot = 6615;
+        double worst_full = 0, worst_none = 0, worst_half = 0;
+        for (u32 fit = 0; fit < 3; ++fit) {
+            Rig r(ramp, frames);
+            r.block.transport.bpm_x10 = 1000;
+            r.set(recur::kRate, off, recur::rate_count);
+            r.parameters[recur::kDepth] = 0;
+            r.parameters[recur::kFit] = at(fit / 2.0);
+            r.run(16 * slot / opxy::block_frames + 2);
+            for (u32 n = 0; n + 1 < 16; ++n) {
+                const double heard = r.heard[(n + 1) * slot - 1] / (32767.0 * 2) * 2 * 4;   // the frame the last sample read
+                const double cut = slot_start(n), fill = 5512.5 / slot;
+                if (fit == 2) worst_full = std::fmax(worst_full, std::fabs(heard - (cut + (slot - 1) * fill)));
+                if (fit == 0) worst_none = std::fmax(worst_none, std::fabs(heard - (cut + slot - 1)));
+                if (fit == 1) worst_half = std::fmax(worst_half, std::fabs(heard - (cut + (slot - 1) * std::sqrt(fill))));
+            }
+        }
+        std::printf("fit: the reader at each slot's end within %.1f frames (fit 0), %.1f (fit 50), %.1f (fit 100)\n",
+                    worst_none, worst_half, worst_full);
+        check(worst_full < 8, "fit 100 reads each slice through in its slot");
+        check(worst_none < 8, "fit 0 keeps the note's pitch, running on past the cut");
+        check(worst_half < 12, "fit 50 reads at the geometric middle");
+    }
+    {   // fit 1 at the tempo the trim was cut for changes nothing: a bar at
+        // 120 BPM in 1/16s already fills its slots.
+        Rig a(voice_like, frames), b(voice_like, frames);
+        b.parameters[recur::kFit] = at(1);
+        a.run(2 * pass / opxy::block_frames);
+        b.run(2 * pass / opxy::block_frames);
+        check(a.heard == b.heard, "fit at a matching tempo plays the same");
     }
     {   // Scrambled, each slot plays a slice of the recording exactly, after its
         // crossfade in: the slice the map put there.
@@ -453,7 +499,7 @@ int main() {
     }
     // --- The shipped sample ------------------------------------------------------
     {   // samples/break.wav, every preset's region: four bars at 120 BPM, so the
-        // 8 x 8 window of 1/16s is the whole break and pos's thirds start its bars.
+        // 8 x 8 slices of the whole break are its 1/16s, and a trim to any bar plays that bar.
         std::string path = __FILE__;
         path = path.substr(0, path.find_last_of("/\\") + 1) + "../samples/break.wav";
         std::vector<opxy::i16> brk;
@@ -479,6 +525,7 @@ int main() {
             const u32 count = u32(brk.size());
             {   // Unscrambled on 8 x 8, the window is the whole break, and it loops.
                 Rig* r = new Rig(brk.data(), count);
+                r->block.region.end = count;
                 r->set(recur::kRate, off, recur::rate_count);
                 r->set(recur::kGrid, grid8, recur::grid_count);
                 r->run(8 * pass / opxy::block_frames + 2);
@@ -488,24 +535,21 @@ int main() {
                 delete r;
             }
             for (u32 bar = 0; bar < 4; ++bar) {
-                // pos at 0, 1/3, 2/3 and 1 plays the bar window on each bar of the break,
-                // to within pos's resolution (a few samples).
+                // Trimmed to bar b (Shift's start and end), the default plays that bar, exactly.
                 Rig* r = new Rig(brk.data(), count);
+                r->block.region.begin = bar * pass;
+                r->block.region.end = (bar + 1) * pass;
                 r->set(recur::kRate, off, recur::rate_count);
-                r->parameters[recur::kPos] = at(bar / 3.0);
                 r->run(pass / opxy::block_frames + 2);
-                bool found = false;
-                for (u32 d = 0; d <= 16 && !found; ++d) {
-                    const u32 start = bar * pass + d - (bar ? 8 : 0);
-                    bool exact = true;
-                    for (u32 i = 0; i < pass && exact; ++i) exact = r->heard[i] == played(brk[(start + i) % count]);
-                    found = exact;
-                }
-                if (!found) { std::printf("FAIL pos doesn't play bar %u of the break\n", bar + 1); ++failures; }
+                bool exact = true;
+                for (u32 i = 0; i < pass && exact; ++i) exact = r->heard[i] == played(brk[bar * pass + i]);
+                if (!exact) { std::printf("FAIL a trim to bar %u doesn't play it\n", bar + 1); ++failures; }
                 delete r;
             }
             for (const Preset& p : presets) {   // every preset plays it under the ceiling (never clamped) and well above silence
                 Rig* r = new Rig(brk.data(), count);
+                r->block.region.begin = p.begin;
+                r->block.region.end = p.end;
                 for (u32 i = 0; i < 8; ++i) r->parameters[i] = at(p.values[i]);
                 const i32 peak = r->run(4 * pass / opxy::block_frames);
                 double sum = 0;

@@ -161,12 +161,23 @@ void collect_captions(const recur::Frame& frame) {
     for (u32 t = 0; t < 16; ++t) ((t & 7) < 4 ? titles_seen : values_seen).insert(frame.texts[t].chars);
 }
 
+// The reshaping outlines (the tape's waveform and the frame round the stretch
+// read) as the frame shapes them, rather than as authored.
+std::vector<Point> reshaped(const recur::Frame& frame, u32 node) {
+    std::vector<Point> pts;
+    for (const opxy::draw::Point& q : frame.paths[node].points) pts.push_back(Point{q.x / 1024.0, q.y / 1024.0});
+    return pts;
+}
+
 bool outlines_ok(const recur::Frame& frame, const char* where) {
-    for (u32 node = 0; node < recur::node_total; ++node)
-        if (shown(frame.nodes[node]) && !outline_ok(outlines[node], frame.nodes[node].scale / 1024.0, node, where)) {
+    for (u32 node = 0; node < recur::node_total; ++node) {
+        if (!shown(frame.nodes[node])) continue;
+        const std::vector<Point>& pts = node < recur::paths ? reshaped(frame, node) : outlines[node];
+        if (!outline_ok(pts, frame.nodes[node].scale / 1024.0, node, where)) {
             ++failures;
             return false;
         }
+    }
     return true;
 }
 }
@@ -297,7 +308,7 @@ int main() {
         for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
         input.track = 1;
         for (u32 v = 0; v <= 100; ++v) {
-            input.slots[recur::kPos] = at(v / 100.0);
+            input.slots[recur::kFit] = at(v / 100.0);
             recur::display(state, input, frame);
             collect_captions(frame);
         }
@@ -319,8 +330,8 @@ int main() {
                     titles_seen.size(), widest_title);
     }
     {   // Shift (stockShift): the header's row names the stock sampler's start,
-        // window and end with their times, encoder 3's cell is blank, and
-        // the tape lights the region they trim, the caliper at its ends.
+        // window, gain and end, with their times and the gain in stock's steps,
+        // and the trim's markers on the tape light up.
         overview.assigned = overview.loaded = 1;
         overview.frames = 176400; overview.begin = 22050; overview.end = 154350;
         opxy::draw::Input input = {};
@@ -332,40 +343,137 @@ int main() {
         recur::display_reset(state);
         for (u32 f = 0; f < 30; ++f) recur::display(state, input, frame);
         const auto text = [&](u32 slot) { return std::string(frame.texts[slot].chars); };
-        if (text(0) != "pos" || text(4) != "0.00s") { std::printf("FAIL: without Shift the header shows pos at the trim's start\n"); ++failures; }
-        u32 lit_bars = 0;
-        for (u32 i = 0; i < recur::bar_count; ++i) lit_bars += frame.nodes[recur::bar_first + i].shade == 15;
+        if (text(0) != "fit" || text(4) != "0") { std::printf("FAIL: without Shift the header shows fit\n"); ++failures; }
+        const u32 unlit = frame.nodes[recur::mark_first].shade;
         input.shift = 1;
         for (u32 f = 0; f < 60; ++f) recur::display(state, input, frame);
-        if (text(0) != "start" || text(1) != "window" || text(2) != "" || text(3) != "end" ||
-            text(4) != "0.50s" || text(5) != "3.00s" || text(6) != "" || text(7) != "3.50s" || frame.header[2][0]) {
+        if (text(0) != "start" || text(1) != "window" || text(2) != "gain" || text(3) != "end" ||
+            text(4) != "0.50s" || text(5) != "3.00s" || text(6) != "+0" || text(7) != "3.50s" || std::strcmp(frame.header[2], "+0")) {
             std::printf("FAIL: Shift's row reads %s %s %s %s / %s %s %s\n", text(0).c_str(), text(1).c_str(), text(2).c_str(),
                         text(3).c_str(), text(4).c_str(), text(5).c_str(), text(7).c_str());
             ++failures;
         }
-        u32 shift_lit = 0, trimmed = 0;
-        for (u32 i = 0; i < recur::bar_count; ++i) {
-            shift_lit += frame.nodes[recur::bar_first + i].shade == 15;
-            trimmed += overview.frames * (i + 1) / recur::bar_count > overview.begin && overview.frames * i / recur::bar_count < overview.end;
-        }
-        if (shift_lit != trimmed || shift_lit <= lit_bars) {
-            std::printf("FAIL: Shift lights %u of the tape's %u bars, not the %u the trim spans; the window lit %u\n", shift_lit,
-                        recur::bar_count, trimmed, lit_bars);
-            ++failures;
-        }
-        const i32 x0 = frame.nodes[recur::jaw_first].x / 1024, x1 = frame.nodes[recur::jaw_first + 1].x / 1024;
+        const i32 x0 = frame.nodes[recur::mark_first].x / 1024, x1 = frame.nodes[recur::mark_first + 1].x / 1024;
         const i32 eighth = (recur::rule_x1 - recur::rule_x0) / 8;
         if (std::abs(x0 - (recur::rule_x0 + eighth)) > 1 || std::abs(x1 - (recur::rule_x1 - eighth)) > 1) {
-            std::printf("FAIL: with Shift the caliper holds %d..%d, not the trim\n", x0, x1);
+            std::printf("FAIL: the trim's markers stand at %d..%d, not the trim\n", x0, x1);
             ++failures;
         }
+        if (frame.nodes[recur::mark_first].shade <= unlit) { std::printf("FAIL: Shift doesn't light the trim's markers\n"); ++failures; }
         for (u32 i = 0; i < 4; ++i) input.shown[i] = opxy::u8(4 + i);
         for (u32 f = 0; f < 30; ++f) recur::display(state, input, frame);
-        if (text(0) != "start" || text(2) != "" || text(6) != "" || text(3) != "end" || frame.header[2][0]) {
+        if (text(0) != "start" || text(2) != "gain" || text(6) != "+0" || text(3) != "end") {
             std::printf("FAIL: page 2's Shift row reads %s .. %s %s\n", text(0).c_str(), text(2).c_str(), text(3).c_str());
             ++failures;
         }
+        // The gain as stock steps it, every value within the caption's width; and
+        // with no gain known (gain_unavailable), its cell shows nothing.
+        for (i32 g = -30; g <= 20; ++g) {
+            overview.gain = g;
+            recur::display(state, input, frame);
+            char expect[8];
+            std::snprintf(expect, sizeof expect, "%c%d", g < 0 ? '-' : '+', g < 0 ? -g : g);
+            if (text(6) != expect) { std::printf("FAIL: gain %d reads '%s'\n", g, text(6).c_str()); ++failures; }
+            const double w = caption_width(frame.texts[6].chars, 20);
+            if (w < 0 || w > 53) { std::printf("FAIL: the gain caption '%s' is %.1f px wide\n", frame.texts[6].chars, w); ++failures; }
+        }
+        overview.gain = opxy::draw::gain_unavailable;
+        recur::display(state, input, frame);
+        if (text(2) != "" || text(6) != "" || frame.header[2][0]) { std::printf("FAIL: an unknown gain shows '%s' '%s'\n", text(2).c_str(), text(6).c_str()); ++failures; }
+        overview.gain = 0;
         overview.begin = 0; overview.end = 176400;
+    }
+    {   // The gain scales the tape's waveform: taller as it rises (the loudest
+        // bins meet the slot's edge from about +10), never past the slot.
+        opxy::draw::Input input = {};
+        for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
+        input.track = 1;
+        input.elapsed = 17;
+        double last = 0;
+        bool rising = true, inside = true;
+        for (i32 g = -30; g <= 20; g += 10) {
+            overview.gain = g;
+            frame = recur::Frame();
+            recur::display_reset(state);
+            recur::display(state, input, frame);
+            double tallest = 0;
+            for (u32 h = 0; h < recur::waves; ++h)
+                for (const opxy::draw::Point& q : frame.paths[h].points) tallest = std::fmax(tallest, std::fabs(q.y / 1024.0));
+            rising = rising && (g <= 0 ? tallest > last + 0.2 : tallest >= last);
+            inside = inside && tallest < 7.5;
+            last = tallest;
+        }
+        if (!rising || !inside) { std::printf("FAIL: the waveform doesn't grow with the gain within the slot\n"); ++failures; }
+        overview.gain = opxy::draw::gain_unavailable;
+        frame = recur::Frame();
+        recur::display_reset(state);
+        recur::display(state, input, frame);
+        recur::Frame unknown = frame;
+        overview.gain = 0;
+        frame = recur::Frame();
+        recur::display_reset(state);
+        recur::display(state, input, frame);
+        bool same = true;
+        for (u32 h = 0; h < recur::waves; ++h)
+            for (u32 i = 0; i < 64; ++i) same = same && unknown.paths[h].points[i].y == frame.paths[h].points[i].y;
+        if (!same) { std::printf("FAIL: an unknown gain changes the waveform\n"); ++failures; }
+    }
+    {   // The tape: the grid's cuts stand where the engine cuts the trim, a long
+        // tick at each row, between the trim's markers; and they don't move at rest.
+        overview.frames = 352800; overview.begin = 0; overview.end = 88200;   // bar 1 of the break
+        for (u32 g = 0; g < recur::grid_count; ++g) {
+            opxy::draw::Input input = {};
+            for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
+            input.slots[recur::kGrid] = choice_of(g, recur::grid_count);
+            input.track = 1;
+            input.elapsed = 17;
+            frame = recur::Frame();
+            recur::display_reset(state);
+            for (u32 f = 0; f < 60; ++f) recur::display(state, input, frame);
+            const u32 bits = 1 + g, side = 1u << bits, cells = side * side;
+            u32 ticks = 0;
+            bool placed = true;
+            for (u32 n = recur::row_first; n < recur::cut_first + recur::cut_count; ++n) {
+                if (!shown(frame.nodes[n])) continue;
+                ++ticks;
+                // Its x is a cut: span * c / cells, as a px of the 312 the whole sample spans.
+                const double x = frame.nodes[n].x / 1024.0 - recur::rule_x0, per = 88200.0 / cells * 312 / 352800;
+                const double c = x / per;
+                placed = placed && std::fabs(c - std::round(c)) < 0.05 && c > 0.5 && c < cells - 0.5;
+            }
+            // At 8 x 8 a bar's 64 slices are 1.2 px apart on the tape: its rows show, not its slices.
+            const u32 expect = g == 2 ? side - 1 : cells - 1;
+            if (ticks != expect || !placed) { std::printf("FAIL: %u x %u shows %u cuts on the tape (expected %u)%s\n", side, side, ticks, expect, placed ? "" : ", off the slices"); ++failures; }
+            recur::Frame before = frame;
+            recur::display(state, input, frame);
+            if (std::memcmp(&before, &frame, sizeof frame)) { std::printf("FAIL: the screen changes at rest\n"); ++failures; }
+        }
+    }
+    {   // fit shows on the tape: the frame round the stretch the slot reads
+        // spans its slot at the note's pitch at fit 0 (two slices for 1/8s of
+        // a bar on 4 x 4) and its own slice at fit 100.
+        overview.frames = 352800; overview.begin = 0; overview.end = 88200;
+        double widths[2];
+        for (u32 fit = 0; fit < 2; ++fit) {
+            opxy::draw::Input input = {};
+            for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
+            input.slots[recur::kSlice] = choice_of(4, recur::slice_count);   // 1/8
+            input.slots[recur::kFit] = at(fit);
+            input.track = 1;
+            input.elapsed = 17;
+            frame = recur::Frame();
+            recur::display_reset(state);
+            for (u32 f = 0; f < 30; ++f) recur::display(state, input, frame);
+            widths[fit] = frame.paths[recur::reading].points[16].x / 1024.0;
+        }
+        const double slice_px = 88200.0 / 16 * 312 / 352800;
+        if (std::fabs(widths[0] - 2 * slice_px) > 0.6 || std::fabs(widths[1] - slice_px) > 0.3) {
+            std::printf("FAIL: the reading frame spans %.2f px at fit 0 and %.2f at fit 100, not %.2f and %.2f\n", widths[0], widths[1],
+                        2 * slice_px, slice_px);
+            ++failures;
+        }
+        std::printf("fit on the tape: the stretch read %.1f px at fit 0, %.1f at fit 100\n", widths[0], widths[1]);
+        overview.frames = 176400; overview.begin = 0; overview.end = 176400;
     }
     if (invalid) { std::printf("FAIL: %u invalid frames\n", invalid); ++failures; }
     std::printf("%u frames; every print piece inside its tile's square, at worst %.2f px inside its edge\n", frames, -worst);
