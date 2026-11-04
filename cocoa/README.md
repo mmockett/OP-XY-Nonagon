@@ -23,7 +23,9 @@ the bubbles rise out, the note climbs back to the key.
 
 **Status: experimental.** Cocoa passes the SDK's tests and runs on an
 OP-XY, where its CPU is
-measured (below).
+measured (below). Its screen now follows the track's amp envelope, which
+needs version 1.10 of the Open-XY SDK: this version can't ship until SDK 1.10
+is released.
 
 ## Controls
 
@@ -260,7 +262,8 @@ and an outline with no area or turning straight back on itself draws
 streaks. So every line is a closed ribbon at least 0.4 px wide, and every
 outline starts in the middle of a long edge. `tools/make_panel.py` checks
 every outline it writes; `tests/screen.cpp` checks every outline the screen
-draws, over every control at five settings, each through a note.
+draws, over every control at five settings, each through a note, with the
+amp envelope unknown and under a long one.
 
 - **The spoon stands in the drink.** Its bowl rests on the floor. Each tap
   rocks it onto the floor in time with the sound, rippling the surface and
@@ -305,6 +308,18 @@ controls, not the audio. It assumes the voices sound for 0.5 s after the last
 key, a guess at the amp release. Reduced motion keeps the spoon, the surface
 and the pops still, and a reset snaps everything into place.
 
+Where the OP-XY tells the screen the track's amp envelope (SDK 1.10), the
+drink and the spoon go on for as long as the sound lasts, and move as far as
+they are heard: the spoon's rock, the ripples, the stir's dip and the slosh
+swell with the envelope's attack, hold at its sustain while keys are held
+and fade over its release, and the pops come as often as they are heard. A
+tap too quiet to hear sends no ring across the floor. A short release stills
+the drink at once; a long one keeps it sloshing, its bubbles rising and the
+spoon tapping until the sound ends, and a slow attack brings the spoon down
+gently. Without the envelope (an older OS, the builder's preview) the screen
+keeps its own timing. The shared `amp.h` follows the envelope; its note
+gives the curve it assumes for stock's envelope times.
+
 **Churn.** `tests/screen.cpp` plays a 22 s scene at 60 fps (a long climb,
 page 2 and its controls, a second note, a chord at fast taps, then cup and
 fill changes): 5.9 nodes change a frame on average, 30 at most. The idle screen changes nothing. Bubbles move in 2 px steps, at most
@@ -317,12 +332,14 @@ fill changes): 5.9 nodes change a frame on average, 30 at most. The idle screen 
 | `drink.h` | The physics both sides share: Wood's equation, the bubble classes, clearing, stirring, the taps |
 | `core.h`, `engine.cpp` | The voice: the drink, the column's and cup's modes, the pops, the strum and the soft clip |
 | `display.h`, `display.cpp` | The screen |
+| `amp.h` | The amp envelope as the screen follows it, a copy of the suite's `tools/amp.h` |
 | `tables.h` | Written by `tools/make_tables.py`: log₂ and 2^x, the sine, W(s), the modes, the cups, the spoon |
 | `panel.svg.fragment`, `plate.h` | Written by `tools/make_panel.py`: the artwork, the vessels and spoons, each spoon's rest on each cup, the scatter of bubbles and flecks |
 | `tests/sound.cpp` | The physics and playing checks |
 | `tests/controls.cpp` | Each control at 0/25/50/75/100, measured (the table above) |
 | `tests/scenes.cpp` | The preset phrases; writes the WAVs when given a folder |
-| `tests/screen.cpp` | The screen: validity, what the device draws badly, the captions' widths, churn, stillness, reduced motion, reset, the spoon clear of the cup; writes frames for the GIF and the contact sheet |
+| `tests/screen.cpp` | The screen: validity, what the device draws badly (also under a long amp envelope), the captions' widths, churn, stillness, reduced motion, reset, the spoon clear of the cup; writes frames for the GIF and the contact sheet |
+| `tests/envelope.cpp` | The screen under the amp envelope: unchanged frames with the envelope unknown, a short envelope's motion ending soon after the note-off and a long one's lasting through its release, a slow attack rocking the spoon less at first, and churn under a held note and its release |
 | `tools/measure.py` | The level measurements, from WAVs |
 | `tools/make_gif.py` | Renders `docs/cocoa.gif` and, with `--sheet`, `docs/controls-1x.png` and `docs/controls.png` from the real display code, in the device's face |
 

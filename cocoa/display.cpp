@@ -32,7 +32,16 @@
 // The screen cannot hear the voices: it keeps its own drink and spoon, stepped
 // with the voices' own code (drink.h) for each 64 samples of time. Like the
 // voices' drink, it waits while nothing sounds, and settles by the next note
-// after a pause. Integer arithmetic only.
+// after a pause.
+//
+// Where the OP-XY tells the screen its amp envelope (SDK 1.10, amp.h), the
+// drink and the spoon go on as long as the sound does, until the envelope's
+// release ends it, and what is heard of them follows the envelope: the
+// spoon's rock, the ripples, the stir's dip and the slosh swell with its
+// attack, hold at its sustain and fade over its release, and the pops come
+// as often as they are heard. A tap too quiet to hear sends no ring across
+// the floor. Without it, the screen keeps its own timing: the voices sound
+// while a key is held and for half a second after. Integer arithmetic only.
 namespace cocoa {
 // The SDK's draw::sine and draw::rotation, kept local to this machine: the
 // Blackfin compiler emits an inline function it doesn't inline as a strong
@@ -234,6 +243,7 @@ inline void captions(const i32* slots, char (*values)[opxy::draw::header_capacit
 inline void display_reset(DisplayState& state) {
     state.header.reset();
     state.notes.reset();
+    nonagon_amp::reset(state.amp);
     state.initialized = 0;   // the next frame snaps everything into place
 }
 
@@ -280,11 +290,19 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     const i32 x0 = drink::powder_void(slots[POWDER]);
 
     // The voices sound while a key is held, and for the amp's release after.
+    // With the amp envelope known, they sound until the envelope ends them,
+    // at its level (heard, Q15); a note finds the drink settled when the last
+    // frame heard nothing.
+    const bool started = !fresh && input.note_serial != state.serial;
+    const bool was_heard = nonagon_amp::sounding(state.amp) && nonagon_amp::level(state.amp) > 0;
+    const bool follows = nonagon_amp::follow(state.amp, input, started);
+    const i32 heard = follows ? nonagon_amp::level(state.amp) : 32768;
+    const bool audible = follows && nonagon_amp::sounding(state.amp) && heard > 0;
     if (events.hold_ended) state.tail = release;
     const i32 elapsed = fresh ? 0 : clamp(input.elapsed, 0, 1024);
-    const bool was_sounding = held || state.tail > 0;
+    const bool was_sounding = follows ? was_heard : held || state.tail > 0;
     state.tail = state.tail > elapsed ? state.tail - elapsed : 0;
-    const bool sounding = held || state.tail > 0;
+    const bool sounding = follows ? audible : held || state.tail > 0;
     state.since_tap = state.since_tap < (1 << 20) ? state.since_tap + elapsed : state.since_tap;
     state.since_stir = state.since_stir < (1 << 20) ? state.since_stir + elapsed : state.since_stir;
 
@@ -297,7 +315,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     // A note stirs the drink and taps at once, as the voices do: after a
     // pause the drink has settled, and is stirred afresh.
     bool tapped = false;
-    if (!fresh && input.note_serial != state.serial) {
+    if (started) {
         const bool settled = !was_sounding;
         if (settled)
             for (u32 i = 0; i < drink::classes; ++i) state.d[i] = 0, state.s[i] = drink::clear;
@@ -343,9 +361,12 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     const i32 h = state.surface, level = floor - h;
     // While a key is held the drink keeps sloshing from wall to wall at the
     // mug's sloshing mode, which fill sets, 1 px for a still drink to 2.5 px
-    // for one stirred at 100. It settles when the key is let go.
+    // for one stirred at 100. It settles when the key is let go; with the
+    // envelope, it sloshes while the sound lasts, as far as it is heard.
     {
-        const i32 target = held && !reduced ? 1024 + static_cast<i32>(1536u * drink::q16(slots[STIR]) >> 16) : 0;
+        const bool sloshing_held = follows ? audible : held;
+        i32 target = sloshing_held && !reduced ? 1024 + static_cast<i32>(1536u * drink::q16(slots[STIR]) >> 16) : 0;
+        if (follows) target = target * heard >> 15;
         state.slosh = keep ? ease(state.slosh, target, keep) : target;
         if (magnitude(state.slosh - target) < 32) state.slosh = target;
         state.slosh_phase += static_cast<u32>(drink::along(tables::slosh_inc, slots[FILL])) * static_cast<u32>(blocks);
@@ -355,10 +376,13 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         // The stirred drink's standing vortex, to 12 px (stir), and a note's stir on top.
         i32 vortex = static_cast<i32>(drink::q16(slots[STIR]) * 12 >> 6), ripple = 0;
         if (!reduced) {
-            if (state.since_stir < 720)   // 0.7 s
-                vortex += ((state.stirred * 8) >> 5) * (720 - state.since_stir) / 720;   // Q10 px, at most 8
+            if (state.since_stir < 720) {   // 0.7 s
+                const i32 dip = ((state.stirred * 8) >> 5) * (720 - state.since_stir) / 720;   // Q10 px, at most 8
+                vortex += follows ? dip * heard >> 15 : dip;
+            }
             if (state.since_tap < 400) {
-                const i32 fade = (400 - state.since_tap) * 1536 / 400;                     // 1.5 px, Q10
+                i32 fade = (400 - state.since_tap) * 1536 / 400;                           // 1.5 px, Q10
+                if (follows) fade = fade * heard >> 15;
                 ripple = (fade * sine(state.since_tap * 3600 * 5 / 1024)) >> 10;            // 5 Hz
             }
         }
@@ -467,6 +491,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             const i32 r = 1024 - state.since_tap * 4;   // back up in a quarter second
             lift = rest - rest * (r * r >> 10) / 1024;
         }
+        // With the envelope, the spoon rocks as far as its taps are heard.
+        if (follows) lift = rest + ((lift - rest) * heard >> 15);
         lift = lift / 5 * 5;   // in half degrees, to change less often
         // Its rest on this cup, leaning on the rim's lip or the wall without
         // crossing them (plate.h), and the tip turned about the lip by the lift.
@@ -503,13 +529,14 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         }
         // Tapping fast, strokes beside the bowl: one from 1.5 taps a second, three from 8.
         const u32 tenths_hz = step ? drink::tap_tenths(slots[TAPS]) : 0;
-        const u32 shakes = !tapping ? 0 : tenths_hz >= 80 ? 3 : tenths_hz >= 40 ? 2 : tenths_hz >= 15 ? 1 : 0;
+        const bool loud = !follows || heard >= 8192;   // a quarter of the envelope, or more
+        const u32 shakes = !tapping || !loud ? 0 : tenths_hz >= 80 ? 3 : tenths_hz >= 40 ? 2 : tenths_hz >= 15 ? 1 : 0;
         for (u32 k = 0; k < node::shakes; ++k) {
             if (k < shakes) put_turned(frame, node::shake + k, tip_x, tip_y, unit, t, grey::detail);
             else conceal(frame, node::shake + k);
         }
         // Each tap sends a ring across the floor from under the bowl, for 0.35 s.
-        if (tapped && !reduced) {
+        if (tapped && !reduced && loud) {
             u32 slot = 0;
             for (u32 k = 1; k < node::rings; ++k)
                 if (state.ring_age[k] < 0 || (state.ring_age[slot] >= 0 && state.ring_age[k] > state.ring_age[slot])) slot = k;
@@ -576,7 +603,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         u32 total = 0;
         for (u32 i = 0; i < drink::classes; ++i)
             if (state.s[i] < drink::clear) total += static_cast<u32>(state.d[i] >> 12) * static_cast<u32>(rate[i] >> 12);
-        const u32 chance = ((((total >> 8) * 750u) >> 9) * static_cast<u32>(drink::q16(slots[POPS]) >> 1)) >> 15;
+        u32 chance = ((((total >> 8) * 750u) >> 9) * static_cast<u32>(drink::q16(slots[POPS]) >> 1)) >> 15;
+        if (follows) chance = (chance > 65536u ? 65536u : chance) * static_cast<u32>(heard) >> 15;   // as often as they are heard
         for (i32 b = 0; b < blocks && b < 64; ++b) {
             if (!total || (next(state.seed) & 0xffff) >= chance) continue;
             for (u32 k = 0; k < node::pops; ++k)
