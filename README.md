@@ -19,7 +19,10 @@ than nine sounds you won't have heard from a synth before.
 
 **Status: experimental.** All nine pass the SDK's tests and run on the
 OP-XY, their screens are checked against how it draws, and their CPU is
-measured on it (below). Expect rough edges.
+measured on it (below). v0.8.0's Ghost and Recur, with Shift on the sampler's
+markers and gain, Recur's own break and its trim as the loop, have been played
+on the OP-XY; their CPU capture for this version is still to come. Expect
+rough edges.
 
 All nine are live in the [open-xy.com](https://open-xy.com) builder:
 [Sand](https://open-xy.com/#preview/machines/sand),
@@ -32,8 +35,9 @@ All nine are live in the [open-xy.com](https://open-xy.com) builder:
 [Butterfly](https://open-xy.com/#preview/machines/butterfly) and
 [Drop](https://open-xy.com/#preview/machines/drop). The builder installs the
 version the Open-XY catalog pins for each, which can be older than this
-repository's latest tag (`v0.7.2`): Sand `v0.5.0`; Cocoa, Coin, Fermi,
-Butterfly and Drop `v0.6.0`; Ghost and Recur `v0.7.0`; Mach `v0.7.2`.
+repository's latest tag (`v0.8.0`): Sand `v0.5.0`; Cocoa, Coin, Fermi,
+Butterfly and Drop `v0.6.0`; Ghost and Recur `v0.7.0`; Mach `v0.7.2`. Until
+the catalog pins v0.8.0, build Ghost and Recur from source (below).
 
 ## The machines
 
@@ -307,12 +311,14 @@ and a loaded sample takes its place. On both, Shift and encoders 1, 2 and 4
 move the stock sampler's start marker, both markers together and its end
 marker, the stretch of the sample they play (for Recur, the loop it slices),
 and Shift + encoder 3 its gain; a strip under each screen shows the sample,
-its trim and its gain.
+its trim and its gain. Both screens follow the track's amp envelope, so their
+motion lasts as long as the sound: as on stock, a larger attack or decay is
+longer, but a larger release is shorter.
 
 ## CPU
 
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`: Mach from
-one capture at `v0.4.0`, Sand from one at `v0.5.0`, Cocoa, Coin, Fermi, Butterfly and Drop from one at `v0.6.0`, and Ghost and Recur from one at `v0.7.0`. For a synth, one voice plays middle C with the first
+one capture at `v0.4.0`, Sand from one at `v0.5.0`, Cocoa, Coin, Fermi, Butterfly and Drop from one at `v0.6.0`, and Ghost and Recur from one at `v0.7.0` (v0.8.0's capture is still to come). For a synth, one voice plays middle C with the first
 four controls at their midpoint; for a sample engine, its sample callback
 plays the SDK's generated two-second test sample at its default settings. Each
 figure is a share of the OP-XY's 580,352-cycle audio block.
@@ -341,23 +347,27 @@ sampler's own mixing, so they don't compare directly with the synths.
 
 The seven synths need SDK 1.4 (the two-page header), on the `staging` branch
 of [etcetc000/open-xy](https://github.com/etcetc000/open-xy). Ghost and Recur
-are sample engines with their own screens and Shift on the stock sampler's
-markers and gain, which need SDK 1.10, also on `staging`, with the sample
-overview's gain ([#400](https://github.com/etcetc000/open-xy/pull/400)); so
-does Recur's own sample.
-
-Check the SDK out beside this repository as `../open-xy`, fetch its
-toolchain (`python sdk.py toolchain fetch`), then:
+are sample engines with their own screens, Shift on the stock sampler's
+markers and gain, and screens that follow the amp envelope, which need SDK
+1.10, also on `staging`. Recur's own sample needs one more SDK change, still
+in review: `samples`, which lets a sample engine ship samples its presets
+load. Until it merges, build all nine from the branch that adds it, `staging`
+with that change on top, checked out beside this repository as `../open-xy`
+(one firmware comes from one SDK checkout):
 
 ```sh
-python ../open-xy/sdk.py test --machine sand --machine cocoa --machine coin --machine fermi --machine mach --machine butterfly --machine drop
-python ../open-xy/sdk.py build --machine sand --machine cocoa --machine coin --machine fermi --machine mach --machine butterfly --machine drop --stock-os <your stock-1.2.1>/os.ldr --layout <your last build's layout.json> --out <folder outside this checkout>
+git clone -b sdk/machine-samples-v2 https://github.com/mmockett/open-xy ../open-xy
+python ../open-xy/sdk.py toolchain fetch
+python ../open-xy/sdk.py test --machine sand --machine cocoa --machine coin --machine fermi --machine mach --machine butterfly --machine drop --machine ghost --machine recur
+python ../open-xy/sdk.py build --machine sand --machine cocoa --machine coin --machine fermi --machine mach --machine butterfly --machine drop --machine ghost --machine recur \
+  --stock-os <your stock-1.2.1>/os.ldr --layout <the layout.json read from your OP-XY> --out <folder outside this checkout>
 ```
 
-and the same for `--machine ghost --machine recur`. Then install the build's `candidate/` files as the SDK's
+Then install the build's `candidate/` files as the SDK's
 [build guide](https://github.com/etcetc000/open-xy/blob/staging/docs/build.md#5-install)
-describes. Pass your last build's `layout.json` so the machines already on
-your OP-XY keep their numbers.
+describes, including `content/samples/recur/break.wav`. Pass the layout read
+from your OP-XY (`/layout.json`) so the machines already on it keep their
+numbers.
 
 They ask for these numbers; a build gives them out when they're free, and
 otherwise the lowest free ones:

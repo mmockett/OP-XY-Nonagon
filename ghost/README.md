@@ -36,9 +36,10 @@ resonators ringing in its share of what excites them, bed's value: none at
 recording's grain, envelope and colour; without one, bed is a whisper of
 Ghost's own.
 
-**Status: experimental.** Ghost passes the SDK's tests and runs on an
-OP-XY, and its CPU is measured there
-(below).
+**Status: experimental.** Ghost passes the SDK's tests and plays on an
+OP-XY (OS 1.2.1), with Shift's markers and gain, the sample's strip and the
+screen following the amp envelope. Its CPU was measured on the device at
+v0.7.0 (below); this version's capture is still to come.
 
 ## Controls
 
@@ -330,7 +331,8 @@ and contact sheets come from `tools/frames.cpp` on the host.
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, as one capture, at
 `v0.7.0`: Ghost's sample callback at its default settings, playing the SDK's
 generated two-second test sample, costs **3.07%** of the 580,352-cycle audio
-block. This test plays one setting; heavier settings cost more.
+block. This test plays one setting; heavier settings cost more. Ghost's sound
+code hasn't changed since; the screen has.
 
 The figures below are host estimates made during development.
 
@@ -437,7 +439,11 @@ the top of its file.
   start, window, gain and end with their times and steps on both pages; that
   the trim's markers stand on the trim and light up, the bars within it lit;
   that the bars grow with the gain; that an unknown gain (`gain_unavailable`)
-  leaves its cell blank; and that with no sample the strip goes.
+  leaves its cell blank; that with no sample the strip goes; and that the
+  apparition follows the amp envelope: fading over ring's time with an
+  unknown envelope, gone at once with the shortest release, kept by a long
+  one, gone sooner for a larger release word, and swelling in slower for a
+  larger attack word.
 - `tools/frames.cpp` checks the screen frame by frame, against the SDK's
   rules and the OP-XY's, counts its churn and writes frames as JSON;
   `frames clear` sweeps every control, with a sample and without, and checks

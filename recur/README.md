@@ -48,9 +48,11 @@ away; load your own over it with Shift + the Sample key. With no sample
 loaded, its screen shows a cover reading "load a sample · shift +" and the
 Sample key's icon.
 
-**Status: experimental.** Recur passes the SDK's tests and runs on an
-OP-XY, and its CPU is measured there
-(below).
+**Status: experimental.** Recur passes the SDK's tests and plays on an
+OP-XY (OS 1.2.1), with its break, the trim as the loop, fit, Shift's markers
+and gain, and the screen following the amp envelope. Its CPU for this
+version is still to be captured on the device; the figure below is from
+v0.7.0.
 
 ## The break
 
@@ -158,7 +160,7 @@ bar's sixteenths are shorter than the project's, against its own render at
 | step | 0/3: 0.05 | 0.5/3: 0.55 | 1/3: 0.96 | 1.5/3: 0.96 | 2/3: 0.95 |
 | rate | off: 0.00 | 4 bar: 0.00 | 1 bar: 0.67 | 1/4: 0.77 | 1/16: 0.76 |
 | depth | 0%: 0.00 | 25%: 0.32 | 50%: 0.49 | 75%: 0.67 | 100%: 0.79 |
-| chrd | off: 0.67, 0.91 | dtun: 0.73, 0.84 | 5th: 1.01, 0.60 | min: 1.15, 0.46 | harm: 1.08, 0.63 |
+| chrd | off: 0.67, 0.91 | dtun: 0.73, 0.84 | 5th: 1.01, 0.61 | min: 1.15, 0.47 | harm: 1.08, 0.63 |
 
 Moved from 0 to 50 and to 100, each control changes the render by 0.5 to
 1.4 on the same scale (`tools/travel.py`, in steps of 5%; fit by 1.40 and
@@ -169,8 +171,9 @@ does nothing are within a choice of an enum, grid's longest: it has three,
 The scrambles stay on the beat (0.89 to 1.00 of onsets on the grid) except
 at hiss, where they are noise; with chords, whose readers blur the onsets;
 and on 8 x 8, where a bar's 64 slices are 1/64s each playing a 1/16 slot,
-so they overlap into stutters. Peaks run −6.0 to −9.3 dBFS for one note at any setting but chrd,
-which sits 2 to 4 dB lower.
+so they overlap into stutters. Peaks run −8.1 to −10.4 dBFS for one note at
+any setting but chrd's chords (5th, min and harm), which sit at −11.3 to
+−12.9.
 
 ### The maps
 
@@ -192,20 +195,22 @@ Each map's period, in iterations:
 | **Recur** | A beat re-sequenced each bar, home every third | cat, 4x4 of 1/16, a bar an iteration, depth 70 | 0.05, 0.96, 0.96, home 0.11 |
 | **Stutter** | Rolls and repeats: rows of 1/32s slide past each other | shear, 8x8 of 1/32, an iteration a 1/4, depth 50 | rows alternate 0.0 to 0.3 and 1.2 to 1.3 |
 | **Phrase** | A melody's notes re-ordered into new phrases, home after six bars | gold, 4x4 of 1/8, a bar an iteration | 0.02, 1.18 to 1.40, home 0.07 at bar 7 |
-| **Riffle** | The baker's shuffle: the bar's halves interleaved like cards, home every fourth | baker, 4x4 of 1/16, a bar an iteration | 0.05, 1.11 to 1.26, home 0.06 |
-| **Glitch** | Dense 1/64 glitching, a new deal every 1/8 | pell, 8x8 of 1/64, an iteration a 1/8 | 0.12, then 1.27 to 1.44, home every half bar |
+| **Riffle** | The baker's shuffle: the bar's halves interleaved like cards, home every fourth | baker, 4x4 of 1/16, a bar an iteration | 0.05, 1.11 to 1.26, home 0.00 |
+| **Glitch** | Dense 1/64 glitching, a new deal every 1/8 | pell, 8x8 of 1/64, an iteration a 1/8 | 0.12, then 1.27 to 1.44, home (0.24) every half bar |
 | **Chorale** | Four beats swapped round under a minor chord of readers | hex, 2x2 of 1/4, a bar an iteration, chrd min | home every third bar |
-| **Frozen** | No motion: one fixed re-sequencing, a new beat to play from | cat, 8x8 of 1/32, rate off, step at the half period | 1.29, every pass the same |
-| **Shred** | The trim shredded into hiss and back in six seconds | hiss on 64 x 64, cat, an iteration a 1/16 | flatness 0.26 to 0.38 against the source's 0.000 |
+| **Frozen** | No motion: one fixed re-sequencing, a new beat to play from | cat, 8x8 of 1/32, rate off, step at the half period | 0.83, every pass the same |
+| **Shred** | The trim shredded into hiss and back in six seconds | hiss on 64 x 64, cat, an iteration a 1/16 | flatness 0.24 to 0.37 mid-period (0.14 as it leaves and comes home) against the source's 0.000 |
 
 Every preset opens on the break. They were measured on the test sources
 (`tools/make_sources.py`); Phrase and Chorale were made on a melody and play
 the break as beats instead. On the break the presets peak 1.2 to 2.2 dB
 under the output ceiling (Shred 7.6 dB), never clamped.
 
-Every preset clicks no more than its source (2.9 to 3.2 click-like events a
-second on the drums, against the source's own 3.2). A slice seam scores at
-most 6.1 to 8.5 on the same scale, where the drums' own onsets reach 117.
+The presets click about as often as their sources: 2.9 to 3.4 click-like
+events a second on the drums, against the source's own 3.2, and 1.0 to 2.3
+on the melody, against its 2.0. A slice seam scores at most 4.7 to 8.5 on
+the same scale, where the drums' own onsets reach 117; on Stutter and Frozen
+a slot starts on a drum hit, which scores 68 there.
 
 ## How it works
 
@@ -358,7 +363,9 @@ contact sheets come from `tools/screen.cpp` on the host.
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, as one capture, at
 `v0.7.0`: Recur's sample callback at its default settings, playing the SDK's
 generated two-second test sample, costs **1.16%** of the 580,352-cycle audio
-block. This test plays one setting; heavier settings cost more.
+block. This test plays one setting; heavier settings cost more. Since then the
+engine slices the whole trim and fit scales each reader's rate, so this
+version's capture is still to come.
 
 The figures below are host estimates made during development.
 
@@ -414,8 +421,11 @@ to +20, a blank cell with no gain known, and that the markers stand on the
 trim and light up. It checks that the waveform grows with the gain within
 the slot and ignores an unknown one; that the cuts stand on the slices the
 engine cuts (rows only when slices crowd); that the screen doesn't change at
-rest; and that fit stretches the frame round the stretch read from two
-slices to one for 1/8 slots on a bar of sixteenths.
+rest; that fit stretches the frame round the stretch read from two
+slices to one for 1/8 slots on a bar of sixteenths; and that the motion
+follows the amp envelope: stopping at once with an unknown envelope or the
+shortest release, playing on through a long one, stopping sooner for a larger
+release word, and swelling in slower for a larger attack word.
 
 ## Files
 
