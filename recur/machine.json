@@ -4,5 +4,6 @@
   "kind": "sample",
   "description": "A window of the sample laid out as a square and scrambled by Arnold's cat map, until it returns exactly.",
   "base": "sampler",
-  "presets": "presets"
+  "presets": "presets",
+  "samples": "samples"
 }
