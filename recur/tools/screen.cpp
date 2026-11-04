@@ -108,8 +108,8 @@ int main(int argc, char** argv) {
     static recur::Frame frame;
     opxy::draw::Input input = {};
     input.amp = opxy::draw::Envelope{-1, -1, -1, -1};   // unknown, unless a frame sets it
-    // ENVELOPE=1: the session with a known amp envelope, a short attack and a long (0.8) release.
-    const opxy::draw::Envelope session_amp = std::getenv("ENVELOPE") ? opxy::draw::Envelope{0x08000000, 0, 0x7fffffff, 0x66666666} : input.amp;
+    // ENVELOPE=1: the session with a known amp envelope, a short attack and a long release (word 0.5, about 3 s to silence).
+    const opxy::draw::Envelope session_amp = std::getenv("ENVELOPE") ? opxy::draw::Envelope{0x08000000, 0, 0x7fffffff, 0x40000000} : input.amp;
     const double defaults[8] = {0, 0.5, 0.583333, 0.083333, 0, 0.4375, 0.7, 0.071429};
     for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
     input.track = 1;
@@ -181,10 +181,11 @@ int main(int argc, char** argv) {
         overview.gain = 0;
         input.shift = 0;
         // The amp envelope: a note held 2 s on the defaults, then half a second
-        // after its release with a short release and a long one (0.8, about
-        // 1.9 s); and a quarter second into a slow attack (0.8).
-        const i32 full = 0x7fffffff, slow = 0x66666666;
-        const opxy::draw::Envelope envelopes[3] = {{0, 0, full, 0}, {0, 0, full, slow}, {slow, 0, full, 0}};
+        // after its release with the shortest release (word 0x7f000000: stock
+        // reads a larger release word as a shorter release) and the longest
+        // (word 0); and a quarter second into a slow attack (0.8).
+        const i32 full = 0x7fffffff, slow = 0x66666666, shortest = 0x7f000000;
+        const opxy::draw::Envelope envelopes[3] = {{0, 0, full, shortest}, {0, 0, full, 0}, {slow, 0, full, shortest}};
         for (u32 v = 0; v <= 2; ++v) {
             for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
             input.slots[recur::kDepth] = at(1);

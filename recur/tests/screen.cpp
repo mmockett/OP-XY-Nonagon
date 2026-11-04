@@ -478,9 +478,11 @@ int main() {
     }
     {   // The amp envelope (input.amp, SDK 1.10): the scramble and the pendulum
         // play on while the note sounds. Unknown, they stop as the note is let
-        // go, as before; with a long release they keep going, the pendulum
-        // narrowing; a short one stops them at once; a long attack swells the
-        // pendulum's swing in.
+        // go, as before. Stock reads a larger release word as a shorter
+        // release: at its top (0x7f000000) they stop at once; a smaller word
+        // keeps them going, the pendulum narrowing, and a larger word stops
+        // them sooner. A larger attack word swells the pendulum's swing in
+        // more slowly.
         overview.frames = 352800; overview.begin = 0; overview.end = 88200;
         struct Run { u32 held_ms; i32 swing; };
         auto play = [&](const opxy::draw::Envelope& amp, u32 held_frames, u32 after_frames) {
@@ -499,14 +501,29 @@ int main() {
             return Run{state.held_ms, after_frames ? std::abs(state.swing) : widest};
         };
         const i32 unknown = opxy::draw::envelope_unavailable;
-        const opxy::draw::Envelope none = {unknown, unknown, unknown, unknown}, quick = {0, 0, 0x7fffffff, 0},
-                                   long_release = {0, 0, 0x7fffffff, 0x66666666}, long_attack = {0x66666666, 0, 0x7fffffff, 0};
+        const opxy::draw::Envelope none = {unknown, unknown, unknown, unknown}, quick = {0, 0, 0x7fffffff, 0x7f000000},
+                                   long_release = {0, 0, 0x7fffffff, 0x20000000}, long_attack = {0x66666666, 0, 0x7fffffff, 0x7f000000};
         const Run a = play(none, 120, 30), b = play(quick, 120, 30), c = play(long_release, 120, 30), d = play(quick, 15, 0), e = play(long_attack, 15, 0);
-        std::printf("envelope: half a second after release, %u ms of motion (unknown), %u (short release), %u (long); "
-                    "the swing a quarter second in %d (fast attack) and %d (slow) tenths of a degree\n", a.held_ms, b.held_ms, c.held_ms, d.swing, e.swing);
-        if (a.held_ms || b.held_ms) { std::printf("FAIL: the motion outlasts a note with no or a short release\n"); ++failures; }
+        // Frames from the release until the motion stops, at two release words.
+        auto stops_after = [&](i32 release) {
+            play(opxy::draw::Envelope{0, 0, 0x7fffffff, release}, 120, 1);
+            opxy::draw::Input input = {};
+            for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
+            input.slots[recur::kSlice] = choice_of(5, recur::slice_count);
+            input.track = 1; input.elapsed = 17; input.amp = opxy::draw::Envelope{0, 0, 0x7fffffff, release};
+            input.note_serial = 1; input.note_off_serial = 1;
+            u32 f = 1;
+            for (; f < 60 * 60 && state.swell.level; ++f) recur::display(state, input, frame);
+            return f;
+        };
+        const u32 longer = stops_after(at(0.3)), shorter = stops_after(at(0.7));
+        std::printf("envelope: half a second after release, %u ms of motion (unknown), %u (shortest release), %u (release word 0.25); "
+                    "the swing a quarter second in %d (fast attack) and %d (slow) tenths of a degree; stops %u frames after release word 0.3, %u after 0.7\n",
+                    a.held_ms, b.held_ms, c.held_ms, d.swing, e.swing, longer, shorter);
+        if (a.held_ms || b.held_ms) { std::printf("FAIL: the motion outlasts a note with no or the shortest release\n"); ++failures; }
         if (c.held_ms < 2400) { std::printf("FAIL: a long release doesn't keep the motion going\n"); ++failures; }
-        if (e.swing * 2 > d.swing) { std::printf("FAIL: a long attack doesn't swell the swing in\n"); ++failures; }
+        if (e.swing * 2 > d.swing) { std::printf("FAIL: a larger attack word doesn't swell the swing in more slowly\n"); ++failures; }
+        if (shorter >= longer) { std::printf("FAIL: a larger release word doesn't stop the motion sooner\n"); ++failures; }
         overview.frames = 176400; overview.begin = 0; overview.end = 176400;
     }
     if (invalid) { std::printf("FAIL: %u invalid frames\n", invalid); ++failures; }

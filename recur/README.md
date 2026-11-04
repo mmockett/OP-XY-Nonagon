@@ -320,11 +320,11 @@ pendulum goes on swinging; the moving tiles and the frame brighten as the
 attack swells and dim toward the sustain and through the release, in four
 steps, and the pendulum's swing widens and narrows with it. With the
 envelope unknown it all stops as the note is let go, as before.
-Stock maps the envelope page's positions to times along its own curves, which
-aren't documented; the screen assumes them exponential in the position, 2 ms
-at 0 to about 10 s at full (1.9 s at 0.8) for attack, decay and release
-alike, and the sustain a level. That is a guess until it is timed against
-the device.
+The times and shapes are stock's: a larger attack or decay is a longer
+stage, but a larger release is a shorter one (about 6 ms at 100, near a
+minute to silence at 0, 3 s at 50). The attack rises fast and slows toward
+its top, the decay falls exponentially to the sustain, a plain level, and the
+release fades exponentially from wherever it was (`amp_curve.h`).
 
 The screen is still at rest. Tiles slide in 0.16 s, easing out. A frame
 spends at most 20 changes on tiles and the pieces they carry, so a big

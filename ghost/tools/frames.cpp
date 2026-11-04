@@ -191,10 +191,11 @@ int sheet(const std::string& dir) {
         overview.begin = 0; overview.end = overview.frames; overview.gain = 0;
     }
     // The amp envelope: a note held 1.5 s, then half a second after its release
-    // with a short release and a long one (0.8, about 1.9 s); and a quarter
+    // with the shortest release (word 0x7f000000: stock reads a larger release
+    // word as a shorter release) and the longest (word 0); and a quarter
     // second into a slow attack (0.8).
-    const opxy::i32 full = 0x7fffffff, slow = 0x66666666;
-    const Envelope envelopes[3] = {{0, 0, full, 0}, {0, 0, full, slow}, {slow, 0, full, 0}};
+    const opxy::i32 full = 0x7fffffff, slow = 0x66666666, shortest = 0x7f000000;
+    const Envelope envelopes[3] = {{0, 0, full, shortest}, {0, 0, full, 0}, {slow, 0, full, shortest}};
     for (u32 v = 0; v < 3; ++v) {
         Session s(dir, 60);
         load();
@@ -302,8 +303,8 @@ int main(int argc, char** argv) {
     const std::string dir = argc > 1 ? argv[1] : ".";
     const u32 fps = argc > 2 ? u32(std::atoi(argv[2])) : 60;
     Session s(dir, fps);
-    // ENVELOPE=1: with a known amp envelope, a short attack and a long (0.8) release.
-    if (std::getenv("ENVELOPE")) s.input.amp = Envelope{0x08000000, 0, 0x7fffffff, 0x66666666};
+    // ENVELOPE=1: with a known amp envelope, a short attack and a long release (word 0.5, about 3 s to silence).
+    if (std::getenv("ENVELOPE")) s.input.amp = Envelope{0x08000000, 0, 0x7fffffff, 0x40000000};
     s.run(1.0, "rest");
     s.press(); s.run(0.15, "arriving"); s.run(1.5, "seance");
     s.release(); s.run(1.2, "fading");

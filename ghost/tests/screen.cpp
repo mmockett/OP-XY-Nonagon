@@ -207,15 +207,16 @@ int main() {
         overview.assigned = 1;
     }
     {   // The amp envelope (input.amp, SDK 1.10): the figure lasts as long as the
-        // sound. Unknown, it fades over ring's time, as before; a long release
-        // keeps it longer, a short one lets it go at once, and a long attack
-        // swells it in.
+        // sound. Unknown, it fades over ring's time, as before. Stock reads a
+        // larger release word as a shorter release: at its top (0x7f000000) the
+        // figure goes at once, a smaller word keeps it longer, and a larger
+        // attack word swells it in more slowly.
         load(true);
-        auto presence_after = [&](const opxy::draw::Envelope& amp, u32 held_frames, u32 after_frames) {
-            static ghost::DisplayState st;
-            static ghost::Frame fr;
+        static ghost::DisplayState st;
+        static ghost::Frame fr;
+        Input in;
+        auto start = [&](const opxy::draw::Envelope& amp, u32 held_frames) {
             std::memset(&fr, 0, sizeof fr);
-            Input in;
             std::memset(&in, 0, sizeof in);
             ghost::display_reset(st);
             in.track = 1; in.elapsed = 17; in.amp = amp;
@@ -224,20 +225,32 @@ int main() {
             in.note_serial = 1; in.held_notes = 1;
             for (u32 f = 0; f < held_frames; ++f) ghost::display(st, in, fr);
             in.held_notes = 0; in.note_off_serial = 1;
+        };
+        auto presence_after = [&](const opxy::draw::Envelope& amp, u32 held_frames, u32 after_frames) {
+            start(amp, held_frames);
             for (u32 f = 0; f < after_frames; ++f) ghost::display(st, in, fr);
             return st.presence;
         };
+        auto gone_after = [&](opxy::i32 release) {   // frames from the release until the figure has gone
+            start(opxy::draw::Envelope{0, 0, 0x7fffffff, release}, 60);
+            u32 f = 0;
+            for (; f < 60 * 60 && (ghost::display(st, in, fr), st.presence != 0); ++f) {}
+            return f;
+        };
         const opxy::i32 unknown = opxy::draw::envelope_unavailable;
-        const opxy::draw::Envelope none = {unknown, unknown, unknown, unknown}, quick = {0, 0, 0x7fffffff, 0},
-                                   long_release = {0, 0, 0x7fffffff, 0x66666666}, long_attack = {0x66666666, 0, 0x7fffffff, 0};
+        const opxy::draw::Envelope none = {unknown, unknown, unknown, unknown}, quick = {0, 0, 0x7fffffff, 0x7f000000},
+                                   long_release = {0, 0, 0x7fffffff, 0x20000000}, long_attack = {0x66666666, 0, 0x7fffffff, 0x7f000000};
         const u32 a = presence_after(none, 60, 180), b = presence_after(quick, 60, 30), c = presence_after(long_release, 60, 60);
         const u32 d = presence_after(quick, 20, 0), e = presence_after(long_attack, 20, 0);
-        std::printf("envelope: presence 3 s after release %u (unknown, ring's fade); 1 s into a 1.9 s release %u; 0.5 s after a short one %u; "
-                    "1/3 s into a fast and a slow attack %u and %u (of 65536)\n", a, c, b, d, e);
+        const u32 longer = gone_after(q31(0.3)), shorter = gone_after(q31(0.7));
+        std::printf("envelope: presence 3 s after release %u (unknown, ring's fade); 1 s into release word 0.25 %u; 0.5 s after the shortest %u; "
+                    "1/3 s into a fast and a slow attack %u and %u (of 65536); gone %u frames after release word 0.3, %u after 0.7\n",
+                    a, c, b, d, e, longer, shorter);
         if (a != 0) fail("an unknown envelope fades over ring's time", "envelope", 0, 0);
-        if (b != 0) fail("a short release lets the figure go", "envelope", 0, 0);
+        if (b != 0) fail("the shortest release lets the figure go", "envelope", 0, 0);
         if (c < 16384 || c > 49152) fail("a long release keeps the figure", "envelope", 0, 0);
-        if (e * 2 > d) fail("a long attack swells the figure in", "envelope", 0, 0);
+        if (e * 2 > d) fail("a larger attack word swells the figure in more slowly", "envelope", 0, 0);
+        if (shorter >= longer) fail("a larger release word ends the figure sooner", "envelope", 0, 0);
     }
     std::printf("screen: %ld frames; sharpest turn %.2f degrees from straight back; %ld faults\n", frames_checked, sharpest, failures);
     return failures ? 1 : 0;

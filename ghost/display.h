@@ -21,7 +21,7 @@ const opxy::i32 path_x = 240, path_y = 174;   // the chalk path's origin, drawn 
 const opxy::i32 strip_x0 = 90, strip_x1 = 390, strip_y = 209;   // the sample's slot under the apron
 
 // The amp envelope's level as the screen follows it (display.cpp, follow()).
-struct Swell { opxy::u32 level, from, stage; };   // level and from (the release's start) Q16; stage 0 idle, 1 attack, 2 decay, 3 release
+struct Swell { opxy::u32 level, from, stage; };   // level Q16; from spare (0); stage 0 idle, 1 attack, 2 decay, 3 release, 4 sustain
 
 struct DisplayState {
     opxy::draw::PageHeader header;
