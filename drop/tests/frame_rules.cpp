@@ -6,7 +6,9 @@
 // pixel. Checks every path as the screen draws it: the static art at its own
 // size, each shown node at its scale, and the drops' reshaping outlines, over
 // each control's sweep (0, 25, 50, 75 and 100, the others at their defaults)
-// while a note and then a chord of drops live and die. Run by sdk.py test.
+// while a note and then a chord of drops live and die: once with the amp
+// envelope unknown, once under a long one (a slow attack and a long release),
+// whose low levels shape the stars as well. Run by sdk.py test.
 #include "../display.cpp"
 #include <cmath>
 #include <cstdio>
@@ -123,23 +125,34 @@ int main() {
     static drop::DisplayState state;
     static drop::Frame frame;
     const char* const names[8] = {"heat", "size", "liquid", "beat", "groove", "vapour", "life", "crackle"};
+    for (int envelope = 0; envelope < 2; ++envelope)
     for (int control = 0; control < 8; ++control)
         for (int step = 0; step <= 4; ++step) {
             double controls[8] = {0.5, 0.85, 0, 0.181, 0, 0.35, 0.55, 0.25};   // definition.json's defaults
             controls[control] = step / 4.0;
             Input input = {};
+            if (envelope) {
+                // A 1.25 s attack, sustain 75 and a 3.4 s release (amp.h's curve).
+                input.amp.attack = input.amp.decay = q31(0.5);
+                input.amp.sustain = q31(0.75);
+                input.amp.release = q31(0.7);
+            } else {
+                input.amp.attack = input.amp.decay = input.amp.sustain = input.amp.release = envelope_unavailable;
+            }
             input.track = 1;
             for (unsigned i = 0; i < 4; ++i) input.shown[i] = static_cast<opxy::u8>(i);
             for (unsigned i = 0; i < 8; ++i) input.slots[i] = q31(controls[i]);
             drop::display_reset(state);
-            // A note at 0.1 s, a chord of three at 1 s; 10 s at 60 frames a second.
+            // A note at 0.1 s, a chord of three at 1 s; 10 s at 60 frames a
+            // second. Under the envelope the keys are held to 2 s.
             for (int n = 0; n < 600; ++n) {
                 if (n == 6 || n == 60) ++input.note_serial;
                 if (n == 61 || n == 62) ++input.note_serial;
+                if (envelope) input.held_notes = n >= 6 && n < 120 ? (n < 60 ? 1 : n < 62 ? n - 58 : 4) : 0;
                 input.elapsed = n ? 17 : 0;
                 drop::display(state, input, frame);
                 char when[96];
-                std::snprintf(when, sizeof when, "%s %d at %.2f s", names[control], step * 25, n / 60.0);
+                std::snprintf(when, sizeof when, "%s %d at %.2f s%s", names[control], step * 25, n / 60.0, envelope ? " under a long envelope" : "");
                 for (unsigned p = 0; p < drop::Frame::path_count; ++p) {
                     const Node& node = frame.nodes[p];
                     if (node.x >= hidden_x * unit) continue;

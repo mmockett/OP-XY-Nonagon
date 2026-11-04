@@ -33,7 +33,9 @@ back into a flutter.
 
 **Status: experimental.** Drop passes the SDK's tests. It runs on an
 OP-XY, and its CPU is measured there
-(below).
+(below). Its screen now follows the track's amp envelope, which needs
+version 1.10 of the Open-XY SDK: this version can't ship until SDK 1.10 is
+released.
 
 ## Controls
 
@@ -171,7 +173,8 @@ release (14000 of 32767), so notes end when the key is let go, like any
 synth, and the drop's life shapes them while they are held. Letting go
 cannot lift the drop off the plate, since the voice is not told. The screen
 is told: it boils the drop away over the amp's fade, so a released note leaves
-the screen still within a second.
+the screen still when the sound ends (within a second where the screen isn't
+told the envelope).
 
 ### Where it departs from the physics
 
@@ -244,10 +247,23 @@ The screen cannot hear the voices. It keeps its own drops, stepped by
 is held. It is still when idle and within a second of the last key's release; reduced motion stops the breathing, flashing, spray, sparks
 and running; a reset snaps everything into place.
 
+Where the OP-XY tells the screen the track's amp envelope (SDK 1.10), the
+drops last as long as the sound. Their stars' lobes are as deep as the sound
+is loud: a slow attack lands a round drop whose lobes swell in, and they hold
+at the sustain while keys are held. Its vapour flashes and its sparks follow
+the level too. Over the release each drop boils away as the sound fades,
+gone when the release ends: a short release clears it at once, a long one
+leaves it shrinking on the iron for seconds. A drop whose own life is shorter
+still goes when it evaporates. Without the envelope (an older OS, the
+builder's preview) the screen keeps its own timing. The shared `amp.h`
+follows the envelope; its note gives the curve it assumes for stock's
+envelope times.
+
 **Churn** (host, 60 fps, nodes changing a frame while drops show): a drop's
 life 3.2, peak 7; three drops 6.7, peak 16; a sizzle 9.5, peak 12 (the
 spray); the ratchet 5.4, peak 8; a 16 s run of everything 2.2 on average
-(6.8 while drops show), peak 17. Idle: 0.
+(6.8 while drops show), peak 17. Under an amp envelope with a 3.4 s release,
+a note 3.5 and a chord 7.8, peak 16. Idle: 0.
 
 ## Level
 
@@ -282,7 +298,7 @@ The figures below are host estimates made during development.
 
 ## Tests
 
-`sdk.py test` runs five host tests. UBSan is clean.
+`sdk.py test` runs six host tests. UBSan is clean.
 
 - **`tests/sound.cpp`**, 30 checks, among them:
   - At 160 °C the drop is gone in 0.35 s, broadband (spectral flatness
@@ -304,9 +320,17 @@ The figures below are host estimates made during development.
 - **`tests/frame_rules.cpp`**: every path the screen draws (the static
   art, each shown node at its scale and the drops' outlines), over each
   control at 0, 25, 50, 75 and 100 while a note and then a chord live and
-  die, has area, no neighbouring points within an eighth of a pixel, no
+  die, with the amp envelope unknown and under a slow attack and a long
+  release, has area, no neighbouring points within an eighth of a pixel, no
   turn straight back and a closing edge of a quarter of a pixel or more:
   what the OP-XY draws as streaks otherwise.
+- **`tests/envelope.cpp`**: the screen under the amp envelope: unchanged
+  frames with the envelope unknown, a short envelope clearing the drop
+  within 0.05 s of the note-off and a long one keeping it for 2.6 s (3.3 s
+  for a long-lived drop), a slow attack reshaping the star less at first,
+  churn under a note and a chord and their release at the defaults and the
+  heaviest settings (at most 7.8 a frame on average, peak 16, none at rest),
+  and clean outlines throughout.
 - **`tests/captions.cpp`**: every caption the header can show (each
   control swept in 1,024 steps over nine settings of the others, and
   200,000 settings at random) is at most 53 px wide at 20 px in the
@@ -327,7 +351,8 @@ The figures below are host estimates made during development.
 | `core.h`, `engine.cpp` | Voice and shared state, and the render |
 | `tables.h` | log2/exp2 tables and the liquids (`tools/make_tables.py`) |
 | `display.h`, `display.cpp`, `panel.svg.fragment` | The screen (`tools/make_panel.py`) |
-| `tests/sound.cpp`, `tests/screen.cpp`, `tests/frame_rules.cpp`, `tests/captions.cpp`, `tests/scenes.cpp` | The host checks above |
+| `amp.h` | The amp envelope as the screen follows it, a copy of the suite's `tools/amp.h` |
+| `tests/sound.cpp`, `tests/screen.cpp`, `tests/frame_rules.cpp`, `tests/envelope.cpp`, `tests/captions.cpp`, `tests/scenes.cpp` | The host checks above |
 | `tools/ears.py` | The presets' listening measurements above |
 | `tools/sweep.py`, `tools/sweep.cpp` | The controls' measurements above |
 | `tools/cpu.py` | The SDK's CPU estimate, steady on a busy computer |
