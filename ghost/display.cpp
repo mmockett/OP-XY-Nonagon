@@ -257,6 +257,72 @@ i32 ease(i32 value, i32 target, u32 ms) {
 }
 }
 
+// An overview bin's largest magnitude, 0..255.
+u32 bin_peak(const SampleOverview& o, u32 b) {
+    const i32 low = o.low[b], high = o.high[b];
+    const u32 m = u32(high > -low ? high : -low) >> 7;
+    return m > 255 ? 255 : m;
+}
+u32 root(u32 n) {
+    u32 r = 0;
+    for (u32 bit = 1u << 15; bit; bit >>= 1)
+        if ((r + bit) * (r + bit) <= n) r += bit;
+    return r;
+}
+
+// The sample in the slot under the apron, where the hint is with none: a bar
+// for each 40th of the whole sample, as tall as the root of its peak against
+// the loudest (so quiet stretches still show) and scaled by the sample's gain
+// (twice as tall each 10 of stock's steps up, within the slot), lit solid
+// within the trim and dim outside it; and the trim's markers, lit while Shift
+// edits them. The bars change only with the sample, its trim or its gain, a
+// few a frame.
+void place_strip(DisplayState& state, Frame& frame, const SampleOverview& o, bool shift) {
+    if (!o.assigned) {
+        for (u32 n = bar_first; n < mark_first + 2; ++n) hide(frame, n);
+        return;
+    }
+    const i32 gain = o.gain == gain_unavailable ? 0 : clamp(o.gain, -30, 20);
+    // 2^(gain / 10), Q10: whole doublings, and the rest of one linearly (near enough to see).
+    const i32 g = gain + 30, louder = (128 << (g / 10)) * (10 + g % 10) / 10;   // 128 at -30 .. 4096 at +20
+    u32 loudest = 1;
+    if (o.loaded) for (u32 b = 0; b < overview_bins; ++b) if (bin_peak(o, b) > loudest) loudest = bin_peak(o, b);
+    const u32 frames = o.frames ? o.frames : 1;
+    const u32 end = o.end && o.end <= frames ? o.end : frames, begin = o.begin < end ? o.begin : 0;
+    const i32 width = (strip_x1 - strip_x0) * unit;
+    u32 budget = 12;
+    for (u32 n = 0; n < bar_count; ++n) {
+        const u32 i = (n + state.bar_sweep) % bar_count;
+        u32 peak = 0;
+        if (o.loaded)
+            for (u32 b = i * overview_bins / bar_count; b < (i + 1) * overview_bins / bar_count; ++b) peak = bin_peak(o, b) > peak ? bin_peak(o, b) : peak;
+        const i32 tall = 256 + i32(root(peak * 65536 / loudest)) * 3;   // Q10 of 12 px: a quarter to all of it at +0
+        const i32 scale = clamp((tall * louder) >> 10, 180, 1500);
+        // Its middle within the trim: lit.
+        const u32 middle = frames / bar_count * i + frames / bar_count / 2;
+        const bool lit = middle >= begin && middle < end;
+        const i32 x = strip_x0 * unit + width * i32(2 * i + 1) / i32(2 * bar_count);
+        const Node& node = frame.nodes[bar_first + i];
+        const Paint paint = lit ? fill_and_stroke : stroke;
+        const u32 shade = lit ? 9 : 4;
+        if (node.x == x && node.y == strip_y * unit && node.scale == scale && node.shade == shade && node.paint == paint) continue;
+        if (node.scale > 0) {   // a frame not yet drawn sets every bar at once
+            if (!budget) continue;
+            --budget;
+        }
+        place(frame, bar_first + i, x, strip_y * unit, scale, shade, paint);
+    }
+    state.bar_sweep = (state.bar_sweep + 7) % bar_count;
+    const u32 marks[2] = {begin, end};
+    for (u32 k = 0; k < 2; ++k) {
+        // marks[k] / frames of the strip's width, without a 64-bit product.
+        u32 a = marks[k], f = frames;
+        while (f >= 65536) { a >>= 1; f >>= 1; }
+        const i32 x = strip_x0 * unit + i32((u32(width >> 4) * a / f) << 4);
+        place(frame, mark_first + k, x, strip_y * unit, unit, shift ? 15 : 8, fill_and_stroke);
+    }
+}
+
 inline void display_reset(DisplayState& state) {
     state.header.reset();
     state.notes.reset();
@@ -268,6 +334,7 @@ inline void display_reset(DisplayState& state) {
     state.scale = 0;
     state.beat_ms = 0;
     state.step_ms = state.step = 0;
+    state.bar_sweep = 0;
 }
 
 inline void display(DisplayState& state, const Input& input, Frame& frame) {
@@ -403,6 +470,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     // No sample: Grains' hint under the apron, the stage playing on above it.
     if (!overview.assigned) hide(frame, hint_cover);
     else place(frame, hint_cover, 0, 0, unit, 0, fill_and_stroke);
+    place_strip(state, frame, overview, input.shift != 0);
 
 }
 }

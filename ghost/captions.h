@@ -74,8 +74,17 @@ inline void fill(const Input& input, bool has_sample, char (&values)[8][header_c
 
 // Shift (resources.stockShift): encoders 1, 2 and 4 turn the stock sampler's
 // start, both markers together (the window, keeping its length) and end, the
-// stretch of the sample the bed plays; encoder 3 turns nothing.
-const char* const shift_titles[4] = {"start", "window", "", "end"};
+// stretch of the sample the bed plays; encoder 3 its gain.
+const char* const shift_titles[4] = {"start", "window", "gain", "end"};
+
+// The sample's gain as stock steps it (SampleOverview.gain, #400), signed:
+// +0, -12, +20; nothing when unknown.
+inline void gain_caption(char (&value)[header_capacity], i32 gain) {
+    value[0] = '\0';
+    if (gain == gain_unavailable) return;
+    value[0] = gain < 0 ? '-' : '+';
+    put(value + 1, u32(gain < 0 ? -gain : gain));
+}
 
 // Frames as seconds: 0.62s, 12.4s, 123s, and from 1000 s whole minutes, 17m.
 inline void seconds(char (&value)[header_capacity], u32 frames, u32 rate) {
@@ -88,9 +97,9 @@ inline void seconds(char (&value)[header_capacity], u32 frames, u32 rate) {
 }
 
 // While Shift is held, the row the encoders turn names what Shift edits, as
-// the stock header does: the start and end at their times in the sample and
-// the window at its length; encoder 3's cell is blank. titles and values are
-// indexed by slot.
+// the stock header does: the start and end at their times in the sample, the
+// window at its length, and the gain in stock's steps (with no gain known,
+// its cell is blank). titles and values are indexed by slot.
 inline void shift_row(const Input& input, const opxy::u8 (&pages)[2][4], const SampleOverview& o, const char* (&titles)[8],
                       char (&values)[8][header_capacity]) {
     if (!input.shift) return;
@@ -103,8 +112,10 @@ inline void shift_row(const Input& input, const opxy::u8 (&pages)[2][4], const S
     for (u32 col = 0; col < 4; ++col) {
         const u32 slot = pages[page][col];
         titles[slot] = shift_titles[col];
-        if (!*shift_titles[col]) values[slot][0] = 0;
-        else if (known) seconds(values[slot], marks[col], o.rate);
+        if (col == 2) {
+            gain_caption(values[slot], o.gain);
+            if (o.gain == gain_unavailable) titles[slot] = "";
+        } else if (known) seconds(values[slot], marks[col], o.rate);
         else copy(values[slot], header_capacity, "-");
     }
 }

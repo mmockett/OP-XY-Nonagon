@@ -154,13 +154,14 @@ folded a picture of a cat over and over; it dissolved into noise and then,
 after enough steps, came back exactly. Henri Poincaré had shown that such
 systems must return.
 
-A sample engine. The sample is cut into a grid of tiles and shuffled step by
-step by a chaotic map, so a loop scrambles further each bar and then comes
-home to the original. Map picks the shuffle, grid and slice the tiles, step
-and rate where and how fast it goes, depth how much of the loop moves and
-chrd stacks shuffled copies into a chord.
+A sample engine. The trimmed stretch of the sample is cut into a grid of
+tiles and shuffled step by step by a chaotic map, so a loop scrambles further
+each bar and then comes home to the original. Map picks the shuffle, grid and
+slice the tiles, fit whether a tile keeps its pitch or stretches to its
+slot, step and rate where and how fast it goes, depth how much of the loop
+moves and chrd stacks shuffled copies into a chord.
 
-**Page 1:** pos, grid, slice, map<br>
+**Page 1:** fit, grid, slice, map<br>
 **Page 2:** step, rate, depth, chrd
 
 The screen is a sliding-tile puzzle tin; each map shuffles its own picture.
@@ -304,7 +305,9 @@ with a sample of its own, a four-bar break played on MD KIT at 120 BPM, and
 plays straight away. Ghost plays without: its bed is then a gusty breath of its own,
 and a loaded sample takes its place. On both, Shift and encoders 1, 2 and 4
 move the stock sampler's start marker, both markers together and its end
-marker, the stretch of the sample they play; Shift + encoder 3 does nothing.
+marker, the stretch of the sample they play (for Recur, the loop it slices),
+and Shift + encoder 3 its gain; a strip under each screen shows the sample,
+its trim and its gain.
 
 ## CPU
 
@@ -339,7 +342,9 @@ sampler's own mixing, so they don't compare directly with the synths.
 The seven synths need SDK 1.4 (the two-page header), on the `staging` branch
 of [etcetc000/open-xy](https://github.com/etcetc000/open-xy). Ghost and Recur
 are sample engines with their own screens and Shift on the stock sampler's
-markers, which need SDK 1.10, also on `staging`; so does Recur's own sample.
+markers and gain, which need SDK 1.10, also on `staging`, with the sample
+overview's gain ([#400](https://github.com/etcetc000/open-xy/pull/400)); so
+does Recur's own sample.
 
 Check the SDK out beside this repository as `../open-xy`, fetch its
 toolchain (`python sdk.py toolchain fetch`), then:
