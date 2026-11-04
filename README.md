@@ -21,6 +21,20 @@ than nine sounds you won't have heard from a synth before.
 OP-XY, their screens are checked against how it draws, and their CPU is
 measured on it (below). Expect rough edges.
 
+All nine are live in the [open-xy.com](https://open-xy.com) builder:
+[Sand](https://open-xy.com/#preview/machines/sand),
+[Cocoa](https://open-xy.com/#preview/machines/cocoa),
+[Ghost](https://open-xy.com/#preview/machines/ghost),
+[Coin](https://open-xy.com/#preview/machines/coin),
+[Recur](https://open-xy.com/#preview/machines/recur),
+[Fermi](https://open-xy.com/#preview/machines/fermi),
+[Mach](https://open-xy.com/#preview/machines/mach),
+[Butterfly](https://open-xy.com/#preview/machines/butterfly) and
+[Drop](https://open-xy.com/#preview/machines/drop). The builder installs the
+version the Open-XY catalog pins for each, which can be older than this
+repository's latest tag (`v0.7.2`): Sand `v0.5.0`; Cocoa, Coin, Fermi,
+Butterfly and Drop `v0.6.0`; Ghost and Recur `v0.7.0`; Mach `v0.7.2`.
+
 ## The machines
 
 <table>
@@ -291,8 +305,8 @@ and a loaded sample takes its place.
 
 ## CPU
 
-Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`: three runs
-each for the rest at `v0.1.0`, Mach from one capture at `v0.4.0`, Sand from one at `v0.5.0`, and Cocoa, Coin, Fermi, Butterfly and Drop from one at `v0.6.0`, and Ghost and Recur from one at `v0.7.0`. For a synth, one voice plays middle C with the first
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`: Mach from
+one capture at `v0.4.0`, Sand from one at `v0.5.0`, Cocoa, Coin, Fermi, Butterfly and Drop from one at `v0.6.0`, and Ghost and Recur from one at `v0.7.0`. For a synth, one voice plays middle C with the first
 four controls at their midpoint; for a sample engine, its sample callback
 plays the SDK's generated two-second test sample at its default settings. Each
 figure is a share of the OP-XY's 580,352-cycle audio block.
@@ -310,7 +324,7 @@ figure is a share of the OP-XY's 580,352-cycle audio block.
 | Recur (sample callback) | 1.2% | n/a |
 
 The OP-XY's own engines measure 1.6–2.7% a voice in the same test, and
-Hexagon's synths 2.4–6.5%. A full chord on one track is fine; several tracks
+Hexagon's synths 2.4–4.1%. A full chord on one track is fine; several tracks
 of heavy chords at once, with effects, can run out. Each test plays one
 setting, and heavier settings cost more: Coin's four disks, a fully rattling
 plate in Sand or a hissing chord in Recur cost several times their figure
