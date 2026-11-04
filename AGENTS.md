@@ -55,3 +55,19 @@ screen done:
 
 When a change reaches the device, ask for a photo of the screen, and check
 each machine at its heaviest settings before calling it finished.
+
+## The amp envelope on the synths' screens
+
+The seven synths' screens follow the track's stock amp envelope (SDK 1.10's
+`input.amp`) through `tools/amp.h`. A machine builds from its own folder, so
+each synth holds a byte-identical copy as `amp.h`: edit `tools/amp.h`, copy
+it to every synth, and check with
+`for m in sand cocoa coin fermi mach butterfly drop; do cmp tools/amp.h $m/amp.h; done`.
+Its functions are `static`, so the copies never clash in one firmware.
+The envelope scales or times each screen's own note-driven motion; it adds
+no decoration. With the envelope unknown a screen draws exactly as before,
+which each synth's `tests/envelope.cpp` checks against a checksum of its
+frames; a host test that zeroes its `Input` gets a known envelope of zeros,
+so set `input.amp` to `envelope_unavailable` where a test means the old
+timing. The time curve is an assumption (see `tools/amp.h`); change only
+`stage_time()` if stock is measured.
