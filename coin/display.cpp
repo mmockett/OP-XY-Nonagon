@@ -30,6 +30,15 @@
 // The screen cannot hear the voices: it keeps its own disks' lives, stepped
 // with the voices' own code (spin.h), for each 64 samples of time since the
 // note. Integer arithmetic only.
+//
+// Where the OP-XY tells the screen its amp envelope (SDK 1.10, amp.h), the
+// disks spin as long as the sound lasts, as the voice spins them until the
+// envelope ends it (at hold, kept spinning until then), and what is seen is
+// what is heard: the lean, the rattle, the ghost's rocking and the ripples'
+// flare scaled by the envelope, swelling with its attack, holding at its
+// sustain and fading over its release, when the disks lie flat. A disk that
+// settles first still stops as it does. Without it, the screen keeps its own
+// timing: at hold, spinning while keys are held and settling in 0.3 s after.
 namespace coin {
 // The SDK's draw::sine and draw::rotation, kept local to this machine: the
 // Blackfin compiler emits an inline function it doesn't inline as a strong
@@ -340,6 +349,7 @@ inline u32 fingerprint(const i32* slots) {
 inline void display_reset(DisplayState& state) {
     state.header.reset();
     state.notes.reset();
+    nonagon_amp::reset(state.amp);
     state.initialized = 0;   // the next frame snaps everything into place
 }
 
@@ -410,11 +420,18 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     }
     ++state.frames;
 
+    // The track's amp envelope (amp.h): what is heard of the disks, Q15, all
+    // of it without one. With it, the voice spins them until it ends.
+    const bool started = !fresh && input.note_serial != state.serial;
+    const bool follows = nonagon_amp::follow(state.amp, input, started);
+    const i32 heard = follows ? nonagon_amp::level(state.amp) : 32768;
+    const bool voiced = !follows || (nonagon_amp::sounding(state.amp) && heard > 0);
+
     // A note throws its disks, all their life left. Between notes, a turned
     // control stands them at their throw, to show it.
     bool any = false;
     for (u32 k = 0; k < spin::most; ++k) any = any || state.disk[k].rolling;
-    if (!fresh && input.note_serial != state.serial) {
+    if (started) {
         state.count = spin::count(slots[MANY]);
         for (u32 k = 0; k < spin::most; ++k) {
             state.disk[k].rolling = k < state.count;
@@ -433,13 +450,14 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
 
     // Their lives, a block of 64 samples at a time, as the voices step them.
     // Kept at hold while a note is held; with none held they settle in 0.3 s,
-    // as the amp envelope's release takes the sound away. Lives catch up a
+    // as the amp envelope's release takes the sound away. With the envelope
+    // known, kept at hold while it sounds, and stopped when it ends. Lives catch up a
     // second a frame, so a slow screen keeps time with the voices; motion
     // eases on the frame's time, at most 0.1 s.
     state.owed += (fresh ? 0 : clamp(input.elapsed, 0, 1024)) * 11025 / 16;
     const i32 blocks = state.owed >> 10;
     state.owed &= 1023;
-    const bool kept = hand && held;
+    const bool kept = hand && (follows ? voiced : held);
     const i32 step = hand ? fade_step : spin::life_step(slots[SPIN]);
     const u32 was = state.disk[0].rolling;
     any = false;
@@ -447,7 +465,10 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         ScreenDisk& d = state.disk[k];
         if (!d.rolling) continue;
         const i32 own = spin::disk_step(step, k);
-        if (kept) {
+        if (!voiced) {
+            d.life = 0;   // the envelope has ended the sound
+            d.rolling = 0;
+        } else if (kept) {
             for (i32 b = 0; b < blocks; ++b) d.life = spin::next_life(d.life, own, true);
         } else if (blocks && (spin::rise(d.life, n) >= cut || d.life <= cut_life ||
                               blocks >= (d.life - cut_life + own - 1) / own)) {
@@ -462,11 +483,15 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     if (was && !lead.rolling) state.since = 0;
     state.since = state.since + dt > 1 << 20 ? 1 << 20 : state.since + dt;
 
-    // Each disk's lean and way round: settling, standing at its throw, or flat.
+    // Each disk's lean and way round: settling (as loud as it is heard),
+    // standing at its throw, or flat.
     for (u32 k = 0; k < spin::most; ++k) {
         ScreenDisk& d = state.disk[k];
-        const i32 target = d.rolling ? tilt_of(d, lean, n) : state.poised ? lean : 0;
-        d.tilt = keep ? ease(d.tilt, target, keep) : target;
+        const i32 target = d.rolling ? tilt_of(d, lean, n) * heard >> 15 : state.poised ? lean : 0;
+        // Rising with the envelope, it eases up as it eases down (ease()
+        // rounds a rise to stop a degree short).
+        const bool up = follows && d.tilt < target;
+        d.tilt = !keep ? target : up ? 2 * target - ease(2 * target - d.tilt, target, keep) : ease(d.tilt, target, keep);
         if (magnitude(d.tilt - target) < 2) d.tilt = target;
         if (d.rolling && !reduced) d.precession += laps_of(d, n) * static_cast<u32>(dt);
     }
@@ -485,6 +510,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             state.seed ^= state.seed << 5;
         }
         jitter = static_cast<i32>((state.seed >> 20) * wobble >> 16) - static_cast<i32>(2048u * wobble >> 16);
+        jitter = jitter * heard >> 15;
         jitter = ((jitter + 256) >> 9) << 9;
     }
 
@@ -576,11 +602,13 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     // further over, as far as wobble is felt in the sound, w(2 - w): none at
     // 0, 1 px and 1 degree at 5, 9 px and 7.5 degrees at 50, 12 px and 10
     // degrees at 100. It rattles with the disk, two of its eight dashes a
-    // frame; gone when the disk lies flat.
-    const bool rocking = wobble > 1300 && (lead.rolling || state.poised);
+    // frame, rocking as far as it is heard; gone when the disk lies flat, or
+    // rocks less than at wobble 2.
+    const u32 felt = (static_cast<u32>(wobble) * (131071u - static_cast<u32>(wobble)) >> 16) *
+                     static_cast<u32>(lead.rolling ? heard : 32768) >> 15;   // w(2 - w), Q16
+    const bool rocking = wobble > 1300 && (lead.rolling || state.poised) && felt > 2574;
     if (rocking) {
         Pose ghost = pose;
-        const u32 felt = static_cast<u32>(wobble) * (131071u - static_cast<u32>(wobble)) >> 16;   // w(2 - w), Q16
         const i32 swing = static_cast<i32>(felt * 100u >> 16), lift = static_cast<i32>(felt * 12u >> 6);   // tenths, Q10 px
         lean_to(ghost, (capped ? drawn : lead.tilt) + swing);
         ghost.middle += lift;
@@ -694,7 +722,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     // ring sets, from just beyond its rim out to the mirror's edge: none for a
     // dead slap, eight reaching the glass's edge for a 4 s bell. As the disk
     // falls flat they flare, outward a frame a ripple, and fade over the
-    // ring's time; at most three change a frame.
+    // ring's time, as bright as the ring is heard; at most three change a frame.
     const u32 ripples = (ring * 8 + 32768) >> 16;
     const i32 ringing = static_cast<i32>(spin::after_hundredths(slots[RING], material) * 1024u / 100u);   // Q10 s
     const i32 gap = ((scene::reach - 16) * unit - radius) / 7;
@@ -707,7 +735,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 since = state.since - 34 * static_cast<i32>(j);
         u32 grey = third;
         if (!lead.rolling && since >= 0 && since < ringing)
-            grey += static_cast<u32>(static_cast<i32>(brightest - third) * (ringing - since) / ringing);
+            grey += static_cast<u32>(static_cast<i32>(brightest - third) * (ringing - since) / ringing * heard >> 15);
         const i32 size_ = (r << 10) / authored;
         const Node& d = frame.nodes[n_];
         if (d.x == cx && d.y == cy && d.scale == size_ && d.shade == grey && d.paint == stroke) continue;

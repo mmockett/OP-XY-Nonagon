@@ -9,7 +9,8 @@
 // Checked for the disk's four reshaping outlines and for every shown node of
 // the artwork as each frame places it, over each control at 0, 25, 50, 75 and
 // 100 (the rest at Euler's) through a note's whole animation, at every size
-// and material, and with reduced motion.
+// and material, and with reduced motion; and again under a slow amp envelope
+// (SDK 1.10), whose attack and release lay the disk low.
 #include "../display.cpp"
 #include <cmath>
 #include <cstdio>
@@ -104,19 +105,27 @@ void check(const coin::Frame& f, const char* when) {
 
 opxy::i32 q31(double v) { return static_cast<opxy::i32>(v * 2147483647.0 + (v < 1 ? 0.5 : 0)); }
 
-// Plays a note's animation, 30 fps, with the controls `c`, checking each frame.
-void play(const double (&c)[8], bool reduced, const char* name) {
+// Plays a note's animation, 30 fps, with the controls `c`, checking each frame;
+// `slow`, under an amp envelope of a 1.25 s attack and a 3.4 s release, to its end.
+void play(const double (&c)[8], bool reduced, const char* name, bool slow = false) {
     static coin::DisplayState state;
     static coin::Frame frame;
     Input input;
     std::memset(&input, 0, sizeof input);
     std::memset(&frame, 0, sizeof frame);
+    // The envelope unknown, as before SDK 1.10 (tests/envelope.cpp follows one).
+    input.amp.attack = input.amp.decay = input.amp.sustain = input.amp.release = envelope_unavailable;
+    if (slow) {
+        input.amp.attack = input.amp.decay = q31(0.5);
+        input.amp.sustain = q31(0.75);
+        input.amp.release = q31(0.7);
+    }
     input.reduced_motion = reduced;
     for (int k = 0; k < 8; ++k) input.slots[k] = q31(c[k]);
     for (int k = 0; k < 4; ++k) { input.parameters[k] = input.slots[k]; input.shown[k] = static_cast<opxy::u8>(k); }
     coin::display_reset(state);
     const int before = failures;
-    for (int t = 0; t < 150 && failures - before < 3; ++t) {
+    for (int t = 0; t < (slow ? 210 : 150) && failures - before < 3; ++t) {
         input.elapsed = t ? 34 : 0;
         if (t == 3) { input.note_serial++; input.held_notes = 1; }
         if (t == 60) input.held_notes = 0;
@@ -141,7 +150,9 @@ int main() {
             char name[48];
             std::snprintf(name, sizeof name, "%s at %d", names[k], v * 25);
             play(c, false, name);
-            ++runs;
+            std::snprintf(name, sizeof name, "%s at %d, slow envelope", names[k], v * 25);
+            play(c, false, name, true);
+            runs += 2;
         }
     // Every size and material, a short spin and at hold, with full wobble and many.
     for (int size = 0; size < 5; ++size)
@@ -151,9 +162,11 @@ int main() {
                 char name[64];
                 std::snprintf(name, sizeof name, "size %d, disk %d, spin %s", size, disk, s ? "hold" : "0");
                 play(c, s == 0, name);
-                ++runs;
+                std::snprintf(name, sizeof name, "size %d, disk %d, spin %s, slow envelope", size, disk, s ? "hold" : "0");
+                play(c, false, name, true);
+                runs += 2;
             }
     if (failures) { std::printf("frames: %d faults\n", failures); return 1; }
-    std::printf("frames: %d runs of 150 frames, every outline drawable\n", runs);
+    std::printf("frames: %d runs of 150 frames (210 under the slow envelope), every outline drawable\n", runs);
     return 0;
 }
