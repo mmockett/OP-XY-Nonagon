@@ -162,7 +162,11 @@ a spark marks where it was every quarter second.
 A thin ring flashes at the listener's ear as each boom (or, below Mach 1,
 the pass's pulse) is heard. Two marks
 on the line of flight show where the sound you hear now left the projectile;
-after the cone they part, one forwards and one backwards. Releasing every
+after the cone they part, one forwards and one backwards. A flight that
+reaches the field's right side passes behind the glass's edge and leaves
+whole: the projectile, its shocks and its wake slide out together, even past
+the end of its sound, and the waves it sends from beyond the edge spread back
+into the field; the sparks it laid stay on the plate. Releasing every
 note eases the photograph back. Reduced motion shows the end state at once.
 
 Where the OP-XY tells the screen the track's amp envelope (SDK 1.10), the
@@ -184,19 +188,20 @@ and time through `flight.h`, which the engine shares.
 
 | Scenario | average | while a flight shows | peak |
 | --- | --- | --- | --- |
-| One supersonic flight | 2.5 | 4.8 | 17 |
-| A session of turns and notes | 4.2 | 5.7 | 17 |
-| Echo | 2.6 | 3.8 | 15 |
-| Subsonic | 2.2 | 5.4 | 16 |
-| The GIF's tour | 4.7 | 7.3 | 18 |
+| One supersonic flight | 3.0 | 5.9 | 13 |
+| A session of turns and notes | 4.9 | 6.6 | 16 |
+| Echo | 3.5 | 5.1 | 16 |
+| Subsonic | 2.4 | 5.9 | 11 |
+| The GIF's tour | 6.0 | 9.4 | 20 |
 
-The peaks fall at a note-on, when the idle sparks clear as the flight
-starts. The screen uses 43 nodes, eight of them the header, nine the
+The peaks fall as a flight starts, when the idle sparks clear, and as a
+release eases the photograph back. The screen uses 43 nodes, eight of them the header, nine the
 pointer and the sparks (each spark keeps its node, so only the newest
 moves), and four reshaping outlines of 64 points (the bow and tail shocks,
 the reflected shock and the wake), re-keyed only when they change. Fills are
 kept to the small solid parts (the projectile, the listener, the plate) and
-the plate's static edge and engraving.
+the plate's static edge and engraving, and a static black mask at its right
+edge, drawn over the nodes, that a flight leaving the field passes behind.
 
 ## How it works
 
@@ -292,7 +297,9 @@ The figures below are host estimates made during development.
   below Mach 1 and at Mach 3); and every outline it reshapes draws cleanly on
   the OP-XY: none without area or turning straight back, no neighbouring
   points within an eighth of a pixel, no closing edge under a quarter. No
-  spark is drawn over the projectile.
+  spark is drawn over the projectile, and no flight that reaches the field's
+  right side loses a part (projectile, shock, wake, spark) before all of that
+  part is behind the mask.
   Every header caption, each control swept in 400ths and all of them at
   their ends and middles together, fits its column in the OP-XY's font
   (a value at most 53 px at 20 px, a title 56 at 10).

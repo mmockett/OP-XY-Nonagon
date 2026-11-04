@@ -174,7 +174,10 @@ int main() {
         const unsigned long long h = play(s ? heavy : init, unknown, 180, 240, true).hash;
         hash = fnv(hash, &h, sizeof h);
     }
-    const unsigned long long before = 0x46a1bddae409221full;  // the screen at origin/main, 59f7414
+    // The screen at origin/main (59f7414) with the clean exit past the field's
+    // right side applied to it: the exit changed these frames (they were
+    // 46a1bddae409221f), and an envelope still changes none of them.
+    const unsigned long long before = 0x5f94adfd3d5832f2ull;
     std::printf("envelope: unknown frames hash %016llx\n", hash);
     if (hash != before) { std::printf("FAIL unknown envelope: frames hash %016llx, before %016llx\n", hash, before); ++failures; }
 
