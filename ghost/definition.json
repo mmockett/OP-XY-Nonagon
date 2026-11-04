@@ -180,7 +180,7 @@
     "stockShift": [
       "start",
       "window",
-      "",
+      "none",
       "end"
     ],
     "display": {

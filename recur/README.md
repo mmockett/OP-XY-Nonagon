@@ -94,7 +94,7 @@ over: the whole sample when it is newly loaded.
 | --- | --- | --- |
 | encoder 1 | **start**: where the trim begins | the tape lights the trim, the caliper on its ends; the start's time in the sample |
 | encoder 2 | **window**: start and end together, keeping the trim's length | the lit stretch slides; its length |
-| encoder 3 | its own control: depth in fine steps on page 2; slice on page 1, a choice a detent as ever | as without Shift |
+| encoder 3 | nothing | a blank cell |
 | encoder 4 | **end**: where the trim ends | the end's time in the sample |
 
 Trim to the bar or phrase that matters, and pos places the window inside
@@ -251,7 +251,7 @@ middle of the tin; beside it are only the instruments that carry a control.
   how much of the tape it covers.
 - **Shift** lights the whole trim on the tape, the caliper's jaws on the
   start and end markers, and the header's bright row reads start, window and
-  end with the times they mark (encoder 3 keeps its own control).
+  end with the times they mark (encoder 3's cell is blank).
 - In **hiss** the tiles stay home and dim by how much of each is out of
   place, so the print fades away and comes back.
 - With **no sample**, a cover over everything but the header reads
@@ -342,7 +342,8 @@ every control in hundredths on each map, grid and slice, with samples from a
 tenth of a second to twenty minutes long, and Shift's row for those samples
 trimmed anywhere, and measures every caption the header shows in the OP-XY's
 face: a value must fit 53 px at 20 px, a title 56 px at 10 px. With Shift
-held it checks the row's titles and times on both pages, and that the tape
+held it checks the row's titles and times on both pages, encoder 3's cell
+blank, and that the tape
 lights the trim and the caliper holds its ends.
 
 ## Files

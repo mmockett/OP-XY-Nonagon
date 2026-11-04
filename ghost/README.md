@@ -57,7 +57,7 @@ most sustained part, or past a silence that would leave the bed gapped.
 | --- | --- | --- |
 | encoder 1 | **start**: where the bed's stretch begins | the robe frays into that stretch's waveform; the start's time in the sample |
 | encoder 2 | **window**: start and end together, keeping the length | the fray follows the stretch; its length |
-| encoder 3 | a fine turn of split (page 1) or near (page 2) | as without Shift |
+| encoder 3 | nothing | a blank cell |
 | encoder 4 | **end**: where the stretch ends | the end's time in the sample |
 
 The track saves the markers, as the sampler does, and the sample's gain set
@@ -415,7 +415,7 @@ the top of its file.
   shape, its fray drawn from any trim of the sample: points 1/8 px apart, a
   closing edge of 1/4 px, and no turn sharper than 2.5 degrees from straight
   back. It also checks that a trim changes the fray and that Shift's row reads
-  start, window and end with their times on both pages.
+  start, window and end with their times on both pages, encoder 3's cell blank.
 - `tools/frames.cpp` checks the screen frame by frame, against the SDK's
   rules and the OP-XY's, counts its churn and writes frames as JSON;
   `frames clear` sweeps every control, with a sample and without, and checks

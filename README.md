@@ -303,7 +303,7 @@ loaded, both screens say so ("load a sample · shift + sample"). Recur needs
 one to play. Ghost plays without: its bed is then a gusty breath of its own,
 and a loaded sample takes its place. On both, Shift and encoders 1, 2 and 4
 move the stock sampler's start marker, both markers together and its end
-marker, the stretch of the sample they play; encoder 3 keeps its fine turn.
+marker, the stretch of the sample they play; Shift + encoder 3 does nothing.
 
 ## CPU
 
