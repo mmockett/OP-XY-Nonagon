@@ -43,21 +43,24 @@ OP-XY, and its CPU is measured there
 ## The break
 
 `samples/break.wav` is a funk break in the pattern of the most sampled one
-of all, the four bars of the Winstons' "Amen, Brother" groove: ride on the
-eighths, the kick's pairs, ghost notes round the backbeat, the backbeat
-pushed late in bars 3 and 4, and the crash on the and of three in bar 4. It
-is played on [MD KIT](https://github.com/mmockett/OP-XY-MNMD), not sampled
-from any record: MD KIT's engine renders every hit on the host, the kick a
-damped P-I BD over a TRX-BD, the snare a P-I SD with its snares wide open
-over a TRX-SD's crack, ghosts on the same snare struck softly, a P-I RC ride
-and a P-I CC with a TRX-CY crash. The hits sit a little behind the grid as a
-drummer plays (1.2 ms on the off-sixteenths, the backbeat 3 ms late, a
-millisecond of spread), through a small dark room, gentle compression and a
-touch of saturation.
+of all, the four bars of the Winstons' "Amen, Brother" groove: a dry ride on
+the eighths, the kick's pairs, ghost notes round the backbeat, the backbeat
+pushed late in bars 3 and 4, and the crash on the and of three in bar 4, with
+soft closed-hat pickups, a foot chick on two and four and one open hat
+closing into bar 3. It is played on
+[MD KIT](https://github.com/mmockett/OP-XY-MNMD), not sampled from any
+record: MD KIT's engine renders every hit on the host. The kick is a short,
+damped P-I BD over a short TRX-BD; the snare a P-I SD tuned low with its
+shell ringing, over a TRX-SD's crack; the ghosts the same snare struck
+softly; the ride a P-I RC tuned up and cut short to a bright ping; the hats
+TRX-CH and TRX-OH; the crash a P-I CC with a TRX-CY. The hits sit a little
+behind the grid as a drummer plays (1.2 ms on the off-sixteenths, the
+backbeat 3 ms late, a millisecond of spread), through a small dark room, a
+firm compressor and some crunch.
 
 It is four bars at 120 BPM, the tempo Recur falls back on and its screen
 times slices at: exactly 8 seconds, 352,800 frames, 16-bit mono at 44.1 kHz
-(689 KiB), peaking at −3 dBFS so the seams' crossfades stay under Recur's
+(689 KiB), peaking at −4 dBFS so the seams' crossfades stay under Recur's
 output ceiling. At 120 BPM every slice Recur cuts lands on the break's own
 grid: the default 4 x 4 of 1/16 is one bar of it, pos at 0, a third, two
 thirds and the end picks bars 1 to 4, and 8 x 8 of 1/16 is the whole break.
@@ -152,8 +155,8 @@ Each map's period, in iterations:
 
 Every preset opens on the break. They were measured on the test sources
 (`tools/make_sources.py`); Phrase and Chorale were made on a melody and play
-the break as beats instead. On the break the presets peak 0.4 to 2.5 dB
-under the output ceiling (Shred 10 dB), never clamped.
+the break as beats instead. On the break the presets peak 1.2 to 2.2 dB
+under the output ceiling (Shred 7.6 dB), never clamped.
 
 Every preset clicks no more than its source (2.9 to 3.2 click-like events a
 second on the drums, against the source's own 3.2). A slice seam scores at

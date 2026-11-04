@@ -1,6 +1,7 @@
 // Renders MD KIT hits on the host, through MD KIT's own engine (machines/mdkit/engine.cpp).
-// Reads from stdin:  <frames> then lines "<start frame> <model> <c0..c7 0..127> <gain>".
-// Each hit gets a fresh voice, rendered until the engine says it has ended (or 6 s);
+// Reads from stdin:  <frames> then lines "<start frame> <model> <c0..c7 0..127> <gain> <choke>".
+// Each hit gets a fresh voice, rendered until the engine says it has ended (or 6 s), or,
+// when choke is above 0, until choke frames and then faded out over 4 ms (a hat closing);
 // its tail wraps round the loop so the loop point is seamless. Writes float32 mono
 // (full scale = 1.0, the engine's half-scale ceiling = 0.5) to stdout.
 // Built and run by make_break.py.
@@ -17,10 +18,11 @@ int main() {
     unsigned model;
     unsigned c[8];
     double gain;
+    long choke;
     opxy::u32 pitch[opxy::block_frames];
     for (unsigned i = 0; i < opxy::block_frames; ++i) pitch[i] = ::md::kit::middle_c;
-    while (std::scanf("%ld %u %u %u %u %u %u %u %u %u %lf", &start, &model, &c[0], &c[1], &c[2], &c[3], &c[4],
-                      &c[5], &c[6], &c[7], &gain) == 11) {
+    while (std::scanf("%ld %u %u %u %u %u %u %u %u %u %lf %ld", &start, &model, &c[0], &c[1], &c[2], &c[3], &c[4],
+                      &c[5], &c[6], &c[7], &gain, &choke) == 12) {
         opxy::i32 values[8];
         for (int k = 0; k < 8; ++k) values[k] = c[k] >= 127 ? 0x7fffffff : static_cast<opxy::i32>(c[k] << 24);
         mdkit::Voice voice = mdkit::Voice();
@@ -31,10 +33,15 @@ int main() {
         for (long b = 0; b < blocks && !voice.done; ++b) {
             mdkit::drum_select(voice, shared, 1, model);
             mdkit::render(voice, shared, 1, out, values, pitch);
+            bool closed = false;
             for (unsigned i = 0; i < opxy::block_frames; ++i) {
+                const long t = b * opxy::block_frames + i, fade = 176;
+                const double shut = choke <= 0 || t < choke ? 1.0 : t < choke + fade ? 1.0 - double(t - choke) / fade : 0.0;
+                closed = choke > 0 && t >= choke + fade;
                 const long f = ((start + b * opxy::block_frames + i) % frames + frames) % frames;
-                mix[f] += gain * (out[i] / 2147483648.0);
+                mix[f] += shut * gain * (out[i] / 2147483648.0);
             }
+            if (closed) break;
         }
     }
     std::vector<float> f32(mix.begin(), mix.end());

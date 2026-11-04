@@ -12,7 +12,7 @@ Needs numpy and a C++ compiler (--cxx, default clang++).
 
 The loop is exactly bars * 4 * 60/bpm seconds at 44.1 kHz; every tail wraps
 round the loop point, and the bus runs over three tiled passes of which the
-middle one is kept, so the loop is seamless. 16-bit mono WAV, -3 dBFS peak.
+middle one is kept, so the loop is seamless. 16-bit mono WAV, -4 dBFS peak.
 """
 import argparse, os, subprocess, tempfile, wave
 import numpy as np
@@ -23,30 +23,41 @@ HITS = None   # the compiled hits.cpp
 
 # MD KIT machines (kit.h model numbers) and per-instrument controls, 0..127 in each
 # machine's own slot order. Layers sound together on each hit.
-TRX_BD, TRX_SD, TRX_CY, PI_BD, PI_SD, PI_RC, PI_CC = 0, 1, 8, 21, 22, 27, 28
+TRX_BD, TRX_SD, TRX_CH, TRX_OH, TRX_CY, PI_BD, PI_SD, PI_RC, PI_CC = 0, 1, 6, 7, 8, 21, 22, 27, 28
 KIT = {
-    # kick: P-I BD (PTCH DEC HARD HAMR TENS DAMP) for the beater and shell, short and
-    # damped, with TRX-BD (PTCH DEC RAMP RDEC STRT NOIS HARM CLIP) under it for punch
-    'K': [(PI_BD, [64, 20, 80, 80, 56, 60, 0, 0], 1.45),
-          (TRX_BD, [52, 40, 50, 30, 0, 20, 0, 0], 0.70)],
-    # snare: P-I SD (PTCH DEC HARD RING TENS RVOL RDEC) tuned up a little with the
-    # snares loud and long, with TRX-SD (PTCH DEC BUMP BENV SNAP TONE TUNE CLIP) for the crack
-    'S': [(PI_SD, [72, 56, 90, 40, 60, 100, 100, 0], 1.00),
-          (TRX_SD, [50, 44, 40, 30, 90, 70, 50, 20], 0.50)],
+    # kick: P-I BD (PTCH DEC HARD HAMR TENS DAMP), a hard beater on a short, damped
+    # shell, with a short TRX-BD (PTCH DEC RAMP RDEC STRT NOIS HARM CLIP) under it for punch
+    'K': [(PI_BD, [70, 14, 100, 90, 60, 70, 0, 0], 1.30),
+          (TRX_BD, [56, 28, 56, 30, 0, 24, 0, 10], 0.65)],
+    # snare: P-I SD (PTCH DEC HARD RING TENS RVOL RDEC) tuned down with more shell ring,
+    # mid-heavy, with TRX-SD (PTCH DEC BUMP BENV SNAP TONE TUNE CLIP) for the crack
+    'S': [(PI_SD, [56, 56, 110, 100, 90, 80, 70, 0], 1.00),
+          (TRX_SD, [50, 36, 50, 30, 110, 60, 50, 40], 0.45)],
     # ghost: the same snare struck softly, no crack layer
-    'g': [(PI_SD, [72, 50, 40, 40, 60, 100, 90, 0], 1.00)],
-    # ride: P-I RC (PTCH DEC HARD RING AG AU BR GRAB), hard stick, long
-    'R': [(PI_RC, [64, 110, 100, 30, 64, 0, 44, 127], 1.00)],
+    'g': [(PI_SD, [56, 50, 50, 100, 90, 80, 60, 0], 1.00)],
+    # ride: P-I RC (PTCH DEC HARD RING AG AU BR GRAB) tuned up and short: a dry, bright
+    # ping, about 230 ms to -40 dB, so each eighth stands apart
+    'R': [(PI_RC, [76, 95, 110, 30, 64, 0, 44, 127], 1.05)],
     # crash: P-I CC long for the attack, TRX-CY as the CC key (RICH DEC TOP TTUN SIZE PEAK) for the wash
     'C': [(PI_CC, [64, 127, 90, 0, 64, 0, 64, 127], 0.85),
           (TRX_CY, [100, 110, 64, 90, 40, 64, 0, 0], 0.65)],
+    # closed hat: TRX-CH (GAP DEC HPF LPF MTAL), short and a little darker than the key's
+    'h': [(TRX_CH, [0, 40, 40, 110, 80, 0, 0, 0], 0.55)],
+    # foot chick: the PH key's pedal hat (TRX-CH, very short, high-passed)
+    'p': [(TRX_CH, [0, 8, 90, 100, 30, 0, 0, 0], 0.55)],
+    # open hat: TRX-OH, shortened, closed by the next hat
+    'o': [(TRX_OH, [32, 50, 30, 110, 70, 0, 0, 0], 0.50)],
 }
+CHOKED = 'o'      # rings until the next hat (h or p), then closes
+HATS = 'hpo'
 
 # The pattern, one line per instrument, 16 sixteenths a bar, four bars.
-# K kick, S snare backbeat, g ghost snare, R ride, C crash; digits under a line
-# are not used: velocity comes from the letter and the step (below).
+# R ride, C crash, h closed hat, o open hat, p foot chick, S snare backbeat,
+# g ghost snare, K kick. Velocity comes from the letter and the step (below).
 PATTERN = {
     'ride ': ['R.R.R.R.R.R.R.R.', 'R.R.R.R.R.R.R.R.', 'R.R.R.R.R.R.R.R.', 'R.R.R.R.R.C.R.R.'],
+    'hat  ': ['...h.......h...h', '...h...h...h..o.', '...h.......h...h', '...h...h........'],
+    'foot ': ['....p.......p...', '....p.......p...', 'p...p.......p...', '....p...........'],
     'snare': ['....S..g.g..S..g', '....S..g.g..S..g', '....S..g.g....S.', '.g..S..g.g....S.'],
     'kick ': ['K.K.......KK....', 'K.K.......KK....', 'K.K.......K.....', '..KK......K.....'],
 }
@@ -60,13 +71,17 @@ def velocity(kind, bar, step):
     if kind == 'R':
         return 1.0 if step % 4 == 0 else 0.72        # quarters lead, the "and"s lighter
     if kind == 'g':
-        return {7: 0.30, 9: 0.26, 15: 0.32, 1: 0.27}.get(step, 0.28)
+        return {7: 0.40, 9: 0.34, 15: 0.42, 1: 0.36}.get(step, 0.38)
     if kind == 'S':
         return 1.0 if step in (4, 12) else 0.95       # the delayed backbeat in bars 3 and 4
     if kind == 'K':
         return 1.0 if step in (0, 10) else 0.86       # the second of a pair a little softer
-    if kind == 'C':
-        return 1.0
+    if kind == 'h':
+        return {3: 0.30, 7: 0.24, 11: 0.34, 15: 0.40}.get(step, 0.3)   # pickups, the last leaning in
+    if kind == 'p':
+        return 0.45 if step in (4, 12) else 0.55      # the chick closing the open hat a little firmer
+    if kind == 'o':
+        return 0.55
     return 1.0
 
 
@@ -91,11 +106,17 @@ def events(bpm, bars=4):
 
 
 def render_dry(bpm, bars, frames):
+    hits = sorted(events(bpm, bars))
+    hat_starts = sorted(int(round(t * SR)) for t, ch, _ in hits if ch in HATS)
     lines = [str(frames)]
-    for t, ch, v in events(bpm, bars):
+    for t, ch, v in hits:
         start = int(round(t * SR))
+        choke = 0
+        if ch in CHOKED:   # until the next hat, round the loop
+            later = [h for h in hat_starts if h > start] or [h + frames for h in hat_starts]
+            choke = later[0] - start
         for model, ctl, gain in KIT[ch]:
-            lines.append(f"{start} {model} {' '.join(map(str, ctl))} {gain * v:.4f}")
+            lines.append(f"{start} {model} {' '.join(map(str, ctl))} {gain * v:.4f} {choke}")
     raw = subprocess.run([HITS], input=('\n'.join(lines) + '\n').encode(),
                          capture_output=True, check=True).stdout
     return np.frombuffer(raw, dtype=np.float32).astype(np.float64)
@@ -153,9 +174,9 @@ def compress(x, threshold_db=-16.0, ratio=2.5, attack=0.004, release=0.09):
 def bus(dry, peak_db):
     n = len(dry)
     x = np.tile(dry, 3)                      # the loop as it repeats: tails and the room wrap
-    x = x + 0.16 * room(x)                   # slightly roomy
-    x = compress(x)                          # glue, gently
-    x = np.tanh(1.6 * x / np.max(np.abs(x))) # light tape-ish saturation
+    x = x + 0.13 * room(x)                   # a touch of room
+    x = compress(x, -20.0, 4.0, 0.003, 0.07) # squeezed, as a 60s funk drum bus
+    x = np.tanh(2.2 * x / np.max(np.abs(x))) # crunch
     x = x[n:2 * n]                           # the middle pass: seamless both ends
     x = x - x.mean()
     return x * (10 ** (peak_db / 20) / np.max(np.abs(x)))
@@ -170,7 +191,7 @@ def write_wav(path, x):
 def grid_text(bpm, bars, frames):
     lines = [f"Four-bar break on MD KIT, {bpm:g} BPM, {bars} bars, {frames} frames at 44.1 kHz "
              f"({frames / SR:.4f} s); 16 steps a bar, 1 e + a 2 e + a 3 e + a 4 e + a",
-             "R ride, C crash, S snare backbeat, g ghost snare, K kick", ""]
+             "R ride, C crash, h closed hat, o open hat (closed by the next hat), p foot chick, S snare backbeat, g ghost snare, K kick", ""]
     for bar in range(bars):
         lines.append(f"bar {bar + 1}   |1   2   3   4   |")
         for name, rows in PATTERN.items():
@@ -188,8 +209,8 @@ def main():
     p.add_argument('--bars', type=int, default=4)
     p.add_argument('--out', default=os.path.join(HERE, '..', '..', 'samples', 'break.wav'))
     p.add_argument('--grid', default=None)
-    p.add_argument('--peak', type=float, default=-3.0,
-                   help='peak in dBFS: -3 keeps Recur\'s seam crossfades under its output ceiling')
+    p.add_argument('--peak', type=float, default=-4.0,
+                   help='peak in dBFS: -4 keeps Recur\'s seam crossfades under its output ceiling')
     p.add_argument('--mnmd', required=True, help='OP-XY-MNMD checkout (MD KIT)')
     p.add_argument('--sdk', required=True, help='Open-XY SDK checkout (its sdk/include)')
     p.add_argument('--cxx', default='clang++')
