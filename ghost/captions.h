@@ -3,6 +3,7 @@
 // column on the device: values 53 px or less at 20 px, titles 56 at 10
 // (tests/sound.cpp measures every one).
 #include <opxy/page_header.hpp>
+#include <opxy/sample_overview.hpp>
 #include "ghost.h"
 
 namespace ghost {
@@ -69,6 +70,42 @@ inline void fill(const Input& input, bool has_sample, char (&values)[8][header_c
     else { put(values[kNear], cm); append(values[kNear], "cm"); }
     // bed: the sample's share, or without one the whisper's.
     percent(values[kBed], bed_share(level(input.slots[kBed]), has_sample));
+}
+
+// Shift (resources.stockShift): encoders 1, 2 and 4 turn the stock sampler's
+// start, both markers together (the window, keeping its length) and end, the
+// stretch of the sample the bed plays; encoder 3 keeps its own fine turn.
+const char* const shift_titles[4] = {"start", "window", nullptr, "end"};
+
+// Frames as seconds: 0.62s, 12.4s, 123s, and from 1000 s whole minutes, 17m.
+inline void seconds(char (&value)[header_capacity], u32 frames, u32 rate) {
+    const u32 per = rate / 100 ? rate / 100 : 1, hundredths = frames / per;
+    if (hundredths < 1000) decimal(value, hundredths, 2);
+    else if (hundredths < 10000) decimal(value, hundredths / 10, 1);
+    else if (hundredths < 100000) put(value, hundredths / 100);
+    else { put(value, hundredths / 6000); append(value, "m"); return; }
+    append(value, "s");
+}
+
+// While Shift is held, the row the encoders turn names what Shift edits, as
+// the stock header does: the start and end at their times in the sample, and
+// the window at its length. titles and values are indexed by slot.
+inline void shift_row(const Input& input, const opxy::u8 (&pages)[2][4], const SampleOverview& o, const char* (&titles)[8],
+                      char (&values)[8][header_capacity]) {
+    if (!input.shift) return;
+    u32 page = 0;   // as page_header finds it
+    for (u32 col = 0; col < 4; ++col)
+        if (pages[1][col] != pages[0][col] && input.shown[col] == pages[1][col]) page = 1;
+    const bool known = o.assigned && o.loaded && o.frames && o.rate;
+    const u32 end = o.end && o.end <= o.frames ? o.end : o.frames, begin = o.begin < end ? o.begin : 0;
+    const u32 marks[4] = {begin, end - begin, 0, end};
+    for (u32 col = 0; col < 4; ++col) {
+        if (!shift_titles[col]) continue;
+        const u32 slot = pages[page][col];
+        titles[slot] = shift_titles[col];
+        if (known) seconds(values[slot], marks[col], o.rate);
+        else copy(values[slot], header_capacity, "-");
+    }
 }
 }
 }

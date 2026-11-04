@@ -24,8 +24,9 @@ actor hidden from the audience, so a transparent figure seems to stand among
 the cast. Ghost's screen is that stage.
 
 Ghost is an OP-XY sample engine with stereo output, id `ghost`. It targets
-Open-XY SDK 1.8, which gives a sample engine its own screen and the sample's
-overview.
+Open-XY SDK 1.10: SDK 1.8 gives a sample engine its own screen and the
+sample's overview, and 1.10's `stockShift` hands Shift and three encoders
+back to the stock sampler's start and end markers.
 It plays without a sample, on breath and hum alone. A loaded sample sets the
 resonators ringing in its share of what excites them, bed's value: none at
 0%, half at the 50% default, all of it at 100%, so the ghost takes on the
@@ -38,7 +39,7 @@ OP-XY, and its CPU is measured there
 
 ## Controls
 
-Press any encoder to switch pages. Shift + turn makes fine steps.
+Press any encoder to switch pages.
 
 | Encoder | Page 1 | Page 2 |
 | --- | --- | --- |
@@ -46,6 +47,22 @@ Press any encoder to switch pages. Shift + turn makes fine steps.
 | 2 | voice | orbit |
 | 3 | split | near |
 | 4 | trade | bed |
+
+Holding Shift, encoders 1, 2 and 4 move the stock sampler's markers
+instead, on either page: the stretch of the recording the bed plays, the
+whole sample when it is newly loaded. Trim a recording to its breathiest or
+most sustained part, or past a silence that would leave the bed gapped.
+
+| Shift + | Edits | On the screen |
+| --- | --- | --- |
+| encoder 1 | **start**: where the bed's stretch begins | the robe frays into that stretch's waveform; the start's time in the sample |
+| encoder 2 | **window**: start and end together, keeping the length | the fray follows the stretch; its length |
+| encoder 3 | a fine turn of split (page 1) or near (page 2) | as without Shift |
+| encoder 4 | **end**: where the stretch ends | the end's time in the sample |
+
+The track saves the markers, as the sampler does, and the sample's gain set
+on the stock sampler still scales the bed. Without a sample, Shift's row
+reads `-`.
 
 | Control | Range | Default | Caption | What it does |
 | --- | --- | --- | --- | --- |
@@ -254,7 +271,7 @@ Every control acts on the apparition or the stage:
 | beat | The apparition's outline trembles, up to 6 px, the tremble running at the beat's rate while held. |
 | orbit | The chalk path on the floor where it can walk: a mark at the front at 0, an arc as the notes spread, the whole circle once they circle. The apparition walks it while held. |
 | near | Its size and depth, from small at the back wall to large behind the footlights. The chalk path follows it. |
-| bed | Its robe frays, up to 8 px with its share: into the sample's own waveform (64 peaks from its overview's 96 bins), or with no sample into the whisper's ragged gusts. The fray scrolls while held. |
+| bed | Its robe frays, up to 8 px with its share: into the waveform of the stretch the bed plays, between the start and end markers (64 peaks from the overview's bins there), or with no sample into the whisper's ragged gusts. The fray scrolls while held. |
 
 A second and third held note bring two more apparitions, each where its
 own note began.
@@ -373,9 +390,11 @@ Not yet checked on the device:
 - **The head:** a near source on the right is louder there and later on the
   left, the far ear's highs are shadowed, and behind is darker.
 - **orbit:** it closes a circle in 2 s.
-- **Captions:** every value each control can show, and every title, fits its
-  header column in the device's face (values within 53 px at 20 px, titles
-  within 56 px at 10 px; `tests/header_font.h`, from `tools/header_font.py`).
+- **Captions:** every value each control can show, every time Shift's row
+  can show (samples of a tenth of a second to twenty minutes, trimmed
+  anywhere), and every title, fits its header column in the device's face
+  (values within 53 px at 20 px, titles within 56 px at 10 px;
+  `tests/header_font.h`, from `tools/header_font.py`).
 - **A loaded sample** changes the default sound (Seance, bed at 50%): its
   third-octave spectrum moves at least 6 dB on average (6.8 dB as tested).
   Every preset also passes the level and chord checks with a sample loaded.
@@ -393,8 +412,10 @@ the top of its file.
 - `tools/bench.cpp` gives the host CPU estimate.
 - `tests/screen.cpp`, run by `sdk.py test`, holds every shown outline to the
   device's rules over every control, random settings and the apparition's own
-  shape: points 1/8 px apart, a closing edge of 1/4 px, and no turn sharper than
-  2.5 degrees from straight back.
+  shape, its fray drawn from any trim of the sample: points 1/8 px apart, a
+  closing edge of 1/4 px, and no turn sharper than 2.5 degrees from straight
+  back. It also checks that a trim changes the fray and that Shift's row reads
+  start, window and end with their times on both pages.
 - `tools/frames.cpp` checks the screen frame by frame, against the SDK's
   rules and the OP-XY's, counts its churn and writes frames as JSON;
   `frames clear` sweeps every control, with a sample and without, and checks

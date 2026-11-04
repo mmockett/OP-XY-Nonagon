@@ -50,11 +50,30 @@ inline bool turns_back(const Point& a, const Point& b, const Point& c) {
     return dot < 0 && (cross < 0 ? -cross : cross) * 20 < -dot;
 }
 
-// The robe's 64 peaks from the overview's 96 min/max bins: each one's largest
-// magnitude, 0..255.
-i32 peak_of(const SampleOverview& o, u32 column) {
+// The overview bin (0..96) a frame falls in, without a 64-bit product.
+u32 bin_of(u32 at, u32 frames) {
+    if (!frames) return 0;
+    const u32 bin = frames < (1u << 25) ? at * overview_bins / frames : at / (frames / overview_bins);
+    return bin < overview_bins ? bin : overview_bins;
+}
+// The bins the bed plays: those between the start and end markers.
+void played_bins(const SampleOverview& o, u32& first, u32& count) {
+    const u32 end = o.end && o.end <= o.frames ? o.end : o.frames, begin = o.begin < end ? o.begin : 0;
+    first = bin_of(begin, o.frames);
+    if (first >= overview_bins) first = overview_bins - 1;
+    const u32 last = end ? bin_of(end - 1, o.frames) + 1 : 1;
+    count = last > first ? last - first : 1;
+}
+
+// The robe's 64 peaks from the overview's min/max bins between the markers,
+// the part of the sample the bed plays (all 96 on an untrimmed sample): each
+// one's largest magnitude, 0..255.
+i32 peak_of(const SampleOverview& o, u32 column, u32 first, u32 count) {
     i32 most = 0;
-    for (u32 b = column * 3 / 2; b < (column + 1) * 3 / 2; ++b) {
+    const u32 b0 = first + column * count / 64;
+    u32 b1 = first + (column + 1) * count / 64;
+    if (b1 <= b0) b1 = b0 + 1;
+    for (u32 b = b0; b < b1; ++b) {
         const i32 low = o.low[b], high = o.high[b];
         const i32 size = high > -low ? high : -low;
         if (size > most) most = size;
@@ -71,7 +90,9 @@ i32 peak_of(const SampleOverview& o, u32 column) {
 void shape_figure(Frame& frame, u32 voice, u32 beat, u32 tremble, u32 bed, const SampleOverview& overview, u32 step, bool held) {
     const u32 pose = (voice + 1024) >> 11, shake = (beat + 1024) >> 11, fray = (bed + 1024) >> 11;   // 33 steps each
     const bool sampled = fray && overview.assigned && overview.loaded;
-    const u32 peaks_key = sampled ? overview.generation : 0;
+    u32 first = 0, count = overview_bins;
+    if (sampled) played_bins(overview, first, count);
+    const u32 peaks_key = sampled ? overview.generation * 2654435761u ^ (first << 8 | count) : 0;
     const u32 key = hash((pose | shake << 6 | tremble << 12 | fray << 16 | (held ? step : 0) << 22 | u32(held) << 30) ^ peaks_key) | 1;
     if (frame.paths[apparition].key == key) return;
     // The bed's peaks about their mean, scaled so the widest reaches the fray;
@@ -80,7 +101,7 @@ void shape_figure(Frame& frame, u32 voice, u32 beat, u32 tremble, u32 bed, const
     i32 peaks[64];
     if (sampled) {
         mean = 0; widest = 1;
-        for (u32 i = 0; i < 64; ++i) { peaks[i] = peak_of(overview, i); mean += peaks[i]; }
+        for (u32 i = 0; i < 64; ++i) { peaks[i] = peak_of(overview, i, first, count); mean += peaks[i]; }
         mean >>= 6;
         for (u32 i = 0; i < 64; ++i) widest = widest > peaks[i] - mean ? (widest > mean - peaks[i] ? widest : mean - peaks[i]) : peaks[i] - mean;
     }
@@ -254,7 +275,11 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     char values[8][header_capacity] = {};
     captions::fill(input, overview.assigned != 0, values);
     const opxy::u8 pages[2][4] = {{kRing, kVoice, kSplit, kTrade}, {kBeat, kOrbit, kNear, kBed}};
-    page_header(state.header, input, frame, captions::titles, values, header_first, pages);
+    const char* own[8];
+    for (u32 i = 0; i < 8; ++i) own[i] = captions::titles[i];
+    captions::shift_row(input, pages, overview, own, values);
+    const char* const titles[8] = {own[0], own[1], own[2], own[3], own[4], own[5], own[6], own[7]};
+    page_header(state.header, input, frame, titles, values, header_first, pages);
 
     if (state.track != input.track) {
         const PageHeader header = state.header;

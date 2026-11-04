@@ -119,15 +119,55 @@ int main() {
             std::snprintf(when, sizeof when, "random %d%s", r, sampled ? ", sampled" : "");
             play(c, 1 + r % 3, 90, when);
         }
-        // The apparition's shape alone, all over: pose, tremble, fray and scroll.
+        // The apparition's shape alone, all over: pose, tremble, fray and scroll,
+        // and with a sample, its fray from any trim of it (Shift's start and end).
         for (int r = 0; r < 200000; ++r) {
             const u32 voice = next() & 0xffff, beat = next() & 0xffff, bed = next() & 0xffff;
             const u32 tremble = next() & 7, step = next() & 63;
+            if (sampled) {
+                const u32 a = next() % overview.frames, b = next() % overview.frames;
+                const bool whole = (r & 3) == 0;
+                overview.begin = whole ? 0 : a < b ? a : b;
+                overview.end = whole ? overview.frames : (a < b ? b : a) + 1;
+            }
             frame.paths[ghost::apparition].key = 0;
             ghost::shape_figure(frame, voice, beat, tremble, bed, overview, step, (next() & 3) != 0);
             ++frames_checked;
             check_path(ghost::apparition, sampled ? "shape, sampled" : "shape");
         }
+    }
+    {   // The robe frays into the part of the sample the bed plays: a trim to one
+        // stretch changes it, and Shift's row names start, window and end with their times.
+        load(true);
+        Point whole[64], trimmed[64];
+        ghost::shape_figure(frame, 0x8000, 0, 0, 0xffff, overview, 0, false);
+        for (u32 i = 0; i < 64; ++i) whole[i] = frame.paths[ghost::apparition].points[i];
+        overview.begin = 0; overview.end = overview.frames / 8;
+        ghost::shape_figure(frame, 0x8000, 0, 0, 0xffff, overview, 0, false);
+        bool differs = false;
+        for (u32 i = 0; i < 64; ++i) {
+            trimmed[i] = frame.paths[ghost::apparition].points[i];
+            differs = differs || trimmed[i].x != whole[i].x || trimmed[i].y != whole[i].y;
+        }
+        if (!differs) fail("a trim leaves the robe's fray as it was", "trim", 0, 0);
+        overview.begin = 26460; overview.end = 158760;
+        std::memset(&frame, 0, sizeof frame);
+        Input input;
+        std::memset(&input, 0, sizeof input);
+        ghost::display_reset(state);
+        input.track = 1;
+        input.elapsed = 17;
+        for (int k = 0; k < 4; ++k) input.shown[k] = opxy::u8(k);
+        input.shift = 1;
+        for (int t = 0; t < 20; ++t) ghost::display(state, input, frame);
+        const char* expect[8] = {"start", "window", "split", "end", "0.60s", "3.00s", nullptr, "3.60s"};
+        for (u32 t = 0; t < 8; ++t)
+            if (expect[t] && std::strcmp(frame.texts[t].chars, expect[t]))
+                fail("Shift's row", frame.texts[t].chars, 0, 0);
+        for (int k = 0; k < 4; ++k) input.shown[k] = opxy::u8(4 + k);
+        for (int t = 0; t < 20; ++t) ghost::display(state, input, frame);
+        if (std::strcmp(frame.texts[0].chars, "start") || std::strcmp(frame.texts[2].chars, "near") || std::strcmp(frame.texts[3].chars, "end"))
+            fail("page 2's Shift row", frame.texts[2].chars, 0, 0);
     }
     std::printf("screen: %ld frames; sharpest turn %.2f degrees from straight back; %ld faults\n", frames_checked, sharpest, failures);
     return failures ? 1 : 0;
