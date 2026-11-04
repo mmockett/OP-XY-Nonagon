@@ -12,6 +12,43 @@ namespace ghost {
 namespace {
 using namespace opxy::draw;
 
+// The track's amp envelope as the screen follows it (SDK 1.10, input.amp),
+// so the note's motion lasts as long as its sound: a level that swells over
+// the attack, falls over the decay to the sustain while a note is held, and
+// fades over the release from wherever it was. Stock maps the envelope page's
+// positions to times along its own curves, which aren't documented: assumed
+// here exponential in the position, 2 ms at 0 to 10 s at full, for attack,
+// decay and release alike, and the sustain a level, linear. With the envelope
+// unknown, or reduced motion, the level is 1 while a note is held and 0
+// otherwise, as before.
+inline opxy::u32 stage_ms(opxy::i32 position) {
+    const opxy::u32 p = position < 0 ? 0 : opxy::u32(position) >> 15;   // Q16
+    opxy::u32 l = ((p >> 4) * 3146) >> 4;   // 12.29 p, Q16: log2(5000) octaves at full
+    const opxy::u32 whole = l >> 16, m = 65536 + (l & 0xffff);
+    const opxy::u32 ms = (m << whole) >> 15;   // 2 ms * 2^l, by Mitchell's approximation
+    return ms < 2 ? 2 : ms;
+}
+inline void follow(Swell& s, const opxy::draw::Envelope& amp, bool held, bool started, bool still, opxy::u32 ms) {
+    if (still || !opxy::draw::envelope_known(amp)) { s.level = held ? 65536 : 0; s.stage = held ? 2 : 0; return; }
+    if (held && (started || s.stage == 0 || s.stage == 3)) s.stage = 1;
+    if (held) {
+        const opxy::u32 sustain = opxy::u32(amp.sustain < 0 ? 0 : amp.sustain) >> 15;
+        if (s.stage == 1) {
+            s.level += 65536 * ms / stage_ms(amp.attack);
+            if (s.level >= 65536) { s.level = 65536; s.stage = 2; }
+        } else {
+            const opxy::u32 step = (65536 - sustain) * ms / stage_ms(amp.decay);
+            s.level = s.level > sustain + step ? s.level - step : sustain;
+        }
+    } else if (s.stage) {
+        if (s.stage != 3) { s.stage = 3; s.from = s.level; }
+        const opxy::u32 step = s.from * ms / stage_ms(amp.release) + 1;
+        s.level = s.level > step ? s.level - step : 0;
+        if (!s.level) s.stage = 0;
+    }
+}
+
+
 u32 hash(u32 x) {
     x ^= x >> 16; x *= 0x7feb352du;
     x ^= x >> 15; x *= 0x846ca68bu;
@@ -50,11 +87,30 @@ inline bool turns_back(const Point& a, const Point& b, const Point& c) {
     return dot < 0 && (cross < 0 ? -cross : cross) * 20 < -dot;
 }
 
-// The robe's 64 peaks from the overview's 96 min/max bins: each one's largest
-// magnitude, 0..255.
-i32 peak_of(const SampleOverview& o, u32 column) {
+// The overview bin (0..96) a frame falls in, without a 64-bit product.
+u32 bin_of(u32 at, u32 frames) {
+    if (!frames) return 0;
+    const u32 bin = frames < (1u << 25) ? at * overview_bins / frames : at / (frames / overview_bins);
+    return bin < overview_bins ? bin : overview_bins;
+}
+// The bins the bed plays: those between the start and end markers.
+void played_bins(const SampleOverview& o, u32& first, u32& count) {
+    const u32 end = o.end && o.end <= o.frames ? o.end : o.frames, begin = o.begin < end ? o.begin : 0;
+    first = bin_of(begin, o.frames);
+    if (first >= overview_bins) first = overview_bins - 1;
+    const u32 last = end ? bin_of(end - 1, o.frames) + 1 : 1;
+    count = last > first ? last - first : 1;
+}
+
+// The robe's 64 peaks from the overview's min/max bins between the markers,
+// the part of the sample the bed plays (all 96 on an untrimmed sample): each
+// one's largest magnitude, 0..255.
+i32 peak_of(const SampleOverview& o, u32 column, u32 first, u32 count) {
     i32 most = 0;
-    for (u32 b = column * 3 / 2; b < (column + 1) * 3 / 2; ++b) {
+    const u32 b0 = first + column * count / 64;
+    u32 b1 = first + (column + 1) * count / 64;
+    if (b1 <= b0) b1 = b0 + 1;
+    for (u32 b = b0; b < b1; ++b) {
         const i32 low = o.low[b], high = o.high[b];
         const i32 size = high > -low ? high : -low;
         if (size > most) most = size;
@@ -71,7 +127,9 @@ i32 peak_of(const SampleOverview& o, u32 column) {
 void shape_figure(Frame& frame, u32 voice, u32 beat, u32 tremble, u32 bed, const SampleOverview& overview, u32 step, bool held) {
     const u32 pose = (voice + 1024) >> 11, shake = (beat + 1024) >> 11, fray = (bed + 1024) >> 11;   // 33 steps each
     const bool sampled = fray && overview.assigned && overview.loaded;
-    const u32 peaks_key = sampled ? overview.generation : 0;
+    u32 first = 0, count = overview_bins;
+    if (sampled) played_bins(overview, first, count);
+    const u32 peaks_key = sampled ? overview.generation * 2654435761u ^ (first << 8 | count) : 0;
     const u32 key = hash((pose | shake << 6 | tremble << 12 | fray << 16 | (held ? step : 0) << 22 | u32(held) << 30) ^ peaks_key) | 1;
     if (frame.paths[apparition].key == key) return;
     // The bed's peaks about their mean, scaled so the widest reaches the fray;
@@ -80,7 +138,7 @@ void shape_figure(Frame& frame, u32 voice, u32 beat, u32 tremble, u32 bed, const
     i32 peaks[64];
     if (sampled) {
         mean = 0; widest = 1;
-        for (u32 i = 0; i < 64; ++i) { peaks[i] = peak_of(overview, i); mean += peaks[i]; }
+        for (u32 i = 0; i < 64; ++i) { peaks[i] = peak_of(overview, i, first, count); mean += peaks[i]; }
         mean >>= 6;
         for (u32 i = 0; i < 64; ++i) widest = widest > peaks[i] - mean ? (widest > mean - peaks[i] ? widest : mean - peaks[i]) : peaks[i] - mean;
     }
@@ -236,6 +294,72 @@ i32 ease(i32 value, i32 target, u32 ms) {
 }
 }
 
+// An overview bin's largest magnitude, 0..255.
+u32 bin_peak(const SampleOverview& o, u32 b) {
+    const i32 low = o.low[b], high = o.high[b];
+    const u32 m = u32(high > -low ? high : -low) >> 7;
+    return m > 255 ? 255 : m;
+}
+u32 root(u32 n) {
+    u32 r = 0;
+    for (u32 bit = 1u << 15; bit; bit >>= 1)
+        if ((r + bit) * (r + bit) <= n) r += bit;
+    return r;
+}
+
+// The sample in the slot under the apron, where the hint is with none: a bar
+// for each 40th of the whole sample, as tall as the root of its peak against
+// the loudest (so quiet stretches still show) and scaled by the sample's gain
+// (twice as tall each 10 of stock's steps up, within the slot), lit solid
+// within the trim and dim outside it; and the trim's markers, lit while Shift
+// edits them. The bars change only with the sample, its trim or its gain, a
+// few a frame.
+void place_strip(DisplayState& state, Frame& frame, const SampleOverview& o, bool shift) {
+    if (!o.assigned) {
+        for (u32 n = bar_first; n < mark_first + 2; ++n) hide(frame, n);
+        return;
+    }
+    const i32 gain = o.gain == gain_unavailable ? 0 : clamp(o.gain, -30, 20);
+    // 2^(gain / 10), Q10: whole doublings, and the rest of one linearly (near enough to see).
+    const i32 g = gain + 30, louder = (128 << (g / 10)) * (10 + g % 10) / 10;   // 128 at -30 .. 4096 at +20
+    u32 loudest = 1;
+    if (o.loaded) for (u32 b = 0; b < overview_bins; ++b) if (bin_peak(o, b) > loudest) loudest = bin_peak(o, b);
+    const u32 frames = o.frames ? o.frames : 1;
+    const u32 end = o.end && o.end <= frames ? o.end : frames, begin = o.begin < end ? o.begin : 0;
+    const i32 width = (strip_x1 - strip_x0) * unit;
+    u32 budget = 12;
+    for (u32 n = 0; n < bar_count; ++n) {
+        const u32 i = (n + state.bar_sweep) % bar_count;
+        u32 peak = 0;
+        if (o.loaded)
+            for (u32 b = i * overview_bins / bar_count; b < (i + 1) * overview_bins / bar_count; ++b) peak = bin_peak(o, b) > peak ? bin_peak(o, b) : peak;
+        const i32 tall = 256 + i32(root(peak * 65536 / loudest)) * 3;   // Q10 of 12 px: a quarter to all of it at +0
+        const i32 scale = clamp((tall * louder) >> 10, 180, 1500);
+        // Its middle within the trim: lit.
+        const u32 middle = frames / bar_count * i + frames / bar_count / 2;
+        const bool lit = middle >= begin && middle < end;
+        const i32 x = strip_x0 * unit + width * i32(2 * i + 1) / i32(2 * bar_count);
+        const Node& node = frame.nodes[bar_first + i];
+        const Paint paint = lit ? fill_and_stroke : stroke;
+        const u32 shade = lit ? 9 : 4;
+        if (node.x == x && node.y == strip_y * unit && node.scale == scale && node.shade == shade && node.paint == paint) continue;
+        if (node.scale > 0) {   // a frame not yet drawn sets every bar at once
+            if (!budget) continue;
+            --budget;
+        }
+        place(frame, bar_first + i, x, strip_y * unit, scale, shade, paint);
+    }
+    state.bar_sweep = (state.bar_sweep + 7) % bar_count;
+    const u32 marks[2] = {begin, end};
+    for (u32 k = 0; k < 2; ++k) {
+        // marks[k] / frames of the strip's width, without a 64-bit product.
+        u32 a = marks[k], f = frames;
+        while (f >= 65536) { a >>= 1; f >>= 1; }
+        const i32 x = strip_x0 * unit + i32((u32(width >> 4) * a / f) << 4);
+        place(frame, mark_first + k, x, strip_y * unit, unit, shift ? 15 : 8, fill_and_stroke);
+    }
+}
+
 inline void display_reset(DisplayState& state) {
     state.header.reset();
     state.notes.reset();
@@ -247,6 +371,8 @@ inline void display_reset(DisplayState& state) {
     state.scale = 0;
     state.beat_ms = 0;
     state.step_ms = state.step = 0;
+    state.bar_sweep = 0;
+    state.swell = Swell{0, 0, 0};
 }
 
 inline void display(DisplayState& state, const Input& input, Frame& frame) {
@@ -254,7 +380,11 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     char values[8][header_capacity] = {};
     captions::fill(input, overview.assigned != 0, values);
     const opxy::u8 pages[2][4] = {{kRing, kVoice, kSplit, kTrade}, {kBeat, kOrbit, kNear, kBed}};
-    page_header(state.header, input, frame, captions::titles, values, header_first, pages);
+    const char* own[8];
+    for (u32 i = 0; i < 8; ++i) own[i] = captions::titles[i];
+    captions::shift_row(input, pages, overview, own, values);
+    const char* const titles[8] = {own[0], own[1], own[2], own[3], own[4], own[5], own[6], own[7]};
+    page_header(state.header, input, frame, titles, values, header_first, pages);
 
     if (state.track != input.track) {
         const PageHeader header = state.header;
@@ -265,8 +395,13 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     const NoteEvents events = state.notes.update(input);
     const bool held = input.held_notes != 0 && input.held_notes <= 128;
     const bool still = input.reduced_motion != 0;
-    const bool moving = held && !still;
     const u32 ms = u32(clamp(input.elapsed, 0, 102)) * 1000 >> 10;
+    // With the track's amp envelope known, the figure follows it: it swells in
+    // over the attack, holds at the sustain and fades over the release, still
+    // circling while it sounds. Unknown, it eases in and fades over ring's time.
+    follow(state.swell, input.amp, held, events.hold_started, still, ms);
+    const bool enveloped = envelope_known(input.amp) && !still;
+    const bool moving = (held || (enveloped && state.swell.level)) && !still;
     const u32 ring = level(input.slots[kRing]), sung = level(input.slots[kVoice]), split = level(input.slots[kSplit]);
     const u32 trade = level(input.slots[kTrade]), beat = level(input.slots[kBeat]), orbit = level(input.slots[kOrbit]);
     const u32 near = level(input.slots[kNear]), bed = level(input.slots[kBed]);
@@ -289,6 +424,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     const u32 ring_time = ring_ms(ring);
     state.linger = ring_time > 2500 ? 2500 : ring_time;
     if (still) state.presence = held ? 65536 : 0;
+    else if (enveloped) state.presence = state.swell.level;
     else if (held) state.presence = u32(ease(i32(state.presence), 65536, ms));
     else {
         const u32 fall = 65536 * ms / (state.linger ? state.linger : 1);
@@ -378,6 +514,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     // No sample: Grains' hint under the apron, the stage playing on above it.
     if (!overview.assigned) hide(frame, hint_cover);
     else place(frame, hint_cover, 0, 0, unit, 0, fill_and_stroke);
+    place_strip(state, frame, overview, input.shift != 0);
 
 }
 }

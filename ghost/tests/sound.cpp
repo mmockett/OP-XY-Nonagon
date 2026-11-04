@@ -271,6 +271,28 @@ int main() {
         for (u32 i = 0; i < opxy::block_frames; ++i) sound = sound || r.out[i] != 0;
         check(sound, "mono output sounds");
     }
+    {   // Shift's start and end (stockShift) choose the stretch the bed plays: it
+        // reads only between them, and a stretch of silence leaves the bed quiet.
+        const std::vector<i16>& recording = voice_recording();
+        const u32 n = u32(recording.size());
+        std::vector<i16> gapped(recording);
+        for (u32 i = 0; i < n / 2; ++i) gapped[i] = 0;
+        double v[8] = {0.6, 0, 0.5, 0, 0, 0, 0.5, 1};   // breath, all bed
+        Rig quiet(220, v, gapped.data(), n), loud(220, v, gapped.data(), n);
+        quiet.block.region.end = n / 2;
+        loud.block.region.begin = n / 2;
+        bool inside = true;
+        for (u32 b = 0; b < 2000; ++b) {
+            ghost::render_sample(quiet.voice, quiet.block);
+            inside = inside && quiet.voice.frame < n / 2;
+        }
+        quiet.run(2, left, right);
+        const double q = rms(left);
+        loud.run(2, left, right);
+        const double l = rms(left);
+        check(inside, "the bed reads only between the start and end markers");
+        check(l > 2 * q, "a trim to silence quiets the bed, a trim to the recording sounds it");
+    }
     {   // Every caption fits its header column on the device, in its own
         // face (tests/header_font.h): each control's value, swept in 4097
         // steps, within 53 px at 20 px, and each title within 56 px at 10 px.
@@ -292,8 +314,44 @@ int main() {
                 const double w = Width::of(values[c], 20);
                 if (w > widest) { widest = w; opxy::draw::copy(which, sizeof which, values[c]); }
             }
+        // Shift's row (stockShift): start, window and end in seconds, for
+        // samples from a tenth of a second to twenty minutes, trimmed anywhere.
+        const u32 lengths[] = {4410, 44100, 441000, 4410000, 52920000};
+        static opxy::draw::SampleOverview o;
+        o.assigned = o.loaded = 1;
+        o.rate = 44100;
+        const opxy::u8 pages[2][4] = {{0, 1, 2, 3}, {4, 5, 6, 7}};
+        for (u32 length : lengths)
+            for (u32 a = 0; a <= 40; ++a)
+                for (u32 b = a; b <= 40; ++b) {
+                    o.frames = length;
+                    o.begin = u32((unsigned long long)(length) * a / 40);
+                    o.end = u32((unsigned long long)(length) * b / 40);
+                    opxy::draw::Input input = {};
+                    input.shift = 1;
+                    const char* titles[8] = {};
+                    char values[8][opxy::draw::header_capacity] = {};
+                    ghost::captions::shift_row(input, pages, o, titles, values);
+                    for (u32 c : {0u, 1u, 3u}) {
+                        const double w = Width::of(values[c], 20);
+                        if (w > widest) { widest = w; opxy::draw::copy(which, sizeof which, values[c]); }
+                    }
+                }
+        // ...and the gain in stock's steps (#400), -30 to +20.
+        for (opxy::i32 g = -30; g <= 20; ++g) {
+            o.gain = g;
+            opxy::draw::Input input = {};
+            input.shift = 1;
+            const char* titles[8] = {};
+            char values[8][opxy::draw::header_capacity] = {};
+            ghost::captions::shift_row(input, pages, o, titles, values);
+            const double w = Width::of(values[2], 20);
+            if (w > widest) { widest = w; opxy::draw::copy(which, sizeof which, values[2]); }
+        }
+        o.gain = 0;
         double widest_title = 0;
         for (const char* title : ghost::captions::titles) widest_title = std::fmax(widest_title, Width::of(title, 10));
+        for (const char* title : ghost::captions::shift_titles) if (title) widest_title = std::fmax(widest_title, Width::of(title, 10));
         std::printf("captions: the widest value \"%s\" %.1f px (53 allowed), the widest title %.1f px (56)\n", which, widest, widest_title);
         check(widest <= 53 && widest_title <= 56, "every caption fits its column on the device");
     }

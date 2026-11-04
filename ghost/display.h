@@ -3,20 +3,25 @@
 
 namespace ghost {
 // Matches resources.display: paths, points, nodes, texts, palette (README, "Screen").
-using Frame = opxy::draw::Frame<4, 64, 24, 16, 16>;
+using Frame = opxy::draw::Frame<4, 64, 66, 16, 16>;
 
 // Nodes: the apparition, its twin in the glass, its mouth and the chalk path
 // it walks (the paths), the header's bar, its halos, two more apparitions for
 // more held notes, the twin's own halos and mouth, the cover over the hint
-// under the apron, and a black silhouette under each of the two figures.
+// under the apron, a black silhouette under each of the two figures, and with
+// a sample, its bars in the slot under the apron and the trim's two markers.
 // tools/make_panel.py draws them.
 const opxy::u32 apparition = 0, twin = 1, mouth = 2, floor_path = 3, header_first = 4, halo_first = 12,
                 halo_count = 3, extra_first = 15, twin_halo_first = 17, twin_mouth = 20, hint_cover = 21,
-                mask = 22, twin_mask = 23;
+                mask = 22, twin_mask = 23, bar_first = 24, bar_count = 40, mark_first = 64;
 // Where make_panel.py puts the stage, in pixels.
 const opxy::i32 stage_front = 198, stage_back = 150, half_front = 170, half_back = 108;
 const opxy::i32 front_feet = 187;   // the nearest feet: clear of the footlights' hoods (194) on the apron
 const opxy::i32 path_x = 240, path_y = 174;   // the chalk path's origin, drawn at twice its points
+const opxy::i32 strip_x0 = 90, strip_x1 = 390, strip_y = 209;   // the sample's slot under the apron
+
+// The amp envelope's level as the screen follows it (display.cpp, follow()).
+struct Swell { opxy::u32 level, from, stage; };   // level and from (the release's start) Q16; stage 0 idle, 1 attack, 2 decay, 3 release
 
 struct DisplayState {
     opxy::draw::PageHeader header;
@@ -30,5 +35,7 @@ struct DisplayState {
     opxy::i32 x, y, scale;    // its place on the stage (Q10), eased
     opxy::u32 beat_ms;        // time held, for the beat's tremble and the halos' breath
     opxy::u32 step_ms, step;  // the hem's ripple and the bed's scroll, a step every 100 ms while held
+    opxy::u32 bar_sweep;      // where the sample's bars' changes begin this frame
+    Swell swell;              // the amp envelope's level: the figure swells, holds and fades with it
 };
 }

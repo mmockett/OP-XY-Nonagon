@@ -4,8 +4,10 @@
 // tiles; they slide to where the map puts the slices they stand for, as the
 // sound plays them, and come home together at the period. The print is the
 // map, the pendulum's weight slice, the lever rate, the comb's plucked teeth
-// chrd, the pinned and darkened tiles depth, and the lit stretch of the
-// sample's tape pos and the window's length.
+// chrd, and the pinned and darkened tiles depth. Along the tin's foot the
+// tape: the sample's waveform with the trim's markers and the grid's cuts on
+// it, and a frame round the stretch the slot playing reads, which fit
+// stretches to its slice or leaves at the note's pitch.
 // With no sample, a cover says how to load one. Drawn from the controls, the
 // notes and time through recur.h, not read from the audio.
 #include "display.h"
@@ -15,6 +17,43 @@
 namespace recur {
 namespace {
 using namespace opxy::draw;
+
+// The track's amp envelope as the screen follows it (SDK 1.10, input.amp),
+// so the note's motion lasts as long as its sound: a level that swells over
+// the attack, falls over the decay to the sustain while a note is held, and
+// fades over the release from wherever it was. Stock maps the envelope page's
+// positions to times along its own curves, which aren't documented: assumed
+// here exponential in the position, 2 ms at 0 to 10 s at full, for attack,
+// decay and release alike, and the sustain a level, linear. With the envelope
+// unknown, or reduced motion, the level is 1 while a note is held and 0
+// otherwise, as before.
+inline opxy::u32 stage_ms(opxy::i32 position) {
+    const opxy::u32 p = position < 0 ? 0 : opxy::u32(position) >> 15;   // Q16
+    opxy::u32 l = ((p >> 4) * 3146) >> 4;   // 12.29 p, Q16: log2(5000) octaves at full
+    const opxy::u32 whole = l >> 16, m = 65536 + (l & 0xffff);
+    const opxy::u32 ms = (m << whole) >> 15;   // 2 ms * 2^l, by Mitchell's approximation
+    return ms < 2 ? 2 : ms;
+}
+inline void follow(Swell& s, const opxy::draw::Envelope& amp, bool held, bool started, bool still, opxy::u32 ms) {
+    if (still || !opxy::draw::envelope_known(amp)) { s.level = held ? 65536 : 0; s.stage = held ? 2 : 0; return; }
+    if (held && (started || s.stage == 0 || s.stage == 3)) s.stage = 1;
+    if (held) {
+        const opxy::u32 sustain = opxy::u32(amp.sustain < 0 ? 0 : amp.sustain) >> 15;
+        if (s.stage == 1) {
+            s.level += 65536 * ms / stage_ms(amp.attack);
+            if (s.level >= 65536) { s.level = 65536; s.stage = 2; }
+        } else {
+            const opxy::u32 step = (65536 - sustain) * ms / stage_ms(amp.decay);
+            s.level = s.level > sustain + step ? s.level - step : sustain;
+        }
+    } else if (s.stage) {
+        if (s.stage != 3) { s.stage = 3; s.from = s.level; }
+        const opxy::u32 step = s.from * ms / stage_ms(amp.release) + 1;
+        s.level = s.level > step ? s.level - step : 0;
+        if (!s.level) s.stage = 0;
+    }
+}
+
 
 // Shades (palette entries, black to white in 16 steps).
 const u32 moving_shade = 15, held_shade = 5, pin_shade = 14, tooth_lit = 15, tooth_dark = 6;
@@ -43,11 +82,13 @@ char* put(char* out, u32 n) {
     return out;
 }
 
-// The sample as the screen knows it, or none.
-struct Sample { u32 frames, begin, span, rate; bool shown; };
+// The sample as the screen knows it, or none; and its gain in stock's steps
+// (-30..+20, SDK 1.10 with #400), or gain_unavailable.
+struct Sample { u32 frames, begin, span, rate; bool shown; i32 gain; };
 Sample read_sample(const SampleOverview& o) {
-    if (!o.assigned || !o.frames || !o.rate) return Sample{0, 0, 0, 44100, false};
+    if (!o.assigned || !o.frames || !o.rate) return Sample{0, 0, 0, 44100, false, o.gain};
     Sample s;
+    s.gain = o.gain;
     s.frames = o.frames;
     s.begin = o.begin < o.frames ? o.begin : 0;
     const u32 end = o.end && o.end <= o.frames ? o.end : o.frames;
@@ -84,25 +125,43 @@ void put(Frame& frame, u32 node, i32 x, i32 y, u32 shade, i32 scale = unit, Turn
     turn(frame, node, t);
 }
 
-// The header: real values. pos in seconds to the window's start; step the
-// iteration and its fraction; depth the share of the slices that move.
-void place_header(DisplayState& state, const Input& input, Frame& frame, const Sample& sample, u32 from, u32 k, u32 ahead16,
+// Frames as seconds, within the 53 px a value has in the device's face:
+// 0.62s, 12.4s, 123s, and from 1000 s on whole minutes, 17m ("1000s" is too
+// wide).
+void seconds(char* at, u32 frames, u32 rate) {
+    const u32 per = rate / 100 ? rate / 100 : 1, hundredths = frames / per;
+    if (hundredths < 1000) { at = put(at, hundredths / 100); *at++ = '.'; at = put(at, hundredths / 10 % 10); at = put(at, hundredths % 10); }
+    else if (hundredths < 10000) { at = put(at, hundredths / 100); *at++ = '.'; at = put(at, hundredths / 10 % 10); }
+    else if (hundredths < 100000) at = put(at, hundredths / 100);
+    else { at = put(at, hundredths / 6000); *at++ = 'm'; *at = 0; return; }
+    *at++ = 's';
+    *at = 0;
+}
+
+// Shift (resources.stockShift): encoders 1, 2 and 4 turn the stock sampler's
+// start, both markers together (the window, keeping its length) and end;
+// encoder 3 the sample's gain.
+const char* const shift_titles[4] = {"start", "window", "gain", "end"};
+
+// The gain as stock steps it, signed: +0, -12, +20; nothing when unknown.
+void gain_caption(char* out, i32 gain) {
+    if (gain == gain_unavailable) { out[0] = 0; return; }
+    *out++ = gain < 0 ? '-' : '+';
+    out = put(out, u32(gain < 0 ? -gain : gain));
+    *out = 0;
+}
+
+// The header: real values. fit 0 to 100; step the iteration and its
+// fraction; depth the share of the slices that move. While
+// Shift is held, the row the encoders turn names what Shift edits, as the
+// stock header does: the sampler's start and end at their times in the
+// sample, the window at its length, and the gain (with no gain known, its
+// cell is blank).
+void place_header(DisplayState& state, const Input& input, Frame& frame, const Sample& sample, u32 k, u32 ahead16,
                   u32 period, u32 moving_share) {
-    const char* const titles[8] = {"pos", "grid", "slice", "map", "step", "rate", "depth", "chrd"};
+    const char* own[8] = {"fit", "grid", "slice", "map", "step", "rate", "depth", "chrd"};
     char values[8][header_capacity] = {};
-    if (sample.shown) {
-        // Seconds into the sample, within the 53 px a value has in the
-        // device's face: 0.62s, 12.4s, 123s, and from 1000 s on whole
-        // minutes, 17m ("1000s" is too wide).
-        const u32 per_ms = sample.rate / 1000 ? sample.rate / 1000 : 1;
-        const u32 hundredths = from / (per_ms * 10);
-        char* at = values[kPos];
-        if (hundredths < 1000) { at = put(at, hundredths / 100); *at++ = '.'; at = put(at, hundredths / 10 % 10); at = put(at, hundredths % 10); }
-        else if (hundredths < 10000) { at = put(at, hundredths / 100); *at++ = '.'; at = put(at, hundredths / 10 % 10); }
-        else if (hundredths < 100000) at = put(at, hundredths / 100);
-        else { at = put(at, hundredths / 6000); *at++ = 'm'; *at = 0; }
-        if (hundredths < 100000) { *at++ = 's'; *at = 0; }
-    } else header_amount(values[kPos], header_capacity, input.slots[kPos]);
+    header_amount(values[kFit], header_capacity, input.slots[kFit]);
     copy(values[kGrid], header_capacity, grid_names[choice(input.slots[kGrid], grid_count)]);
     copy(values[kSlice], header_capacity, slice_names[choice(input.slots[kSlice], slice_count)]);
     copy(values[kMap], header_capacity, map_names[choice(input.slots[kMap], map_count)]);
@@ -120,7 +179,23 @@ void place_header(DisplayState& state, const Input& input, Frame& frame, const S
     while (*at) ++at;
     *at++ = '%'; *at = 0;
     copy(values[kChrd], header_capacity, chord_names[choice(input.slots[kChrd], chord_count)]);
-    page_header(state.header, input, frame, titles, values, 0);
+    if (input.shift) {
+        u32 page = 0;   // as page_header finds it
+        for (u32 col = 0; col < 4; ++col)
+            if (page_header_slots[1][col] != page_header_slots[0][col] && input.shown[col] == page_header_slots[1][col]) page = 1;
+        const u32 marks[4] = {sample.begin, sample.span, 0, sample.begin + sample.span};
+        for (u32 col = 0; col < 4; ++col) {
+            const u32 slot = page_header_slots[page][col];
+            own[slot] = shift_titles[col];
+            if (col == 2) {
+                gain_caption(values[slot], sample.gain);
+                if (sample.gain == gain_unavailable) own[slot] = "";
+            } else if (sample.shown) seconds(values[slot], marks[col], sample.rate);
+            else copy(values[slot], header_capacity, "-");
+        }
+    }
+    const char* const titles[8] = {own[0], own[1], own[2], own[3], own[4], own[5], own[6], own[7]};
+    page_header(state.header, input, frame, titles, values, header_first);
 }
 
 // The tiles: plain squares, sliding from slot to slot as the map moves the
@@ -129,21 +204,23 @@ void place_header(DisplayState& state, const Input& input, Frame& frame, const S
 // round the tray, so a big reshuffle ripples across it; a sliding tile and its
 // pieces always move together.
 void place_tiles(DisplayState& state, Frame& frame, u32 bits, u32 map, u32 k, const Orbits& orbits, bool hiss,
-                 u32 hiss_bits, u32 depth, u32 ms, bool snap, u32& budget) {
+                 u32 hiss_bits, u32 depth, u32 ms, bool snap, u32& budget, u32 bright) {
     const u32 side = 1u << bits, cells = side * side;
     if (state.bits != bits) {   // a new grid: its tiles start at home
         state.bits = bits;
         for (u32 c = 0; c < 64; ++c) state.slides[c] = Slide{opxy::u8(c), opxy::u8(c), at_rest};
         state.hiss_key = 0;
     }
-    // Inks: a moving tile bright, a held one dark; in hiss, each tile by how
-    // much of it is heard in place: the part back home, and depth's plain window.
-    const u32 key = (hiss ? map << 24 | hiss_bits << 16 | k : 1u << 31) ^ (orbits.moving[0] * 2654435761u) ^ orbits.moving[1] ^ bits ^ depth << 7;
+    // Inks: a moving tile bright (as bright as the amp envelope lets it, in
+    // four steps), a held one dark; in hiss, each tile by how much of it is
+    // heard in place: the part back home, and depth's plain window.
+    const u32 key = ((hiss ? map << 24 | hiss_bits << 16 | k : 1u << 31) ^ (orbits.moving[0] * 2654435761u) ^ orbits.moving[1] ^ bits ^ depth << 7) +
+                    bright * 0x01000193u;
     if (key != state.hiss_key) {
         const u32 fine = 1u << hiss_bits, per = fine >> bits;   // sub-cells a tile a side
         const Mat m = power(map, k, hiss_bits);
         for (u32 c = 0; c < cells; ++c) {
-            u32 ink = moves(orbits.moving, c) ? moving_shade : held_shade;
+            u32 ink = moves(orbits.moving, c) ? bright : held_shade;
             if (hiss) {
                 u32 home = 0;
                 for (u32 y = 0; y < per; ++y)
@@ -154,7 +231,7 @@ void place_tiles(DisplayState& state, Frame& frame, u32 bits, u32 map, u32 k, co
                         home += mx == cx && my == cy;
                     }
                 const u32 cells_in = per * per, plain = (65536 - depth) >> 8;   // Q8
-                ink = 2 + (home * 256 + plain * (cells_in - home)) * (moving_shade - 2) / (cells_in * 256);
+                ink = 2 + (home * 256 + plain * (cells_in - home)) * (bright - 2) / (cells_in * 256);
             }
             state.inks[c] = opxy::u8(ink);
         }
@@ -268,27 +345,6 @@ void place_pins(Frame& frame, u32 bits, const u32 (&moving)[2], bool hiss, bool 
     }
 }
 
-// The window pos picks, frames into the sample's region, as the engine
-// places it: from the region's start to the window ending at its end. In
-// slices a window longer than the region wraps round it (to may fall below
-// from) and pos turns it, to a slice short of a whole turn.
-void window(const Sample& sample, const Input& input, u32 bits, u32 slice, bool hiss, u32 hiss_bits, u32& from, u32& to) {
-    const u32 span = sample.span ? sample.span : 1, pos = level(input.slots[kPos]) >> 4;
-    // A slice's frames at 120 BPM: 1378 a 64th note.
-    const u32 one = hiss ? 1 : slice64[slice] * 1378;
-    const u32 length = hiss ? 1u << (2 * hiss_bits) : (1u << (2 * bits)) * one;
-    if (hiss) {
-        if (length >= span) { from = 0; to = span; return; }
-        from = scaled(span - length + 1, pos, 4096);
-        to = from + length;
-        return;
-    }
-    const u32 room = span > length ? span - length : span > one ? span - one : 0;
-    from = scaled(room + 1, pos, 4096);
-    if (length >= span) { to = from; return; }   // the whole region, turned
-    to = from + length < span ? from + length : from + length - span;
-}
-
 u32 root(u32 n) {
     u32 r = 0;
     for (u32 bit = 1u << 15; bit; bit >>= 1)
@@ -303,50 +359,150 @@ u32 bin_peak(const SampleOverview& o, u32 b) {
     return scaled > 255 ? 255 : scaled;
 }
 
-// The tape: a bar for each stretch of the sample, as tall as the root of its
-// peak against the loudest (so quiet stretches still show); the window's bars
-// lit solid, the rest of the region dim and what lies outside it dark.
-void place_tape(const Input& input, Frame& frame, const SampleOverview& overview, const Sample& sample, u32 bits, u32 slice,
-                bool hiss, u32 hiss_bits, bool snap, u32 budget) {
-    u32 from, to;
-    window(sample, input, bits, slice, hiss, hiss_bits, from, to);
-    const bool wraps = to <= from;
-    const i32 width = (rule_x1 - rule_x0) * unit;
-    u32 loudest = 1;
-    for (u32 i = 0; i < overview_bins; ++i) if (bin_peak(overview, i) > loudest) loudest = bin_peak(overview, i);
-    for (u32 i = 0; i < bar_count; ++i) {
-        const u32 b0 = scaled(sample.frames, i, bar_count), b1 = scaled(sample.frames, i + 1, bar_count);
-        u32 shade = bar_outside;
-        bool lit = false;
-        if (b1 > sample.begin && b0 < sample.begin + sample.span) {
-            const u32 r0 = b0 > sample.begin ? b0 - sample.begin : 0, r1 = b1 - sample.begin;
-            lit = wraps ? (r1 > from || r0 < to) : (r1 > from && r0 < to);
-            shade = lit ? bar_lit : bar_dim;
+// log2 and 2^x of Q16 values by Mitchell's approximations: near enough for a picture.
+i32 log2_q16(u32 x) {
+    if (!x) return -(24 << 16);
+    i32 e = 0;
+    while (x >= 131072) { x >>= 1; ++e; }
+    while (x < 65536) { x <<= 1; --e; }
+    return e * 65536 + i32(x - 65536);
+}
+u32 exp2_q16(i32 l) {
+    const i32 e = l >> 16;
+    const u32 m = 65536 + u32(l & 0xffff);
+    return e >= 15 ? 0x7fffffffu : e >= 0 ? m << e : e > -17 ? m >> -e : 0;
+}
+
+// A place in the sample, frames, as an x on the tape, Q10.
+i32 tape_x(const Sample& sample, u32 frame) {
+    return rule_x0 * unit + i32(scaled(frame, u32(rule_x1 - rule_x0) * 64, sample.frames ? sample.frames : 1)) * 16;
+}
+
+// The waveform: the whole sample in three outlines, a column an overview bin,
+// each a closed ribbon as tall as the root of its peak against the loudest
+// (so quiet stretches still show), scaled by the sample's gain (twice as
+// tall each 10 of stock's steps up, within the slot), drawn afresh only for a
+// new sample or gain. A shade: brighter while Shift edits the trim.
+void place_wave(DisplayState& state, Frame& frame, const SampleOverview& overview, bool shift) {
+    const i32 gain = overview.gain == gain_unavailable ? 0 : clamp(overview.gain, -30, 20);
+    const u32 key = (overview.generation << 7 | u32(gain + 30) << 1) | 1;
+    if (state.wave_key != key) {
+        const u32 louder = exp2_q16(gain * 6554);   // 2^(gain / 10), Q16
+        u32 loudest = 1;
+        for (u32 i = 0; i < overview_bins; ++i) if (bin_peak(overview, i) > loudest) loudest = bin_peak(overview, i);
+        for (u32 h = 0; h < waves; ++h) {
+            Frame::path_type& path = frame.paths[h];
+            for (u32 i = 0; i < wave_columns; ++i) {
+                const u32 bin = h * wave_columns + i < overview_bins ? h * wave_columns + i : overview_bins - 1;
+                const i32 x = i32(i) * 104 * unit / i32(wave_columns - 1) - 52 * unit;
+                const u32 tall = scaled(root(bin_peak(overview, bin) * 65536 / loudest) * 3300 / 256, louder >> 4, 4096);   // 3.2 px at 0
+                const i32 half = 600 + i32(tall < 6000 ? tall : 6000);   // 0.6 to 6.5 px
+                path.points[i].x = x;
+                path.points[i].y = -half;
+                path.points[2 * wave_columns - 1 - i].x = x;
+                path.points[2 * wave_columns - 1 - i].y = half;
+            }
+            path.key = key;
         }
-        u32 peak = 0;
-        for (u32 b = i * overview_bins / bar_count; b < ((i + 1) * overview_bins + bar_count - 1) / bar_count; ++b)
-            if (bin_peak(overview, b) > peak) peak = bin_peak(overview, b);
-        const i32 tall = i32(root(peak * unit * unit / loudest)), scale = tall > 300 ? tall : 300;
-        const Paint paint = lit ? fill_and_stroke : stroke;
-        const u32 node = bar_first + i;
-        const i32 x = rule_x0 * unit + width * i32(2 * i + 1) / i32(2 * bar_count);
-        if (changed(frame, node, x, rule_y * unit, shade, scale, Turn{unit, 0}, paint) && (snap || budget)) {
-            put(frame, node, x, rule_y * unit, shade, scale, Turn{unit, 0}, paint);
-            if (!snap) --budget;
+        state.wave_key = key;
+    }
+    for (u32 h = 0; h < waves; ++h) place(frame, h, (rule_x0 + 52 + 104 * i32(h)) * unit, rule_y * unit, unit, shift ? 9 : 6, stroke);
+}
+
+// The trim's markers, the stock sampler's start and end: lit while Shift edits them.
+void place_marks(Frame& frame, const Sample& sample, bool shift) {
+    const u32 shade = shift ? 15 : 9;
+    place(frame, mark_first, tape_x(sample, sample.begin), rule_y * unit, unit, shade, fill_and_stroke);
+    place(frame, mark_first + 1, tape_x(sample, sample.begin + sample.span), rule_y * unit, unit, shade, fill_and_stroke);
+}
+
+// Where slice c of the trim begins, frames into the sample, as the engine cuts it.
+u32 cut(const Sample& sample, u32 bits, u32 c) {
+    const u32 shift = 2 * bits, cells = 1u << shift;
+    return sample.begin + (sample.span >> shift) * c + (((sample.span & (cells - 1)) * c) >> shift);
+}
+
+// The grid's cuts on the tape: a long tick where each row of the square
+// begins and a short one at each other slice, between the trim's markers.
+// Slices closer than 3 px show only their rows, and rows closer than that
+// nothing; in hiss, nothing (its cells are single samples).
+void place_cuts(Frame& frame, const Sample& sample, u32 bits, bool hiss, bool snap, u32& budget) {
+    const u32 side = 1u << bits, cells = side * side;
+    const i32 span_px = tape_x(sample, sample.begin + sample.span) - tape_x(sample, sample.begin);
+    const bool slices = !hiss && span_px >= i32(cells) * 3 * unit, rows = !hiss && span_px >= i32(side) * 3 * unit;
+    for (u32 r = 0; r < row_count; ++r) {
+        const u32 node = row_first + r;
+        if (!rows || r + 1 >= side) {
+            if (shown(frame, node) && (snap || budget)) { hide(frame, node); if (!snap) --budget; }
+            continue;
         }
+        const i32 x = tape_x(sample, cut(sample, bits, (r + 1) * side));
+        if (changed(frame, node, x, rule_y * unit, 7) && (snap || budget)) { put(frame, node, x, rule_y * unit, 7); if (!snap) --budget; }
+    }
+    u32 c = 0;   // the slices within rows, in order
+    for (u32 i = 0; i < cut_count; ++i) {
+        const u32 node = cut_first + i;
+        while (c < cells && c % side == 0) ++c;
+        if (!slices || c >= cells) {
+            if (shown(frame, node) && (snap || budget)) { hide(frame, node); if (!snap) --budget; }
+            continue;
+        }
+        const i32 x = tape_x(sample, cut(sample, bits, c++));
+        if (changed(frame, node, x, rule_y * unit, 7) && (snap || budget)) { put(frame, node, x, rule_y * unit, 7); if (!snap) --budget; }
     }
 }
 
-// The pendulum, the lever, the comb and the caliper.
-void place_works(DisplayState& state, const Input& input, Frame& frame, const Sample& sample, u32 bits, bool hiss,
-                 u32 hiss_bits, bool held, u32 ms, bool snap) {
-    // The pendulum: its weight up the rod by slice; while a note plays it
-    // swings a side each slice, less for slices too quick to follow.
+// The stretch the slot playing reads, frames: from its slice's cut, a slot
+// at the note's pitch at fit 0 (more than the slice, running on past its end,
+// or less, cropped), exactly the slice at fit 100, geometrically between, as
+// the engine reads it at middle C. The display has no tempo: 120 BPM, as the
+// pendulum ticks. In hiss, the square of single samples from the trim's start.
+void place_reading(Frame& frame, const Sample& sample, const Input& input, u32 bits, bool hiss, u32 hiss_bits, u32 source, u32 bright) {
+    u32 from, length;
+    if (hiss) {
+        from = sample.begin;
+        length = 1u << (2 * hiss_bits);
+    } else {
+        const u32 shift = 2 * bits, slice = sample.span >> shift ? sample.span >> shift : 1;
+        // A slot's frames at the sample's own rate: a 64th is 1/32 s at 120 BPM.
+        const u32 own = slice64[choice(input.slots[kSlice], slice_count)] * (sample.rate / 32);
+        const i32 l0 = log2_q16(scaled(own, 32768, slice) * 2);   // the slot over the slice, Q16
+        const u32 fit = level(input.slots[kFit]);
+        const u32 heard = exp2_q16(((l0 >> 4) * i32((65535 - fit) >> 4)) >> 8);   // over the slice, Q16
+        from = cut(sample, bits, source);
+        length = heard >= (64u << 16) ? slice * 64 : slice * (heard >> 16) + scaled(slice, (heard & 0xffff) >> 1, 32768);
+    }
+    const i32 x0 = tape_x(sample, from);
+    i32 width = tape_x(sample, from + length) - x0;
+    if (from + length > sample.frames) width = tape_x(sample, sample.frames) - x0;
+    width = width < 3 * unit ? 3 * unit : width > 120 * unit ? 120 * unit : width;
+    Frame::path_type& path = frame.paths[reading];
+    const u32 key = u32(width) | 1u << 31;
+    if (path.key != key) {
+        // A rectangle of 64 points round it, 16 a side, the slot's height.
+        const i32 h = 8 * unit;
+        for (u32 i = 0; i < 16; ++i) {
+            const i32 along = width * i32(i) / 16, down = 2 * h * i32(i) / 16;
+            path.points[i] = Point{along, -h};
+            path.points[16 + i] = Point{width, -h + down};
+            path.points[32 + i] = Point{width - along, h};
+            path.points[48 + i] = Point{0, h - down};
+        }
+        path.key = key;
+    }
+    place(frame, reading, x0, rule_y * unit, unit, bright, stroke);
+}
+
+// The pendulum, the lever and the comb.
+void place_works(DisplayState& state, const Input& input, Frame& frame, bool held, u32 ms, bool snap) {
+    // The pendulum: its weight up the rod by slice; while a note sounds it
+    // swings a side each slice, less for slices too quick to follow, and as
+    // wide as the amp envelope's level.
     const u32 slice = choice(input.slots[kSlice], slice_count);
     i32 aim = 0;
     if (held && !input.reduced_motion) {
         const u32 us = slice64[slice] ? slice64[slice] * us_a_64th : 6000;
-        const i32 amplitude = us >= 125000 ? 140 : i32(140 * us / 125000);
+        const i32 amplitude = (i32((us >= 125000 ? 140 : 140 * us / 125000) * (state.swell.level >> 6)) >> 10);
         const u32 t = (state.held_ms % 600000) * 1000 % (2 * us);
         aim = amplitude * sine(i32(t * 1800 / us) + 900) / unit;
     }
@@ -368,16 +524,6 @@ void place_works(DisplayState& state, const Input& input, Frame& frame, const Sa
         place(frame, teeth_first + t, (comb_x + i32(t) * comb_pitch) * unit, comb_y * unit, lit ? plucked : unit,
               lit ? tooth_lit : tooth_dark, lit ? fill_and_stroke : stroke);
     }
-    // The caliper: the window pos picks, on the tape.
-    const u32 frames = sample.frames;
-    u32 from, to;
-    window(sample, input, bits, slice, hiss, hiss_bits, from, to);
-    const i32 width = rule_x1 - rule_x0;
-    const i32 x0 = rule_x0 * unit + i32(scaled(sample.begin + from, u32(width) * 64, frames)) * 16;
-    i32 x1 = rule_x0 * unit + i32(scaled(sample.begin + to, u32(width) * 64, frames)) * 16;
-    if (to > from && x1 < x0 + 4 * unit) x1 = x0 + 4 * unit;
-    place(frame, jaw_first, x0, rule_y * unit, unit, 15, stroke);
-    place(frame, jaw_first + 1, x1, rule_y * unit, unit, 15, stroke);
 }
 }
 
@@ -391,6 +537,8 @@ inline void display_reset(DisplayState& state) {
     state.hiss_key = 0;
     state.swing = 0;
     state.sweep = 0;
+    state.wave_key = 0;
+    state.swell = Swell{0, 0, 0};
 }
 
 inline void display(DisplayState& state, const Input& input, Frame& frame) {
@@ -410,7 +558,12 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     const bool held = input.held_notes != 0 && input.held_notes <= 128;
     const u32 ms = u32(clamp(input.elapsed, 0, 102)) * 1000 >> 10;
     if (events.hold_started) state.held_ms = 0;
-    if (held && !input.reduced_motion) state.held_ms += ms;
+    // The amp envelope: the scramble, the tape and the pendulum play on while
+    // the note sounds, held or in its release, and dim and narrow with it.
+    follow(state.swell, input.amp, held, events.hold_started, input.reduced_motion != 0, ms);
+    const bool sounding = held || state.swell.level;
+    const u32 bright = sounding ? 6 + 3 * ((state.swell.level * 3 + 32768) >> 16) : moving_shade;   // 6, 9, 12, 15
+    if (sounding && !input.reduced_motion) state.held_ms += ms;
     else state.held_ms = 0;
     const u32 rate = rate64[choice(input.slots[kRate], rate_count)];
     u32 moved = 0;
@@ -427,15 +580,14 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
 
     Orbits orbits = {{~0u, ~0u}, {0, 0}, 0};
     if (!hiss) rank_orbits(map, bits, depth16(input.slots[kDepth]), ahead16, orbits);
-    u32 from, to;
-    window(sample, input, bits, slice, hiss, hiss_bits, from, to);
     const u32 cells = 1u << (2 * bits);
-    place_header(state, input, frame, sample, from, k, ahead16, period, hiss ? ~0u : (orbits.moving_cells * 100 + cells / 2) / cells);
+    place_header(state, input, frame, sample, k, ahead16, period, hiss ? ~0u : (orbits.moving_cells * 100 + cells / 2) / cells);
     // With no sample, a cover over everything but the header says how to load one.
     if (!overview.assigned) {
         place(frame, cover_stage, 0, 0, unit, 0, fill_and_stroke);
         hide(frame, cover_hint);
-        for (u32 n = 8; n < cover_stage; ++n) hide(frame, n);
+        for (u32 n = 0; n < cover_stage; ++n)
+            if (n < header_first || n >= header_first + 8) hide(frame, n);
         state.bits = 0;
         state.fresh = 1;
         return;
@@ -443,10 +595,25 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     hide(frame, cover_stage);
     place(frame, cover_hint, 0, 0, unit, 0, fill_and_stroke);
     u32 budget = most_changes;
-    place_tiles(state, frame, bits, map, k, orbits, hiss, hiss_bits, depth16(input.slots[kDepth]), ms, snap, budget);
+    place_tiles(state, frame, bits, map, k, orbits, hiss, hiss_bits, depth16(input.slots[kDepth]), ms, snap, budget, bright);
     place_pins(frame, bits, orbits.moving, hiss, snap, budget);
-    place_tape(input, frame, overview, sample, bits, slice, hiss, hiss_bits, snap, budget > 2 ? budget : 2);   // what's left, and a little
-    place_works(state, input, frame, sample, bits, hiss, hiss_bits, held, ms, snap);
+    // The tape. The slot playing (the first at rest, as time goes while a note
+    // is held) reads the slice the map put there, as the engine finds it.
+    u32 slot = 0;
+    if (!hiss && state.held_ms) slot = (state.held_ms * sixty_fourths_a_second / 1000 / slice64[slice]) % cells;
+    u32 source = slot;
+    if (!hiss && moves(orbits.moving, slot)) {
+        const u32 at = moves(orbits.ahead, slot) ? (k + 1) % period : k;
+        u32 x = slot & ((1u << bits) - 1), y = slot >> bits;
+        send(power(map, (period - at) % period, bits), map, bits, x, y);
+        source = (y << bits) | x;
+    }
+    place_wave(state, frame, overview, input.shift != 0);
+    place_marks(frame, sample, input.shift != 0);
+    u32 left = budget > 4 ? budget : 4;   // what's left, and a little
+    place_cuts(frame, sample, bits, hiss, snap, left);
+    place_reading(frame, sample, input, bits, hiss, hiss_bits, source, bright);
+    place_works(state, input, frame, sounding, ms, snap);
     state.fresh = 0;
 }
 }

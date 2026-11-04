@@ -24,8 +24,12 @@ actor hidden from the audience, so a transparent figure seems to stand among
 the cast. Ghost's screen is that stage.
 
 Ghost is an OP-XY sample engine with stereo output, id `ghost`. It targets
-Open-XY SDK 1.8, which gives a sample engine its own screen and the sample's
-overview.
+Open-XY SDK 1.10: SDK 1.8 gives a sample engine its own screen and the
+sample's overview, and 1.10's `stockShift` hands Shift and all four encoders
+back to the stock sampler's start and end markers and gain. Showing the gain
+needs the sample overview's `gain`
+([etcetc000/open-xy#400](https://github.com/etcetc000/open-xy/pull/400)) as
+well as `stockShift`.
 It plays without a sample, on breath and hum alone. A loaded sample sets the
 resonators ringing in its share of what excites them, bed's value: none at
 0%, half at the 50% default, all of it at 100%, so the ghost takes on the
@@ -38,7 +42,7 @@ OP-XY, and its CPU is measured there
 
 ## Controls
 
-Press any encoder to switch pages. Shift + turn makes fine steps.
+Press any encoder to switch pages.
 
 | Encoder | Page 1 | Page 2 |
 | --- | --- | --- |
@@ -46,6 +50,21 @@ Press any encoder to switch pages. Shift + turn makes fine steps.
 | 2 | voice | orbit |
 | 3 | split | near |
 | 4 | trade | bed |
+
+Holding Shift, the encoders edit the stock sampler's markers and gain
+instead, on either page. The markers set the stretch of the recording the
+bed plays, the whole sample when it is newly loaded. Trim a recording to its breathiest or
+most sustained part, or past a silence that would leave the bed gapped.
+
+| Shift + | Edits | On the screen |
+| --- | --- | --- |
+| encoder 1 | **start**: where the bed's stretch begins | the robe frays into that stretch's waveform; the start's time in the sample |
+| encoder 2 | **window**: start and end together, keeping the length | the fray follows the stretch; its length |
+| encoder 3 | **gain**: the sample's gain, in stock's steps from -30 to +20; it scales the bed | the strip's bars grow and shrink; `+0`, `-12`, `+20` |
+| encoder 4 | **end**: where the stretch ends | the end's time in the sample |
+
+The track saves the markers and gain, as the sampler does. Without a sample,
+Shift's times read `-` and the gain's cell is blank.
 
 | Control | Range | Default | Caption | What it does |
 | --- | --- | --- | --- | --- |
@@ -254,7 +273,7 @@ Every control acts on the apparition or the stage:
 | beat | The apparition's outline trembles, up to 6 px, the tremble running at the beat's rate while held. |
 | orbit | The chalk path on the floor where it can walk: a mark at the front at 0, an arc as the notes spread, the whole circle once they circle. The apparition walks it while held. |
 | near | Its size and depth, from small at the back wall to large behind the footlights. The chalk path follows it. |
-| bed | Its robe frays, up to 8 px with its share: into the sample's own waveform (64 peaks from its overview's 96 bins), or with no sample into the whisper's ragged gusts. The fray scrolls while held. |
+| bed | Its robe frays, up to 8 px with its share: into the waveform of the stretch the bed plays, between the start and end markers (64 peaks from the overview's bins there), or with no sample into the whisper's ragged gusts. The fray scrolls while held. |
 
 A second and third held note bring two more apparitions, each where its
 own note began.
@@ -264,8 +283,24 @@ does: "load a sample", then "shift +" and the Sample key's icon, in Grains'
 words, face and greys. It doesn't cover the stage, because Ghost plays on
 without a sample (breath and hum, and bed's own whisper), so the hint sits on
 one line under the apron, in front of the footlights, where nothing on the
-stage ever reaches. The hint goes as soon as a sample is loaded. The
-contact sheets' last row shows it.
+stage ever reaches. The hint goes as soon as a sample is loaded, and the
+sample takes its place: 40 bars across the slot, each a fortieth of the
+whole sample as tall as the root of its peak, scaled by the sample's gain
+(twice as tall each 10 steps up, within the slot), lit solid within the
+trim and dim outside it, between the trim's start and end markers, flags
+like Grains', lit while Shift edits them. The bars change only with the
+sample, its trim or its gain, at most 12 a frame. The contact sheets' last
+rows show it with Shift held at gain -30, 0 and +20, and the hint.
+
+The apparition follows the track's stock amp envelope (SDK 1.10): it swells
+in over the attack, holds at the sustain while a note is held and fades over
+the release, still circling while it sounds. With the envelope unknown it
+eases in and fades over ring's time, as before.
+Stock maps the envelope page's positions to times along its own curves, which
+aren't documented; the screen assumes them exponential in the position, 2 ms
+at 0 to about 10 s at full (1.9 s at 0.8) for attack, decay and release
+alike, and the sustain a level. That is a guess until it is timed against
+the device.
 
 The display cannot read the audio, so it draws everything from the
 controls, note activity and time, through the same `place()` (`ghost.h`) the
@@ -273,18 +308,19 @@ engine uses. Each apparition's place is seeded from the note's serial, so it
 matches the sound in kind, not note for note.
 
 The screen uses 4 reshaping outlines of 64 points (the apparition, its twin,
-its mouth and the chalk path), 24 nodes (8 of them the header bar), all 16
-text slots, 46 static outlines (37 of the stage, 9 of the hint's icon) and
-84 bytes of state. Churn over a scripted
+its mouth and the chalk path), 66 nodes (8 of them the header bar, 42 the
+sample's strip), all 16 text slots, 46 static outlines (37 of the stage, 9
+of the hint's icon) and 88 bytes of state. Churn over a scripted
 run (`tools/frames.cpp`: every control, a page switch, three notes circling,
-the bed, reduced motion) is below. The idle screen is still: nothing changes
+the bed, Shift held with the trim slid and the gain stepped, reduced motion)
+is below. The idle screen is still: nothing changes
 a second after the last fade. Reduced motion snaps the apparition and stills
 its tremble, hem and circling.
 
 | | Mean nodes changed a frame | While notes are held | Peak |
 | --- | --- | --- | --- |
-| 60 fps | 4.9 | 9.2 | 16 (a page switch) |
-| 30 fps | 5.2 | 9.3 | 16 |
+| 60 fps | 4.7 | 9.2 | 17 |
+| 30 fps | 5.2 | 9.3 | 22 |
 
 Sample engines have no browser preview, so the screen's frames, churn, GIF
 and contact sheets come from `tools/frames.cpp` on the host.
@@ -373,9 +409,11 @@ Not yet checked on the device:
 - **The head:** a near source on the right is louder there and later on the
   left, the far ear's highs are shadowed, and behind is darker.
 - **orbit:** it closes a circle in 2 s.
-- **Captions:** every value each control can show, and every title, fits its
-  header column in the device's face (values within 53 px at 20 px, titles
-  within 56 px at 10 px; `tests/header_font.h`, from `tools/header_font.py`).
+- **Captions:** every value each control can show, every time Shift's row
+  can show (samples of a tenth of a second to twenty minutes, trimmed
+  anywhere), every gain from -30 to +20, and every title, fits its header column in the device's face
+  (values within 53 px at 20 px, titles within 56 px at 10 px;
+  `tests/header_font.h`, from `tools/header_font.py`).
 - **A loaded sample** changes the default sound (Seance, bed at 50%): its
   third-octave spectrum moves at least 6 dB on average (6.8 dB as tested).
   Every preset also passes the level and chord checks with a sample loaded.
@@ -393,12 +431,17 @@ the top of its file.
 - `tools/bench.cpp` gives the host CPU estimate.
 - `tests/screen.cpp`, run by `sdk.py test`, holds every shown outline to the
   device's rules over every control, random settings and the apparition's own
-  shape: points 1/8 px apart, a closing edge of 1/4 px, and no turn sharper than
-  2.5 degrees from straight back.
+  shape, its fray drawn from any trim of the sample: points 1/8 px apart, a
+  closing edge of 1/4 px, and no turn sharper than 2.5 degrees from straight
+  back. It also checks that a trim changes the fray and that Shift's row reads
+  start, window, gain and end with their times and steps on both pages; that
+  the trim's markers stand on the trim and light up, the bars within it lit;
+  that the bars grow with the gain; that an unknown gain (`gain_unavailable`)
+  leaves its cell blank; and that with no sample the strip goes.
 - `tools/frames.cpp` checks the screen frame by frame, against the SDK's
   rules and the OP-XY's, counts its churn and writes frames as JSON;
   `frames clear` sweeps every control, with a sample and without, and checks
-  that nothing drawn reaches the footlights, the hint or the pilasters. `tools/frame2svg.py` draws a frame as SVG; it needs
+  that nothing drawn on the stage reaches the footlights, the hint or the pilasters. `tools/frame2svg.py` draws a frame as SVG; it needs
   `XY_FONT` set to the path of the OP-XY's face, UniversNextPro-Light.ttf,
   which is not in this repository. `tools/make_gif.py` makes `docs/ghost.gif`
   and `tools/make_sheet.py` makes `docs/controls.png` and `docs/controls-1x.png`

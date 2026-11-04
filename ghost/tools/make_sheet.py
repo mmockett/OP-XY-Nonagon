@@ -16,7 +16,8 @@ binary, work = sys.argv[1], pathlib.Path(sys.argv[2])
 work.mkdir(parents=True, exist_ok=True)
 subprocess.run([binary, "sheet", str(work)], check=True)
 rows = [(n, f"sheet-{n}") for n in ("ring", "voice", "split", "trade", "beat", "orbit", "near")]
-rows += [("bed", "sheet-bed"), ("no sample", "sheet-empty")]
+rows += [("bed", "sheet-bed"), ("shift: gain -30, 0, +20", "sheet-shift"),
+         ("envelope: short release, long release, slow attack", "sheet-env"), ("no sample", "sheet-empty")]
 for scale, name in ((1, "controls-1x.png"), (2, "controls.png")):
     cells = []
     for label, stem in rows:

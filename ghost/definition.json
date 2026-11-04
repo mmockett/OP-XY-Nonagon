@@ -177,12 +177,18 @@
   "resources": {
     "voiceCapacity": 256,
     "stereoOutput": 1,
+    "stockShift": [
+      "start",
+      "window",
+      "gain",
+      "end"
+    ],
     "display": {
-      "stateBytes": 84,
+      "stateBytes": 100,
       "stateAlignment": 4,
       "paths": 4,
       "points": 64,
-      "nodes": 24,
+      "nodes": 66,
       "texts": 16,
       "palette": 16
     }
