@@ -294,9 +294,9 @@ Choose a synth on an instrument track, or Ghost or Recur on the sampler page.
 Press any encoder to switch between the two pages; Shift + turn makes fine
 steps. Each machine's presets show what it does; start there.
 
-Levels are matched to the Hexagon Suite: an eight-note chord on any preset
-peaks between about 0.4 and 0.8 of full scale, leaving room for the OP-XY's
-own filter and effects.
+The synths share one loudness with the Hexagon Suite and the Monomachine
+engines: a single held note at default volume sits about as loud on each,
+and every voice peaks at least 2 dB under the SDK's half-scale ceiling.
 
 Synths in the Open-XY SDK get no tempo, no note-off and no velocity, so
 Cocoa's taps, Drop's beat and Recur's rate run in their own units rather than

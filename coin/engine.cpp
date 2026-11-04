@@ -220,8 +220,10 @@ __attribute__((noinline)) void rub(Voice& voice, i32* sum, i32* struck, const i3
     voice.rough = rough;
     voice.last = noise[opxy::block_frames - 1] >> 1;
 }
-// The voice's last pass: a DC blocker and a soft knee to the output. Six times
-// the quarter, with the knee from 0.375 to a ceiling of 0.5. The clamp's bound
+// The voice's last pass: a DC blocker and a soft knee to the output. 8.67
+// times the quarter (six, lifted 3.2 dB to the suites' shared loudness), with
+// the knee from 0.375 to a ceiling of 0.5; the presets' peaks reach about 0.39,
+// so the knee only guards the extremes. The clamp's bound
 // and the knee are passed in, so the compiler keeps the clamp as a minimum and
 // a maximum, and the sign is put back without a branch (either would cost a
 // Blackfin a branch a sample). Returns the largest sample of the quarter mix.
@@ -236,7 +238,7 @@ __attribute__((noinline)) i32 finish(Voice& voice, const i32* sum, opxy::Output 
         i32 v = dc_out > most ? most : dc_out;
         v = v < least ? least : v;
         const i32 sign = v >> 31, a = (v ^ sign) - sign;
-        i32 o = a * 6;
+        i32 o = a * 8 + multiply(a, 1444480447);   // x 8.67
         if (o > knee) {
             const i32 over = o - knee;
             o = over >= 536870912 ? 1073741824 : o - (multiply(over, over) << 1);

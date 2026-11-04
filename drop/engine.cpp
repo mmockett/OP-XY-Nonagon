@@ -386,13 +386,17 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         dc_out += (mixed - dc_in) * 1024 - (dc_out >> 10);   // DC blocker, 7 Hz, its state Q25
         dc_in = mixed;
         // Q15 one is half scale. A soft knee from 0.25 rounds a beat's loudest
-        // onsets off toward 0.45, under the declared half scale.
+        // onsets off toward 0.45; then the level is lifted 1.7 dB to the
+        // suites' shared loudness, held within the declared half scale (only
+        // the knee's flat top, past 0.41, reaches it).
         const i32 v = clamp(dc_out >> 10, -65535, 65535), a = magnitude(v);
         i32 o = a << 15;
         if (o > 536870912) {
             const i32 over = o - 536870912;
             o = over >= 858993459 ? 966367642 : o - (opxy::q31::multiply(over, over) >> 10) * 1280;
         }
+        o += opxy::q31::multiply(o, 464255901);   // x 1.216
+        o = o > 1073741824 ? 1073741824 : o;
         o = static_cast<i32>((static_cast<u32>(o) >> 15) * static_cast<u32>(share));
         output[i] = v < 0 ? -o : o;
         loudest = a > loudest ? a : loudest;

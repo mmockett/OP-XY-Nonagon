@@ -996,15 +996,17 @@ inline void booms(Voice& v, Shared& shared, opxy::Output out, i32 air) {
     rumble(v, x, out, rise, k);
 }
 
-// A DC blocker (a pole at 6 Hz), then twice, within half scale; its state in
-// locals, so stores to output need not reload it.
+// A DC blocker (a pole at 6 Hz), lifted 2.4 dB to the suites' shared
+// loudness, then twice, within half scale; its state in locals, so stores to
+// output need not reload it. The presets' peaks reach about 0.39, just past
+// the knee's start, so it only guards the extremes.
 MACH_LOOP void finish(Voice& voice, opxy::Output output) {
     i32 dc_in = voice.dc_in, dc_out = voice.dc_out;
     for (u32 i = 0; i < opxy::block_frames; ++i) {
         const i32 x = output[i];
         dc_out = x - dc_in + opxy::q31::multiply(dc_out, 2145500000);
         dc_in = x;
-        output[i] = knee(dc_out) * 2;
+        output[i] = knee(dc_out + opxy::q31::multiply(dc_out, 683451142)) * 2;   // x 1.318
     }
     voice.dc_in = dc_in;
     voice.dc_out = dc_out;

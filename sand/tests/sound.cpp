@@ -303,9 +303,10 @@ int main() {
     }
 
 
-    // Level, matched to Hexagon's synths: a held middle C at the defaults sits
-    // within 2 dB of Hollow's Choir (-26.5 dBFS RMS), and an eight-note chord
-    // on every preset peaks between 0.4 and 0.8 of full scale.
+    // Level, at the suites' shared loudness: a held middle C at the defaults
+    // sits within 2 dB of -22.1 dBFS RMS (Hollow's Choir of old, -26.5, raised
+    // 4.4 dB), and an eight-note chord on every preset peaks between 0.66 and
+    // 1.33 of full scale (0.4 to 0.8, raised with it).
     {
         defaults(p);
         Note n(261.63);
@@ -316,7 +317,7 @@ int main() {
         const double level = 20 * std::log10(all);
         char what[80];
         std::snprintf(what, sizeof what, "a held middle C sits near Hexagon's level (%.1f dBFS)", level);
-        check(what, std::fabs(level + 26.5) < 2);
+        check(what, std::fabs(level + 22.1) < 2);
     }
     struct Preset { const char* name; double values[8]; };
     const Preset presets[] = {
@@ -345,9 +346,9 @@ int main() {
         }
         for (Note* n : notes) delete n;
         char what[96];
-        std::snprintf(what, sizeof what, "an eight-note chord of %s peaks between 0.4 and 0.8 (%.2f)", preset.name, peak);
+        std::snprintf(what, sizeof what, "an eight-note chord of %s peaks between 0.66 and 1.33 (%.2f)", preset.name, peak);
         std::printf("%s chord peak %.2f\n", preset.name, peak);
-        check(what, peak >= 0.4 && peak <= 0.8);
+        check(what, peak >= 0.66 && peak <= 1.33);
     }
 
     if (!failures) std::puts("Sand: all sound checks pass");

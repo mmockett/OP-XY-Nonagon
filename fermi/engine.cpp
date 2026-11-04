@@ -23,7 +23,7 @@
 namespace fermi {
 namespace sound {
 using opxy::q31::multiply;
-const u32 level = 1311;                     // a mode's amplitude (Q12) to its partial's (Q16): 0.08 x 16 / 1024 x 1024
+const u32 level = 2358;                     // a mode's amplitude (Q12) to its partial's (Q16): 0.144 x 16 / 1024 x 1024 (0.08, lifted 5.1 dB to the suites' shared loudness)
 const u32 fade_from = 1717986918u;          // partials fade out from 0.40 of the sample rate...
 const u32 fade_to = 1932735283u;            // ...to silence at 0.45
 const i32 ceiling = 1 << 30;                // half scale

@@ -357,11 +357,11 @@ int main() {
         check(std::fabs(best_cents) <= 8 && fundamental > 0.25 * top, what, best_cents, 10 * std::log10(fundamental / top));
     }
 
-    // ---- Level: a single A3 as Hexagon's Wane and Orbit, a chord's peak, the declared peak. ----
+    // ---- Level: a single A3 at the suites' shared loudness (Wane and Orbit of old, +1.7 dB), a chord's peak, the declared peak. ----
     {
         const Life life = play(defaults, 57, 4);
         const double level = db(rms(life.out, 0.5, 3.5));
-        check(level > -26.5 && level < -23.5, "the default A3 at -24 to -26 dBFS RMS", level);
+        check(level > -24.8 && level < -21.8, "the default A3 at -22 to -24.5 dBFS RMS", level);
         static drop::Voice voices[8];
         static drop::Shared shared;
         opxy::i32 parameters[8];
@@ -382,7 +382,7 @@ int main() {
             for (int i = 0; i < 64; ++i)
                 if (std::fabs(mix[i]) > peak) { peak = std::fabs(mix[i]); when = b / block_rate; }
         }
-        check(peak > 0.35 && peak < 0.8, "an eight-note chord of equal drops peaks at 0.4 to 0.8 (peak, when)", peak, when);
+        check(peak > 0.43 && peak < 0.97, "an eight-note chord of equal drops peaks at 0.43 to 0.97 (0.35 to 0.8, +1.7 dB) (peak, when)", peak, when);
         // Every corner of the controls stays under the declared peak.
         bool bounded = true;
         for (int corner = 0; corner < 256; corner += 5) {

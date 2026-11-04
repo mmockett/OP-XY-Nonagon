@@ -370,7 +370,7 @@ void bounded_and_silent() {
         mug.note(0, key);
         for (int b = 0; b < 4 * 689; ++b) {
             mug.play();
-            for (int i = 0; i < 64; ++i) bounded = bounded && mug.out[i] >= -697932186 && mug.out[i] <= 697932186;
+            for (int i = 0; i < 64; ++i) bounded = bounded && mug.out[i] >= -848815354 && mug.out[i] <= 848815354;
         }
     }
     check(bounded, "above the declared peak");
