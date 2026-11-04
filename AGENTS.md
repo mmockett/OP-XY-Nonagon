@@ -6,7 +6,7 @@ This repository holds the Nonagon Suite: nine machines, one per folder
 
 All nine build against the [Open-XY SDK](https://github.com/etcetc000/open-xy)
 on `staging`; Ghost and Recur are sample engines with their own screens, on SDK
-1.8. Do not
+1.10 (`stockShift`). Do not
 edit the SDK to make a machine work; propose an SDK change separately.
 
 Follow the SDK's [machine API](https://github.com/etcetc000/open-xy/blob/staging/docs/api.md)
