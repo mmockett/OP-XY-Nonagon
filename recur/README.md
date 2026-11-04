@@ -313,6 +313,19 @@ on the 8 grid) so it reads over the grid.
 
 ![Each map's print at rest and scrambled, on each grid, at 1:1](docs/prints.png)
 
+**The amp envelope.** The puzzle and the tape follow the track's stock amp
+envelope (SDK 1.10): while the note sounds, held or in its release, the
+tiles go on scrambling, the frame on the tape goes on stepping and the
+pendulum goes on swinging; the moving tiles and the frame brighten as the
+attack swells and dim toward the sustain and through the release, in four
+steps, and the pendulum's swing widens and narrows with it. With the
+envelope unknown it all stops as the note is let go, as before.
+Stock maps the envelope page's positions to times along its own curves, which
+aren't documented; the screen assumes them exponential in the position, 2 ms
+at 0 to about 10 s at full (1.9 s at 0.8) for attack, decay and release
+alike, and the sustain a level. That is a guess until it is timed against
+the device.
+
 The screen is still at rest. Tiles slide in 0.16 s, easing out. A frame
 spends at most 20 changes on tiles and the pieces they carry, so a big
 reshuffle ripples across the tray, and what that leaves (at least 4) on the

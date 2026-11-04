@@ -184,7 +184,7 @@
       "end"
     ],
     "display": {
-      "stateBytes": 88,
+      "stateBytes": 100,
       "stateAlignment": 4,
       "paths": 4,
       "points": 64,

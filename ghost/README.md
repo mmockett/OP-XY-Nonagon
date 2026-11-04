@@ -292,6 +292,16 @@ like Grains', lit while Shift edits them. The bars change only with the
 sample, its trim or its gain, at most 12 a frame. The contact sheets' last
 rows show it with Shift held at gain -30, 0 and +20, and the hint.
 
+The apparition follows the track's stock amp envelope (SDK 1.10): it swells
+in over the attack, holds at the sustain while a note is held and fades over
+the release, still circling while it sounds. With the envelope unknown it
+eases in and fades over ring's time, as before.
+Stock maps the envelope page's positions to times along its own curves, which
+aren't documented; the screen assumes them exponential in the position, 2 ms
+at 0 to about 10 s at full (1.9 s at 0.8) for attack, decay and release
+alike, and the sustain a level. That is a guess until it is timed against
+the device.
+
 The display cannot read the audio, so it draws everything from the
 controls, note activity and time, through the same `place()` (`ghost.h`) the
 engine uses. Each apparition's place is seeded from the note's serial, so it

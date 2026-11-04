@@ -84,6 +84,7 @@ rows = [("map", [f"sheet-map-{v}" for v in range(6)])]
 rows += [(c, [f"sheet-{c}-{v}" for v in (0, 50, 100)]) for c in controls]
 rows.append(("fit, 1/8", [f"sheet-fit8-{v}" for v in (0, 50, 100)]))
 rows.append(("shift: gain -30, 0, +20", [f"sheet-shift-{v}" for v in (0, 50, 100)]))
+rows.append(("envelope: short release, long release, slow attack", [f"sheet-env-{v}" for v in (0, 50, 100)]))
 rows.append(("empty", ["sheet-empty", "no sample: the header stays, a cover says how to load one"]))
 columns = ["0 (map: cat)", "50 (map: baker)", "100 (map: gold)", "map: pell", "map: shear", "map: hex"]
 for scale, name in ((1, "controls-1x.png"), (2, "controls.png")):

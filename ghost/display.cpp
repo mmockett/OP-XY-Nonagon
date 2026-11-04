@@ -12,6 +12,43 @@ namespace ghost {
 namespace {
 using namespace opxy::draw;
 
+// The track's amp envelope as the screen follows it (SDK 1.10, input.amp),
+// so the note's motion lasts as long as its sound: a level that swells over
+// the attack, falls over the decay to the sustain while a note is held, and
+// fades over the release from wherever it was. Stock maps the envelope page's
+// positions to times along its own curves, which aren't documented: assumed
+// here exponential in the position, 2 ms at 0 to 10 s at full, for attack,
+// decay and release alike, and the sustain a level, linear. With the envelope
+// unknown, or reduced motion, the level is 1 while a note is held and 0
+// otherwise, as before.
+inline opxy::u32 stage_ms(opxy::i32 position) {
+    const opxy::u32 p = position < 0 ? 0 : opxy::u32(position) >> 15;   // Q16
+    opxy::u32 l = ((p >> 4) * 3146) >> 4;   // 12.29 p, Q16: log2(5000) octaves at full
+    const opxy::u32 whole = l >> 16, m = 65536 + (l & 0xffff);
+    const opxy::u32 ms = (m << whole) >> 15;   // 2 ms * 2^l, by Mitchell's approximation
+    return ms < 2 ? 2 : ms;
+}
+inline void follow(Swell& s, const opxy::draw::Envelope& amp, bool held, bool started, bool still, opxy::u32 ms) {
+    if (still || !opxy::draw::envelope_known(amp)) { s.level = held ? 65536 : 0; s.stage = held ? 2 : 0; return; }
+    if (held && (started || s.stage == 0 || s.stage == 3)) s.stage = 1;
+    if (held) {
+        const opxy::u32 sustain = opxy::u32(amp.sustain < 0 ? 0 : amp.sustain) >> 15;
+        if (s.stage == 1) {
+            s.level += 65536 * ms / stage_ms(amp.attack);
+            if (s.level >= 65536) { s.level = 65536; s.stage = 2; }
+        } else {
+            const opxy::u32 step = (65536 - sustain) * ms / stage_ms(amp.decay);
+            s.level = s.level > sustain + step ? s.level - step : sustain;
+        }
+    } else if (s.stage) {
+        if (s.stage != 3) { s.stage = 3; s.from = s.level; }
+        const opxy::u32 step = s.from * ms / stage_ms(amp.release) + 1;
+        s.level = s.level > step ? s.level - step : 0;
+        if (!s.level) s.stage = 0;
+    }
+}
+
+
 u32 hash(u32 x) {
     x ^= x >> 16; x *= 0x7feb352du;
     x ^= x >> 15; x *= 0x846ca68bu;
@@ -335,6 +372,7 @@ inline void display_reset(DisplayState& state) {
     state.beat_ms = 0;
     state.step_ms = state.step = 0;
     state.bar_sweep = 0;
+    state.swell = Swell{0, 0, 0};
 }
 
 inline void display(DisplayState& state, const Input& input, Frame& frame) {
@@ -357,8 +395,13 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     const NoteEvents events = state.notes.update(input);
     const bool held = input.held_notes != 0 && input.held_notes <= 128;
     const bool still = input.reduced_motion != 0;
-    const bool moving = held && !still;
     const u32 ms = u32(clamp(input.elapsed, 0, 102)) * 1000 >> 10;
+    // With the track's amp envelope known, the figure follows it: it swells in
+    // over the attack, holds at the sustain and fades over the release, still
+    // circling while it sounds. Unknown, it eases in and fades over ring's time.
+    follow(state.swell, input.amp, held, events.hold_started, still, ms);
+    const bool enveloped = envelope_known(input.amp) && !still;
+    const bool moving = (held || (enveloped && state.swell.level)) && !still;
     const u32 ring = level(input.slots[kRing]), sung = level(input.slots[kVoice]), split = level(input.slots[kSplit]);
     const u32 trade = level(input.slots[kTrade]), beat = level(input.slots[kBeat]), orbit = level(input.slots[kOrbit]);
     const u32 near = level(input.slots[kNear]), bed = level(input.slots[kBed]);
@@ -381,6 +424,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     const u32 ring_time = ring_ms(ring);
     state.linger = ring_time > 2500 ? 2500 : ring_time;
     if (still) state.presence = held ? 65536 : 0;
+    else if (enveloped) state.presence = state.swell.level;
     else if (held) state.presence = u32(ease(i32(state.presence), 65536, ms));
     else {
         const u32 fall = 65536 * ms / (state.linger ? state.linger : 1);

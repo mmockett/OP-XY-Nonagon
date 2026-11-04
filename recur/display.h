@@ -12,6 +12,9 @@ using Frame = opxy::draw::Frame<paths, 64, node_total, 16, 16>;
 struct Slide { opxy::u8 from, to; opxy::u16 ms; };
 const opxy::u16 at_rest = 0xffff;
 
+// The amp envelope's level as the screen follows it (display.cpp, follow()).
+struct Swell { opxy::u32 level, from, stage; };   // level and from (the release's start) Q16; stage 0 idle, 1 attack, 2 decay, 3 release
+
 struct DisplayState {
     opxy::draw::PageHeader header;
     opxy::draw::NoteTracker notes;
@@ -23,6 +26,7 @@ struct DisplayState {
     opxy::i32 swing;      // the pendulum's angle, tenths of a degree
     opxy::u32 sweep;      // where in the tray this frame's changes begin
     opxy::u32 wave_key;   // the sample the waveform was drawn from
+    Swell swell;          // the amp envelope's level: the puzzle and tape play on through the release
     Slide slides[64];     // the shown grid's tiles, by their home slot
     opxy::u8 inks[64];    // each tile's shade: in hiss, how much of it is back in place
 };
