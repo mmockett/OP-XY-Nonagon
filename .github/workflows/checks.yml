@@ -7,9 +7,11 @@ permissions:
   contents: read
 env:
   # Ghost and Recur target SDK 1.10 (a sample engine's own screen, its
-  # overview and stockShift), on etcetc000/open-xy staging.
-  SAMPLE_SDK_REPO: etcetc000/open-xy
-  SAMPLE_SDK_REF: staging
+  # overview, stockShift and the amp envelope, on etcetc000/open-xy staging).
+  # Recur's own sample (machine.json "samples") needs the fork branch below.
+  # Switch back to etcetc000/open-xy staging once that branch merges upstream.
+  SAMPLE_SDK_REPO: mmockett/open-xy
+  SAMPLE_SDK_REF: sdk/machine-samples-v2
 jobs:
   # Each machine's records, browser preview, drawing checks and host sound
   # tests. The native compile needs the pinned Blackfin tools, which this Linux
