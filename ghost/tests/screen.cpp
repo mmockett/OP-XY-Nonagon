@@ -91,6 +91,23 @@ void play(const double* c, u32 notes, int frames, const char* when) {
         check_frame(when);
     }
 }
+// The swap hint, shown (Shift held, with a sample) or not: its nodes and
+// text slots on screen beside the slot's right end, clear of the columns and
+// markers and inside the pilaster, or all off screen with no words.
+void check_hint(bool shown, const char* when) {
+    bool ok = true;
+    for (u32 k = 0; k < ghost::sample_hint_nodes; ++k) {
+        const Node& n = frame.nodes[ghost::swap_first + k];
+        ok = ok && (shown ? n.x == ghost::swap_x * unit && n.y == ghost::swap_y * unit : n.x == hidden_x * unit && n.y == hidden_y * unit);
+    }
+    const Text& a = frame.texts[ghost::swap_text], &b = frame.texts[ghost::swap_text + 1];
+    if (shown) {
+        ok = ok && !std::strcmp(a.chars, "swap") && !std::strcmp(b.chars, "shift +") && a.x == ghost::swap_x * unit && b.x == ghost::swap_x * unit;
+        ok = ok && ghost::swap_x >= ghost::strip_x1 + 6 && ghost::swap_x + ghost::sample_hint_width <= 420 &&
+             ghost::swap_y >= 200 && ghost::swap_y + ghost::sample_hint_height <= 220;
+    } else ok = ok && !a.chars[0] && !b.chars[0] && a.x == hidden_x * unit && b.x == hidden_x * unit;
+    if (!ok) fail(shown ? "the swap hint isn't shown in its place" : "the swap hint shows", when, 0, 0);
+}
 u32 seed = 0x2545f491u;
 u32 next() { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; return seed; }
 }
@@ -172,10 +189,16 @@ int main() {
         if (std::fabs(x0 - (ghost::strip_x0 + width * 26460 / overview.frames)) > 0.5 ||
             std::fabs(x1 - (ghost::strip_x0 + width * 158760 / overview.frames)) > 0.5 || frame.nodes[ghost::mark_first].shade != 15)
             fail("the trim's markers", "Shift", 0, 0);
-        // Bars within the trim lit solid, those outside dim.
+        // Columns within the trim lit, those outside dim; and with Shift held,
+        // the swap hint: "swap" over "shift +" and the Sample key's icon, by the
+        // slot's right end, clear of the columns, the markers and the pilaster.
         u32 lit = 0, dark = 0;
-        for (u32 i = 0; i < ghost::bar_count; ++i) (frame.nodes[ghost::bar_first + i].paint == opxy::draw::fill_and_stroke ? lit : dark) += 1;
-        if (!lit || !dark) fail("the strip lights the trim", "bars", 0, 0);
+        for (u32 b = 0; b < ghost::sample_columns; ++b) {
+            const Node& n = frame.nodes[ghost::sample_line + 1 + b];
+            if (n.x != hidden_x * unit) (n.shade == 9 ? lit : dark) += 1;
+        }
+        if (!lit || !dark) fail("the columns light the trim", "columns", 0, 0);
+        check_hint(true, "Shift");
         for (int k = 0; k < 4; ++k) input.shown[k] = opxy::u8(4 + k);
         for (int t = 0; t < 20; ++t) ghost::display(state, input, frame);
         if (std::strcmp(frame.texts[0].chars, "start") || std::strcmp(frame.texts[2].chars, "gain") || std::strcmp(frame.texts[3].chars, "end") ||
@@ -189,9 +212,15 @@ int main() {
             char want[8];
             std::snprintf(want, sizeof want, "%c%d", g < 0 ? '-' : '+', g < 0 ? -g : g);
             if (std::strcmp(frame.texts[6].chars, want)) fail("the gain's caption", frame.texts[6].chars, 0, 0);
-            double total = 0;
-            for (u32 i = 0; i < ghost::bar_count; ++i) total += frame.nodes[ghost::bar_first + i].scale;
-            if (total <= last) fail("the strip grows with the gain", want, 0, 0);
+            double total = 0, tallest = 0;
+            for (u32 b = 0; b < ghost::sample_columns; ++b) {
+                const Node& n = frame.nodes[ghost::sample_line + 1 + b];
+                if (n.x == hidden_x * unit) continue;
+                total += n.scale;
+                tallest = std::fmax(tallest, n.scale / 1024.0 * ghost::sample_column_half);
+            }
+            if (total < last || (g > -30 && total <= last)) fail("the columns grow with the gain", want, 0, 0);   // at -30 a quiet sample may be only the line
+            if (tallest > 8.01) fail("a column reaches past the slot", want, 0, 0);
             last = total;
         }
         // With no gain known (gain_unavailable), its cell shows nothing.
@@ -202,9 +231,71 @@ int main() {
         // With no sample, the strip goes and the hint shows.
         overview.assigned = 0;
         for (int t = 0; t < 2; ++t) ghost::display(state, input, frame);
-        for (u32 n = ghost::bar_first; n < ghost::mark_first + 2; ++n)
+        for (u32 n = ghost::sample_line; n < ghost::swap_first + ghost::sample_hint_nodes; ++n)
             if (frame.nodes[n].x != opxy::draw::hidden_x * 1024) fail("the strip without a sample", "shown", 0, 0);
+        check_hint(false, "no sample, Shift held");
         overview.assigned = 1;
+        // Shift let go: the hint goes, and only it, the markers' shade and the header change.
+        for (int t = 0; t < 20; ++t) ghost::display(state, input, frame);
+        static ghost::Frame held;
+        held = frame;
+        input.shift = 0;
+        ghost::display(state, input, frame);
+        check_hint(false, "Shift let go");
+        for (u32 n = ghost::header_first + 8; n < ghost::Frame::node_count; ++n)
+            if (std::memcmp(&held.nodes[n], &frame.nodes[n], sizeof(Node)) && !(n >= ghost::mark_first && n < ghost::swap_first + ghost::sample_hint_nodes))
+                fail("letting go of Shift moves more than the hint and markers", "Shift", 0, n);
+        held = frame;
+        ghost::display(state, input, frame);
+        if (std::memcmp(&held, &frame, sizeof frame)) fail("the screen changes at rest after Shift", "Shift", 0, 0);
+    }
+    {   // The columns run from each bin's smallest value to its largest, both
+        // signs: a bin of positive values stands above the centre line, one of
+        // negative values hangs below it, a lopsided one sits off centre; a
+        // silent one leaves the line; and a new gain redraws at most 12 a frame.
+        load(true);
+        overview.high[10] = 20000; overview.low[10] = 4000;
+        overview.high[11] = -4000; overview.low[11] = -20000;
+        overview.high[12] = 24000; overview.low[12] = -6000;
+        overview.high[13] = 0; overview.low[13] = 0;
+        std::memset(&frame, 0, sizeof frame);
+        Input input;
+        std::memset(&input, 0, sizeof input);
+        ghost::display_reset(state);
+        input.track = 1;
+        input.elapsed = 17;
+        for (int t = 0; t < 3; ++t) ghost::display(state, input, frame);
+        const auto span = [&](u32 b, double& top, double& bottom) {
+            const Node& n = frame.nodes[ghost::sample_line + 1 + b];
+            const double h = n.scale / 1024.0 * ghost::sample_column_half;
+            top = n.y / 1024.0 - h; bottom = n.y / 1024.0 + h;
+            return n.x != hidden_x * unit;
+        };
+        double t0, b0;
+        if (!span(10, t0, b0) || b0 > ghost::strip_y || t0 > ghost::strip_y - 4) fail("a bin of positive values stands above the line", "columns", 0, 10);
+        if (!span(11, t0, b0) || t0 < ghost::strip_y || b0 < ghost::strip_y + 4) fail("a bin of negative values hangs below it", "columns", 0, 11);
+        if (!span(12, t0, b0) || !(t0 < ghost::strip_y && b0 > ghost::strip_y && ghost::strip_y - t0 > (b0 - ghost::strip_y) * 1.5))
+            fail("a lopsided bin sits off centre", "columns", 0, 12);
+        if (span(13, t0, b0)) fail("a silent bin leaves only the centre line", "columns", 0, 13);
+        if (frame.nodes[ghost::sample_line].x == hidden_x * unit) fail("the centre line", "columns", 0, 0);
+        static ghost::Frame was;
+        was = frame;
+        ghost::display(state, input, frame);
+        if (std::memcmp(&was, &frame, sizeof frame)) fail("the screen changes at rest", "columns", 0, 0);
+        overview.gain = 10;
+        u32 most = 0, frames_taken = 0;
+        for (int t = 0; t < 20; ++t) {
+            was = frame;
+            ghost::display(state, input, frame);
+            u32 changed = 0;
+            for (u32 b = 0; b <= ghost::sample_columns; ++b)
+                changed += std::memcmp(&was.nodes[ghost::sample_line + b], &frame.nodes[ghost::sample_line + b], sizeof(Node)) != 0;
+            most = changed > most ? changed : most;
+            frames_taken += changed != 0;
+        }
+        if (most > 12 || frames_taken > 8) fail("a new gain redraws more than 12 columns a frame", "columns", 0, most);
+        std::printf("columns: a new gain redraws over %u frames, at most %u a frame\n", frames_taken, most);
+        overview.gain = 0;
     }
     {   // The amp envelope (input.amp, SDK 1.10): the figure lasts as long as the
         // sound. Unknown, it fades over ring's time, as before. Stock reads a

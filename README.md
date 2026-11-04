@@ -310,8 +310,9 @@ plays straight away. Ghost plays without: its bed is then a gusty breath of its 
 and a loaded sample takes its place. On both, Shift and encoders 1, 2 and 4
 move the stock sampler's start marker, both markers together and its end
 marker, the stretch of the sample they play (for Recur, the loop it slices),
-and Shift + encoder 3 its gain; a strip under each screen shows the sample,
-its trim and its gain. Both screens follow the track's amp envelope, so their
+and Shift + encoder 3 its gain; a waveform along the foot of each screen
+shows the sample as a sampler draws it, with its trim and its gain, and
+while Shift is held a hint there says Shift + the Sample key swaps it. Both screens follow the track's amp envelope, so their
 motion lasts as long as the sound: as on stock, a larger attack or decay is
 longer, but a larger release is shorter.
 

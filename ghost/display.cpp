@@ -298,72 +298,165 @@ i32 ease(i32 value, i32 target, u32 ms) {
     const i32 m = i32(ms > 150 ? 150 : ms);
     return value + (target - value) * m / (m + 30);
 }
-}
 
-// An overview bin's largest magnitude, 0..255.
-u32 bin_peak(const SampleOverview& o, u32 b) {
-    const i32 low = o.low[b], high = o.high[b];
-    const u32 m = u32(high > -low ? high : -low) >> 7;
-    return m > 255 ? 255 : m;
+// --- sample view (to be shared) ---
+// A sample engine's own view of its sample, as a sampler draws one: a column
+// for each of SampleOverview's 96 bins, from the bin's smallest value to its
+// largest (both signs), on a faint centre line, lit within the trim and dim
+// outside it; the trim's start and end markers; and, while Shift is held, a
+// hint that Shift and the Sample key swap the sample. Only SampleOverview and
+// the frame API, in 32-bit arithmetic. Each machine's tools/make_panel.py
+// authors what it places:
+// - the centre line, a node: a thin ribbon as long as the slot, about its middle;
+// - the 96 columns, the nodes after it: each a rectangle with a fill,
+//   4.8 px wide and twice sample_column_half tall, about its centre,
+//   closing over a long side. Scaled to a column 2 px tall it is still 0.15 px
+//   wide (its points stay an eighth of a pixel apart on the device); to one
+//   16 px tall, 1.2 px;
+// - the start and end markers, two nodes with a fill, about the slot's centre line;
+// - the hint: sample_hint_nodes nodes, the Sample key's icon (Grains': its
+//   outline, its circle and its bars),
+//   authored with their own paint about the hint's top left corner, and two
+//   text slots, "swap" (10 px, #CBCBCB) and "shift +" (10 px, #7D7D7D), the
+//   empty state's greys.
+const u32 sample_columns = 96;            // overview_bins
+const i32 sample_column_half = 32;        // px, as authored
+const u32 sample_hint_nodes = 3;
+const i32 sample_hint_width = 52, sample_hint_height = 18;   // px, from its top left corner
+
+// Where a machine puts its sample: Q10 px and palette shades.
+struct SampleSlot {
+    i32 x0, width;      // the slot's left end and width (the whole sample)
+    i32 y, half;        // its centre line, and the furthest a column reaches from it
+    u32 lit, dim, line; // columns within the trim, outside it; the centre line
+};
+
+u32 sample_mix(u32 h, u32 v) {
+    h ^= v + 0x9e3779b9u + (h << 6) + (h >> 2);
+    return h;
 }
-u32 root(u32 n) {
+u32 sample_root(u32 n) {
     u32 r = 0;
     for (u32 bit = 1u << 15; bit; bit >>= 1)
         if ((r + bit) * (r + bit) <= n) r += bit;
     return r;
 }
+// at / frames of span (Q10, under 2^21), without a 64-bit product.
+i32 sample_along(i32 span, u32 at, u32 frames) {
+    while (frames >= 65536) { at >>= 1; frames >>= 1; }
+    if (!frames) return 0;
+    if (at > frames) at = frames;
+    return i32((u32(span >> 4) * at / frames) << 4);
+}
+// How far a bin's value v (-32768..32767) reaches from the centre line, Q10
+// px, up for positive values: as the root of |v| against the loudest bin (so
+// quiet stretches still show), the loudest reaching 85% of the way at a
+// gain of 0, scaled by louder (Q10), never past half.
+i32 sample_reach(i32 v, i32 loudest, i32 half, i32 louder) {
+    const u32 size = u32(v < 0 ? -v : v);
+    const u32 r = sample_root(size * 65536u / u32(loudest));   // 0..256
+    i32 h = i32(r) * (half * 87 / 102) >> 8;
+    h = (h * louder) >> 10;
+    if (h > half) h = half;
+    return v < 0 ? -h : h;
+}
 
-// The sample in the slot under the apron, where the hint is with none: a bar
-// for each 40th of the whole sample, as tall as the root of its peak against
-// the loudest (so quiet stretches still show) and scaled by the sample's gain
-// (twice as tall each 10 of stock's steps up, within the slot), lit solid
-// within the trim and dim outside it; and the trim's markers, lit while Shift
-// edits them. The bars change only with the sample, its trim or its gain, a
-// few a frame.
-void place_strip(DisplayState& state, Frame& frame, const SampleOverview& o, bool shift) {
+// The sample in its slot: the centre line (node line) and a column for each
+// bin (the 96 nodes after it), redrawn only when the sample, its loading, its
+// trim or its gain changes (key holds what was last drawn), at most budget
+// columns a frame, from the left (every one at once with snap). The gain is
+// stock's steps, -30..+20: a column is twice as tall each 10 steps up, within
+// the slot. A bin too quiet for a column 2 px tall leaves the centre line.
+// With no sample assigned, all of it goes.
+template <class F>
+void place_waveform(F& frame, u32 line, const SampleOverview& o, const SampleSlot& s, u32& key, bool snap, u32 budget) {
     if (!o.assigned) {
-        for (u32 n = bar_first; n < mark_first + 2; ++n) hide(frame, n);
+        for (u32 n = line; n <= line + sample_columns; ++n) hide(frame, n);
+        key = 0;
         return;
     }
     const i32 gain = o.gain == gain_unavailable ? 0 : clamp(o.gain, -30, 20);
-    // 2^(gain / 10), Q10: whole doublings, and the rest of one linearly (near enough to see).
-    const i32 g = gain + 30, louder = (128 << (g / 10)) * (10 + g % 10) / 10;   // 128 at -30 .. 4096 at +20
-    u32 loudest = 1;
-    if (o.loaded) for (u32 b = 0; b < overview_bins; ++b) if (bin_peak(o, b) > loudest) loudest = bin_peak(o, b);
     const u32 frames = o.frames ? o.frames : 1;
     const u32 end = o.end && o.end <= frames ? o.end : frames, begin = o.begin < end ? o.begin : 0;
-    const i32 width = (strip_x1 - strip_x0) * unit;
-    u32 budget = 12;
-    for (u32 n = 0; n < bar_count; ++n) {
-        const u32 i = (n + state.bar_sweep) % bar_count;
-        u32 peak = 0;
-        if (o.loaded)
-            for (u32 b = i * overview_bins / bar_count; b < (i + 1) * overview_bins / bar_count; ++b) peak = bin_peak(o, b) > peak ? bin_peak(o, b) : peak;
-        const i32 tall = 256 + i32(root(peak * 65536 / loudest)) * 3;   // Q10 of 12 px: a quarter to all of it at +0
-        const i32 scale = clamp((tall * louder) >> 10, 180, 1500);
-        // Its middle within the trim: lit.
-        const u32 middle = frames / bar_count * i + frames / bar_count / 2;
-        const bool lit = middle >= begin && middle < end;
-        const i32 x = strip_x0 * unit + width * i32(2 * i + 1) / i32(2 * bar_count);
-        const Node& node = frame.nodes[bar_first + i];
-        const Paint paint = lit ? fill_and_stroke : stroke;
-        const u32 shade = lit ? 9 : 4;
-        if (node.x == x && node.y == strip_y * unit && node.scale == scale && node.shade == shade && node.paint == paint) continue;
-        if (node.scale > 0) {   // a frame not yet drawn sets every bar at once
-            if (!budget) continue;
+    const u32 want = sample_mix(sample_mix(sample_mix(sample_mix(o.generation, o.loaded), u32(gain + 30)), begin), end) | 1;
+    if (key == want) return;
+    place(frame, line, s.x0 + s.width / 2, s.y, unit, s.line, fill_and_stroke);
+    // 2^(gain / 10), Q10: whole doublings, and the rest of one linearly (near enough to see).
+    const i32 g = gain + 30, louder = (128 << (g / 10)) * (10 + g % 10) / 10;   // 128 at -30 .. 4096 at +20
+    i32 loudest = 1;
+    if (o.loaded)
+        for (u32 b = 0; b < sample_columns; ++b) {
+            const i32 high = o.high[b], low = -i32(o.low[b]);
+            loudest = high > loudest ? high : loudest;
+            loudest = low > loudest ? low : loudest;
+        }
+    bool done = true;
+    for (u32 b = 0; b < sample_columns; ++b) {
+        const u32 node = line + 1 + b;
+        const i32 top = s.y - (o.loaded ? sample_reach(o.high[b], loudest, s.half, louder) : 0);
+        const i32 bottom = s.y - (o.loaded ? sample_reach(o.low[b], loudest, s.half, louder) : 0);
+        const Node& n = frame.nodes[node];
+        i32 x = hidden_x * unit, y = hidden_y * unit, scale = unit;
+        u32 shade = 0;
+        Paint paint = keep;
+        if (bottom - top >= 2 * unit) {
+            // Its middle within the trim: lit.
+            const u32 middle = frames / sample_columns * b + frames / sample_columns / 2;
+            x = s.x0 + s.width * i32(2 * b + 1) / i32(2 * sample_columns);
+            y = (top + bottom) / 2;
+            scale = (bottom - top) / (2 * sample_column_half);
+            shade = middle >= begin && middle < end ? s.lit : s.dim;
+            paint = fill_and_stroke;
+        }
+        if (n.x == x && n.y == y && n.scale == scale && n.cos == unit && n.sin == 0 && (paint == keep || (n.shade == shade && n.paint == paint)))
+            continue;
+        if (!snap) {
+            if (!budget) { done = false; continue; }
             --budget;
         }
-        place(frame, bar_first + i, x, strip_y * unit, scale, shade, paint);
+        place(frame, node, x, y, scale, shade, paint);
     }
-    state.bar_sweep = (state.bar_sweep + 7) % bar_count;
-    const u32 marks[2] = {begin, end};
-    for (u32 k = 0; k < 2; ++k) {
-        // marks[k] / frames of the strip's width, without a 64-bit product.
-        u32 a = marks[k], f = frames;
-        while (f >= 65536) { a >>= 1; f >>= 1; }
-        const i32 x = strip_x0 * unit + i32((u32(width >> 4) * a / f) << 4);
-        place(frame, mark_first + k, x, strip_y * unit, unit, shift ? 15 : 8, fill_and_stroke);
+    if (done) key = want;
+}
+
+// The trim's start and end markers (nodes first and first + 1), on the
+// sample's start and end within the slot, in shade.
+template <class F>
+void place_trim_marks(F& frame, u32 first, const SampleOverview& o, const SampleSlot& s, u32 shade) {
+    const u32 frames = o.frames ? o.frames : 1;
+    const u32 end = o.end && o.end <= frames ? o.end : frames, begin = o.begin < end ? o.begin : 0;
+    place(frame, first, s.x0 + sample_along(s.width, begin, frames), s.y, unit, shade, fill_and_stroke);
+    place(frame, first + 1, s.x0 + sample_along(s.width, end, frames), s.y, unit, shade, fill_and_stroke);
+}
+
+// While shown (Shift held, with a sample), the hint that Shift and the Sample
+// key swap the sample, its top left corner at (x, y), Q10 px: "swap" over
+// "shift +", and the key's icon beside both (nodes first..first + 2, text
+// slots text and text + 1). Otherwise it waits off screen, so it changes only
+// as Shift goes down and up.
+template <class F>
+void place_swap_hint(F& frame, u32 first, u32 text_slot, i32 x, i32 y, bool shown) {
+    for (u32 k = 0; k < sample_hint_nodes; ++k) {
+        if (shown) place(frame, first + k, x, y, unit, 0, keep);
+        else hide(frame, first + k);
     }
+    text(frame, text_slot, shown ? x : hidden_x * unit, shown ? y + 15 * unit / 2 : hidden_y * unit, unit, shown ? "swap" : "");
+    text(frame, text_slot + 1, shown ? x : hidden_x * unit, shown ? y + 18 * unit : hidden_y * unit, unit, shown ? "shift +" : "");
+}
+// --- end of sample view ---
+}
+
+// The sample in the slot under the apron, where the hint is with none
+// (README, "Screen"): the sample view's columns, lit within the trim and dim
+// outside it, at most 12 changing a frame while the sample, its trim or its
+// gain changes; the trim's markers, lit while Shift edits them; and while
+// Shift is held, the swap hint beside the slot's right end.
+void place_strip(DisplayState& state, Frame& frame, const SampleOverview& o, bool shift, bool snap) {
+    const SampleSlot slot = {strip_x0 * unit, (strip_x1 - strip_x0) * unit, strip_y * unit, 8 * unit, 9, 4, 3};
+    place_waveform(frame, sample_line, o, slot, state.wave_key, snap, 12);
+    if (o.assigned) place_trim_marks(frame, mark_first, o, slot, shift ? 15 : 8);
+    else { hide(frame, mark_first); hide(frame, mark_first + 1); }
+    place_swap_hint(frame, swap_first, swap_text, swap_x * unit, swap_y * unit, shift && o.assigned);
 }
 
 inline void display_reset(DisplayState& state) {
@@ -377,7 +470,8 @@ inline void display_reset(DisplayState& state) {
     state.scale = 0;
     state.beat_ms = 0;
     state.step_ms = state.step = 0;
-    state.bar_sweep = 0;
+    state.wave_key = 0;
+    state.drawn = 0;
     state.swell = Swell{0, 0, 0};
 }
 
@@ -520,7 +614,8 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     // No sample: Grains' hint under the apron, the stage playing on above it.
     if (!overview.assigned) hide(frame, hint_cover);
     else place(frame, hint_cover, 0, 0, unit, 0, fill_and_stroke);
-    place_strip(state, frame, overview, input.shift != 0);
+    place_strip(state, frame, overview, input.shift != 0, !state.drawn || still);
+    state.drawn = 1;
 
 }
 }

@@ -23,11 +23,30 @@ using namespace opxy::draw;
 
 i32 at(double v) { return i32(v * 2147483647.0); }
 
-// A sample loaded, its overview's peaks a breathy phrase.
+// A sample loaded: six seconds of a sung phrase, its overview's bins three
+// lines with a breath between, each line's syllables swelling and falling,
+// the wave a little lopsided (its peaks above the centre line higher than
+// those below), as a voice's is.
 void load() {
     overview.assigned = overview.loaded = 1; overview.frames = 264600; overview.rate = 44100; overview.end = 264600;
     overview.generation = 1;
-    for (u32 i = 0; i < 96; ++i) { const opxy::i16 peak = opxy::i16((60 + (i * 53 % 29) * 4 + ((i / 8) % 2) * 50) << 7); overview.high[i] = peak; overview.low[i] = opxy::i16(-peak); }
+    const double lines[3][2] = {{0.03, 0.31}, {0.37, 0.63}, {0.70, 0.95}};
+    u32 seed = 0x9e3779b9u;
+    auto jitter = [&]() { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; return (seed >> 8) / 16777216.0; };
+    for (u32 i = 0; i < 96; ++i) {
+        const double t = (i + 0.5) / 96;
+        double level = 0.035 + 0.02 * jitter();   // breath
+        for (const auto& l : lines)
+            if (t > l[0] && t < l[1]) {
+                const double u = (t - l[0]) / (l[1] - l[0]);
+                const double swell = std::pow(std::sin(M_PI * u), 0.5) * (1 - 0.35 * u);
+                const double syllables = 0.45 + 0.55 * std::fabs(std::sin(u * M_PI * (l[0] < 0.3 ? 4 : 3)));
+                level = std::fmax(level, swell * syllables);
+            }
+        level *= 0.8 + 0.2 * jitter();
+        overview.high[i] = opxy::i16(29000 * level * (0.9 + 0.1 * jitter()));
+        overview.low[i] = opxy::i16(-29000 * level * (0.62 + 0.18 * jitter()));
+    }
 }
 
 // What the OP-XY does with a shown reshaping outline, beyond the SDK's rules
@@ -262,7 +281,7 @@ int clear() {
             s.run(1.0 / 30);
             for (u32 i = 0; i < ghost::Frame::node_count; ++i) {
                 if ((i >= ghost::header_first && i < ghost::header_first + 8) || i == ghost::hint_cover || i == ghost::mask || i == ghost::twin_mask) continue;   // the silhouettes lie inside the figures
-                if (i >= ghost::bar_first) continue;   // the sample's strip and markers: the slot under the apron, by design
+                if (i >= ghost::sample_line) continue;   // the sample view and the swap hint: the slot under the apron, by design
                 const Node& d = s.frame.nodes[i];
                 if (d.x == hidden_x * unit && d.y == hidden_y * unit) continue;
                 // The node's outline: its path, or the shape make_panel.py draws it with.
@@ -318,7 +337,7 @@ int main(int argc, char** argv) {
     s.press(3); s.run(2.0, "circling-three"); s.release(); s.run(1.0);
     s.turn(ghost::kOrbit, 0.25, 0.2); s.turn(ghost::kNear, 0.1, 0.3); s.run(0.4, "far-spread");
     // A bed with a sample loaded.
-    overview.assigned = overview.loaded = 1; overview.frames = 441000; overview.rate = 44100; overview.end = 441000;
+    load(); overview.generation = 2; overview.frames = 441000; overview.end = 441000;
     s.turn(ghost::kBed, 1.0, 0.4); s.press(); s.run(1.2, "bed"); s.release(); s.run(0.6);
     // Shift held: the trim slid along the sample in tenths, then the gain stepped down and back.
     s.input.shift = 1; s.run(0.3);

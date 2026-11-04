@@ -61,11 +61,14 @@ most sustained part, or past a silence that would leave the bed gapped.
 | --- | --- | --- |
 | encoder 1 | **start**: where the bed's stretch begins | the robe frays into that stretch's waveform; the start's time in the sample |
 | encoder 2 | **window**: start and end together, keeping the length | the fray follows the stretch; its length |
-| encoder 3 | **gain**: the sample's gain, in stock's steps from -30 to +20; it scales the bed | the strip's bars grow and shrink; `+0`, `-12`, `+20` |
+| encoder 3 | **gain**: the sample's gain, in stock's steps from -30 to +20; it scales the bed | the waveform under the apron grows and shrinks; `+0`, `-12`, `+20` |
 | encoder 4 | **end**: where the stretch ends | the end's time in the sample |
 
-The track saves the markers and gain, as the sampler does. Without a sample,
-Shift's times read `-` and the gain's cell is blank.
+While Shift is held with a sample loaded, a small hint beside the waveform's
+right end reads "swap" over "shift +" and the Sample key's icon: Shift + the
+Sample key loads another sample in its place. The track saves the markers
+and gain, as the sampler does. Without a sample, Shift's times read `-` and
+the gain's cell is blank.
 
 | Control | Range | Default | Caption | What it does |
 | --- | --- | --- | --- | --- |
@@ -285,13 +288,20 @@ words, face and greys. It doesn't cover the stage, because Ghost plays on
 without a sample (breath and hum, and bed's own whisper), so the hint sits on
 one line under the apron, in front of the footlights, where nothing on the
 stage ever reaches. The hint goes as soon as a sample is loaded, and the
-sample takes its place: 40 bars across the slot, each a fortieth of the
-whole sample as tall as the root of its peak, scaled by the sample's gain
-(twice as tall each 10 steps up, within the slot), lit solid within the
-trim and dim outside it, between the trim's start and end markers, flags
-like Grains', lit while Shift edits them. The bars change only with the
-sample, its trim or its gain, at most 12 a frame. The contact sheets' last
-rows show it with Shift held at gain -30, 0 and +20, and the hint.
+sample takes its place, drawn as a sampler draws one: its waveform, a
+column for each of the sample overview's 96 stretches, from the stretch's
+lowest value to its highest, both above and below a faint centre line, so
+a voice's lopsided wave and its breaths show as they are. A column's
+height is the root of its value against the loudest (so quiet stretches
+still show), scaled by the sample's gain (twice as tall each 10 steps up,
+within the slot); a stretch too quiet for a column 2 px tall leaves the
+line. Columns within the trim are lit and those outside it dim, between
+the trim's start and end markers, flags like Grains', lit while Shift
+edits them. While Shift is held, "swap", "shift +" and the Sample key's
+icon sit beside the waveform's right end, in the empty hint's greys: Shift +
+the Sample key swaps the sample. The waveform changes only with the sample,
+its trim or its gain, at most 12 columns a frame. The contact sheets' last
+rows show it with Shift held at gain -30, 0 and +20, and the empty hint.
 
 The apparition follows the track's stock amp envelope (SDK 1.10): it swells
 in over the attack, holds at the sustain while a note is held and fades over
@@ -309,9 +319,10 @@ engine uses. Each apparition's place is seeded from the note's serial, so it
 matches the sound in kind, not note for note.
 
 The screen uses 4 reshaping outlines of 64 points (the apparition, its twin,
-its mouth and the chalk path), 66 nodes (8 of them the header bar, 42 the
-sample's strip), all 16 text slots, 46 static outlines (37 of the stage, 9
-of the hint's icon) and 88 bytes of state. Churn over a scripted
+its mouth and the chalk path), 126 nodes (8 of them the header bar, 99 the
+sample's waveform and markers, 3 the swap hint's icon), 18 text slots (the
+header's 16 and the swap hint's two words), 46 static outlines (37 of the
+stage, 9 of the hint's icon) and 104 bytes of state. Churn over a scripted
 run (`tools/frames.cpp`: every control, a page switch, three notes circling,
 the bed, Shift held with the trim slid and the gain stepped, reduced motion)
 is below. The idle screen is still: nothing changes
@@ -320,8 +331,8 @@ its tremble, hem and circling.
 
 | | Mean nodes changed a frame | While notes are held | Peak |
 | --- | --- | --- | --- |
-| 60 fps | 4.7 | 9.2 | 17 |
-| 30 fps | 5.2 | 9.3 | 22 |
+| 60 fps | 5.0 | 9.2 | 20 |
+| 30 fps | 5.6 | 9.3 | 22 |
 
 Sample engines have no browser preview, so the screen's frames, churn, GIF
 and contact sheets come from `tools/frames.cpp` on the host.
@@ -437,9 +448,13 @@ the top of its file.
   closing edge of 1/4 px, and no turn sharper than 2.5 degrees from straight
   back. It also checks that a trim changes the fray and that Shift's row reads
   start, window, gain and end with their times and steps on both pages; that
-  the trim's markers stand on the trim and light up, the bars within it lit;
-  that the bars grow with the gain; that an unknown gain (`gain_unavailable`)
-  leaves its cell blank; that with no sample the strip goes; and that the
+  the trim's markers stand on the trim and light up, the columns within it
+  lit; that the swap hint shows in its place while Shift is held and goes,
+  alone, when it is let go; that the columns grow with the gain, within the
+  slot; that they run from each bin's lowest value to its highest, above and
+  below the centre line, and a new gain redraws at most 12 a frame; that an
+  unknown gain (`gain_unavailable`) leaves its cell blank; that with no
+  sample the waveform goes; and that the
   apparition follows the amp envelope: fading over ring's time with an
   unknown envelope, gone at once with the shortest release, kept by a long
   one, gone sooner for a larger release word, and swelling in slower for a
