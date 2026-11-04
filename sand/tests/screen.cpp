@@ -161,6 +161,8 @@ int main() {
         for (int s = 0; s < settings; ++s) {
             Input input;
             std::memset(&input, 0, sizeof input);
+            // The envelope unknown, as before SDK 1.10 (tests/envelope.cpp follows one).
+            input.amp.attack = input.amp.decay = input.amp.sustain = input.amp.release = envelope_unavailable;
             for (int c = 0; c < 8; ++c) {
                 double v = defaults[c];
                 if (control < 0 && c == 0) v = (s + 0.5) / 12;
