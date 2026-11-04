@@ -29,10 +29,12 @@ const double heavy[8] = {1, 1, 1, 0, 1, 1, 0, 1};
 
 struct Amp { double attack, decay, sustain, release; bool known; };
 const Amp unknown = {0, 0, 0, 0, false};
-// An instant attack and a release of about 40 ms (amp.h's curve) ...
-const Amp short_one = {0, 0.5, 1, 0.16, true};
-// ... against a 1.25 s attack and a 3.4 s release.
-const Amp long_one = {0.5, 0.5, 0.75, 0.7, true};
+// Stock's times (amp_curve.h), where a larger release is SHORTER: an
+// instant attack and release 0.996 (word 0x7f..., stock's shortest, about
+// 6 ms) ...
+const Amp short_one = {0, 0.5, 1, 0.996, true};
+// ... against attack 0.5 (about 1.3 s) and release 0.5 (about 3 s to -66 dB).
+const Amp long_one = {0.5, 0.5, 0.75, 0.5, true};
 
 void prepare(Input& input, const double* c, const Amp& e) {
     std::memset(&input, 0, sizeof input);
@@ -90,7 +92,7 @@ struct Run {
     int last_change;      // the last frame after the note-off that changed anything
     int stopped;          // the frame after the note-off the strobe stopped (-1: never)
     double early;         // the widest swing a quarter second into the note, px
-    double late;          // the widest swing 1.5 s after the note-off, px
+    double late;          // the widest swing 0.75 s after the note-off, px
 };
 Run play(const double* c, const Amp& e, int hold, int after, bool again) {
     Input input;
@@ -111,7 +113,7 @@ Run play(const double* c, const Amp& e, int hold, int after, bool again) {
         r.hash = fnv(r.hash, &frame, sizeof frame);
         const int n = count[t] = changed();
         if (t == 15) r.early = widest();
-        if (t == hold + 90) r.late = widest();
+        if (t == hold + 45) r.late = widest();
         if (t >= hold && !state.running && r.stopped < 0) r.stopped = t - hold;
         if (t >= hold && n) r.last_change = t - hold;
         if (t >= frames - 60) r.rest += n;
@@ -148,13 +150,37 @@ int main() {
         const Run a = play(scenes[s], short_one, 60, 360, false), b = play(scenes[s], long_one, 60, 360, false);
         std::printf("envelope: %s: after the note-off the strobe runs %.2f s short, %.2f s long; the screen moves %.2f s against %.2f s\n",
                     names[s], a.stopped / 60.0, b.stopped / 60.0, (a.last_change + 1) / 60.0, (b.last_change + 1) / 60.0);
-        std::printf("envelope: %s: widest swing 0.25 s in %.1f px short, %.1f px long; 1.5 s after the note-off %.1f px long\n",
+        std::printf("envelope: %s: widest swing 0.25 s in %.1f px short, %.1f px long; 0.75 s after the note-off %.1f px long\n",
                     names[s], a.early, b.early, b.late);
         if (a.stopped < 0 || a.stopped > 6) { std::printf("FAIL %s: a short release runs the strobe %d frames after the note-off\n", names[s], a.stopped); ++failures; }
         if (a.last_change > 60) { std::printf("FAIL %s: a short release still moves %d frames after the note-off\n", names[s], a.last_change); ++failures; }
         if (b.stopped < 180) { std::printf("FAIL %s: a long release stops the strobe %d frames after the note-off\n", names[s], b.stopped); ++failures; }
         if (b.early * 2 > a.early) { std::printf("FAIL %s: a slow attack draws the chain out as far early on (%.1f px) as an instant one (%.1f)\n", names[s], b.early, a.early); ++failures; }
-        if (b.late < 2) { std::printf("FAIL %s: a long release shows no swing 1.5 s after the note-off (%.1f px)\n", names[s], b.late); ++failures; }
+        if (b.late < 2) { std::printf("FAIL %s: a long release shows no swing 0.75 s after the note-off (%.1f px)\n", names[s], b.late); ++failures; }
+    }
+
+    // Stock's directions (amp_curve.h): a larger release word ends the motion
+    // sooner (0.25, 0.5 and 0.996: about 7.9 s, 3 s and 6 ms to -66 dB), and a
+    // larger attack word moves less early on (0, 0.5 and 0.625: one block,
+    // about 1.3 s and 5.4 s).
+    {
+        const double releases[3] = {0.25, 0.5, 0.996}, attacks[3] = {0, 0.5, 0.625};
+        int lasted[3];
+        double swell[3];
+        for (int k = 0; k < 3; ++k) {
+            Amp e = short_one;
+            e.release = releases[k];
+            lasted[k] = play(scenes[0], e, 60, 600, false).last_change;
+            e = short_one;
+            e.attack = attacks[k];
+            swell[k] = static_cast<double>(play(scenes[0], e, 60, 60, false).early);
+        }
+        std::printf("envelope: release 0.25, 0.5, 0.996 move on %.2f, %.2f and %.2f s; attack 0, 0.5, 0.625 move %g, %g and %g early on\n",
+                    (lasted[0] + 1) / 60.0, (lasted[1] + 1) / 60.0, (lasted[2] + 1) / 60.0, swell[0], swell[1], swell[2]);
+        for (int k = 0; k < 2; ++k) {
+            if (!(lasted[k] > lasted[k + 1])) { std::printf("FAIL release %.3f doesn't end the motion sooner than %.3f\n", releases[k + 1], releases[k]); ++failures; }
+            if (!(swell[k] > swell[k + 1])) { std::printf("FAIL attack %.3f doesn't swell slower than %.3f\n", attacks[k + 1], attacks[k]); ++failures; }
+        }
     }
 
     // 3. Churn under a held note and its release, at the defaults and the

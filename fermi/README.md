@@ -437,6 +437,7 @@ clock and voices the energy flow between its modes.
 | `tools/make_widths.py` | `tests/widths.h`: the header face's advance widths, for the captions' check |
 | `tools/calibrate.py`, `tools/calibration.json` | The energy knob's and the clock's calibration |
 | `amp.h` | The amp envelope as the screen follows it, a copy of the suite's `tools/amp.h` |
+| `amp_curve.h` | Stock's amp envelope times and shapes, which `amp.h` follows, a copy of the suite's `tools/amp_curve.h` |
 | `tests/sound.cpp`, `tests/screen.cpp`, `tests/envelope.cpp` | Host checks |
 | `tools/render.cc`, `tools/phrases.py`, `tools/sweep.py`, `tools/measure.py` | Phrase renders, Hexagon comparisons, the control sweep and the measurements |
 | `tools/make_gif.py` | `docs/fermi.gif`, `docs/controls.png` and `docs/controls-1x.png`, and stills such as `docs/breathing.png`, `docs/into-chaos.png` and `docs/cubic.png` |

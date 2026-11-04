@@ -29,10 +29,12 @@ const double heavy[8] = {1, 1, 0, 0.5, 1, 1, 1, 1};
 
 struct Amp { double attack, decay, sustain, release; bool known; };
 const Amp unknown = {0, 0, 0, 0, false};
-// An instant attack and a release of about 40 ms (amp.h's curve) ...
-const Amp short_one = {0, 0.5, 1, 0.16, true};
-// ... against a 1.25 s attack and a 3.4 s release.
-const Amp long_one = {0.5, 0.5, 0.75, 0.7, true};
+// Stock's times (amp_curve.h), where a larger release is SHORTER: an
+// instant attack and release 0.996 (word 0x7f..., stock's shortest, about
+// 6 ms) ...
+const Amp short_one = {0, 0.5, 1, 0.996, true};
+// ... against attack 0.5 (about 1.3 s) and release 0.5 (about 3 s to -66 dB).
+const Amp long_one = {0.5, 0.5, 0.75, 0.5, true};
 
 void prepare(Input& input, const double* c, const Amp& e) {
     std::memset(&input, 0, sizeof input);
@@ -143,8 +145,32 @@ int main() {
         std::printf("envelope: %s: after the note-off, short moves for %.2f s, long for %.2f s; first 0.25 s %d against %d nodes, the spoon rocking %.1f against %.1f px\n",
                     names[s], (a.last_change + 1) / 60.0, (b.last_change + 1) / 60.0, a.early, b.early, a.swing / 1024.0, b.swing / 1024.0);
         if (a.last_change > 45) { std::printf("FAIL %s: a short release still moves %d frames after the note-off\n", names[s], a.last_change); ++failures; }
-        if (b.last_change < 150) { std::printf("FAIL %s: a long release stops %d frames after the note-off\n", names[s], b.last_change); ++failures; }
+        if (b.last_change < 30 || b.last_change <= a.last_change) { std::printf("FAIL %s: a long release stops %d frames after the note-off\n", names[s], b.last_change); ++failures; }
         if (b.swing * 4 > a.swing) { std::printf("FAIL %s: a slow attack rocks the spoon %d, an instant one %d\n", names[s], b.swing, a.swing); ++failures; }
+    }
+
+    // Stock's directions (amp_curve.h): a larger release word ends the motion
+    // sooner (0.25, 0.5 and 0.996: about 7.9 s, 3 s and 6 ms to -66 dB), and a
+    // larger attack word moves less early on (0, 0.5 and 0.625: one block,
+    // about 1.3 s and 5.4 s).
+    {
+        const double releases[3] = {0.25, 0.5, 0.996}, attacks[3] = {0, 0.5, 0.625};
+        int lasted[3];
+        double swell[3];
+        for (int k = 0; k < 3; ++k) {
+            Amp e = short_one;
+            e.release = releases[k];
+            lasted[k] = play(scenes[0], e, 60, 600, false).last_change;
+            e = short_one;
+            e.attack = attacks[k];
+            swell[k] = static_cast<double>(play(scenes[0], e, 60, 60, false).early);
+        }
+        std::printf("envelope: release 0.25, 0.5, 0.996 move on %.2f, %.2f and %.2f s; attack 0, 0.5, 0.625 move %g, %g and %g early on\n",
+                    (lasted[0] + 1) / 60.0, (lasted[1] + 1) / 60.0, (lasted[2] + 1) / 60.0, swell[0], swell[1], swell[2]);
+        for (int k = 0; k < 2; ++k) {
+            if (!(lasted[k] > lasted[k + 1])) { std::printf("FAIL release %.3f doesn't end the motion sooner than %.3f\n", releases[k + 1], releases[k]); ++failures; }
+            if (!(swell[k] > swell[k + 1])) { std::printf("FAIL attack %.3f doesn't swell slower than %.3f\n", attacks[k + 1], attacks[k]); ++failures; }
+        }
     }
 
     // 3. Churn under a held note and its release, at the defaults, tapping

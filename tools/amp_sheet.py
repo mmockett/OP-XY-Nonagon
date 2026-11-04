@@ -71,8 +71,8 @@ def svg(data):
 rows = {'short': [], 'long': []}
 for f in frames:
     rows[f['row']].append(f)
-labels = {'short': 'short envelope: attack 0, sustain 100, release ~40 ms',
-          'long': 'long envelope: attack 1.25 s, sustain 75, release 3.4 s'}
+labels = {'short': 'short envelope: attack 0, sustain 100, release word 0x7f000000 (about 6 ms)',
+          'long': 'long envelope: attack word 0x40000000 (about 1.45 s), sustain 75, release word 0 (about 55 s)'}
 parts = []
 for row in ('short', 'long'):
     parts.append(f'<div class="row"><div class="h">{m} · {labels[row]}</div>')

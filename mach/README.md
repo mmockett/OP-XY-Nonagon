@@ -177,8 +177,7 @@ swells, hold at the sustain while keys are held and draw in over the
 release. A short release ends the flight at once; a long one keeps the
 projectile crossing the field, its waves fading, until the sound ends.
 Without the envelope (an older OS, the builder's preview) the screen keeps
-its own timing. The shared `amp.h` follows the envelope; its note gives the
-curve it assumes for stock's envelope times.
+its own timing. The shared `amp.h` follows the envelope; its note gives stock's envelope times and shapes.
 
 The screen cannot hear the engine: it derives the flight from the controls
 and time through `flight.h`, which the engine shares.
@@ -319,6 +318,7 @@ The figures below are host estimates made during development.
 | `flight.h` | the controls' laws and the flight's timeline, shared with the screen |
 | `display.cpp`, `display.h`, `plate.h` | the photograph |
 | `amp.h` | the amp envelope as the screen follows it, a copy of the suite's `tools/amp.h` |
+| `amp_curve.h` | stock's amp envelope times and shapes, which `amp.h` follows, a copy of the suite's `tools/amp_curve.h` |
 | `tables.h` ← `tools/make_tables.py` | wavetables, sine, the bell's rings, the voice's pulse, small curves |
 | `panel.svg.fragment`, `plate.h` ← `tools/make_panel.py` | the artwork |
 | `tests/sound.cpp`, `tests/screen.cpp` | host checks; `screen` also prints frames (`tour` for the GIF, `still:` for the contact sheet) |

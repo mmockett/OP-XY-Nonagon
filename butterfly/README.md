@@ -301,8 +301,7 @@ beating, more and more gently, until the sound ends. A pluck's light still
 dies with its ring. Without the envelope (an older OS, the builder's
 preview) the screen keeps its own timing: the wings beat while keys are
 held, and the light fades in about 0.2 s after. The shared `amp.h` follows
-the envelope; its note gives the curve it assumes for stock's envelope
-times.
+the envelope; its note gives stock's envelope times and shapes.
 
 ### Redrawing little
 
@@ -420,6 +419,7 @@ the screen and outline tests under ASan too.
 | `tables.h`, `tables_data.h` | The tables' declarations, and their one definition (from `tools/make_tables.py`) |
 | `display.h`, `display.cpp` | The screen |
 | `amp.h` | The amp envelope as the screen follows it, a copy of the suite's `tools/amp.h` |
+| `amp_curve.h` | Stock's amp envelope times and shapes, which `amp.h` follows, a copy of the suite's `tools/amp_curve.h` |
 | `panel.svg.fragment`, `plate.h` | Artwork and the wing's geometry, from `tools/make_panel.py` |
 | `tests/sound.cpp`, `tests/screen.cpp`, `tests/outlines.cpp`, `tests/captions.cpp`, `tests/envelope.cpp`, `tests/scenes.cpp` | The checks above |
 | `tests/presets.h` | The presets for the tests, from `tools/make_presets.py` |

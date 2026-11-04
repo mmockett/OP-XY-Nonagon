@@ -225,8 +225,7 @@ holding at its sustain while keys are held and fading over its release. A
 short release lets the sand settle at once; a long one keeps it dancing and
 the bow drawing until the sound ends. Without the envelope (an older OS, the
 builder's preview) the screen keeps its own timing. The shared `amp.h`
-follows the envelope; its note gives the curve it assumes for stock's
-envelope times.
+follows the envelope; its note gives stock's envelope times and shapes.
 
 A settled plate redraws nothing. Only part of the sand is redrawn each
 frame, moving grains every third frame and settled ones every sixth, so
@@ -263,6 +262,8 @@ the plate.
   above, and that every corner of the controls stays bounded.
 - `amp.h`: the amp envelope as the screen follows it, a copy of the
   suite's `tools/amp.h`.
+- `amp_curve.h`: stock's amp envelope times and shapes, which `amp.h`
+  follows, a copy of the suite's `tools/amp_curve.h`.
 - `tests/envelope.cpp`: the screen under the amp envelope, run by
   `sdk.py test`: unchanged frames with the envelope unknown, a short
   envelope's motion ending soon after the note-off and a long one's lasting

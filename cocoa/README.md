@@ -318,7 +318,7 @@ the drink at once; a long one keeps it sloshing, its bubbles rising and the
 spoon tapping until the sound ends, and a slow attack brings the spoon down
 gently. Without the envelope (an older OS, the builder's preview) the screen
 keeps its own timing. The shared `amp.h` follows the envelope; its note
-gives the curve it assumes for stock's envelope times.
+gives stock's envelope times and shapes.
 
 **Churn.** `tests/screen.cpp` plays a 22 s scene at 60 fps (a long climb,
 page 2 and its controls, a second note, a chord at fast taps, then cup and
@@ -333,6 +333,7 @@ fill changes): 5.9 nodes change a frame on average, 30 at most. The idle screen 
 | `core.h`, `engine.cpp` | The voice: the drink, the column's and cup's modes, the pops, the strum and the soft clip |
 | `display.h`, `display.cpp` | The screen |
 | `amp.h` | The amp envelope as the screen follows it, a copy of the suite's `tools/amp.h` |
+| `amp_curve.h` | Stock's amp envelope times and shapes, which `amp.h` follows, a copy of the suite's `tools/amp_curve.h` |
 | `tables.h` | Written by `tools/make_tables.py`: log₂ and 2^x, the sine, W(s), the modes, the cups, the spoon |
 | `panel.svg.fragment`, `plate.h` | Written by `tools/make_panel.py`: the artwork, the vessels and spoons, each spoon's rest on each cup, the scatter of bubbles and flecks |
 | `tests/sound.cpp` | The physics and playing checks |

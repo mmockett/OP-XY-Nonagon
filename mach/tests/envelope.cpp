@@ -31,10 +31,12 @@ const double heavy[8] = {1.0, 0.6, 0.9, 1.0, 1.0, 0.0, 1.0, 0.6};
 
 struct AmpShape { double attack, decay, sustain, release; bool known; };
 const AmpShape unknown = {0, 0, 0, 0, false};
-// An instant attack and a release of about 40 ms (amp.h's curve) ...
-const AmpShape short_one = {0, 0.5, 1, 0.16, true};
-// ... against a 1.25 s attack and a 3.4 s release.
-const AmpShape long_one = {0.5, 0.5, 0.75, 0.7, true};
+// Stock's times (amp_curve.h), where a larger release is SHORTER: an
+// instant attack and release 0.996 (word 0x7f..., stock's shortest, about
+// 6 ms) ...
+const AmpShape short_one = {0, 0.5, 1, 0.996, true};
+// ... against attack 0.5 (about 1.3 s) and release 0.5 (about 3 s to -66 dB).
+const AmpShape long_one = {0.5, 0.5, 0.75, 0.5, true};
 
 void prepare(Input& input, const double* c, const AmpShape& e) {
     std::memset(&input, 0, sizeof input);
@@ -200,10 +202,34 @@ int main() {
         if (a.flown > 6) { std::printf("FAIL %s: a short release still flies %d frames after the note-off\n", names[s], a.flown); ++failures; }
         if (a.last_change > 30) { std::printf("FAIL %s: a short release still moves %d frames after the note-off\n", names[s], a.last_change); ++failures; }
         if (b.flown < 60) { std::printf("FAIL %s: a long release stops flying %d frames after the note-off\n", names[s], b.flown); ++failures; }
-        if (s == 1 && (b.flown < 200 || b.flown > 215)) { std::printf("FAIL %s: flies %d frames after the note-off, not until the release ends (3.4 s)\n", names[s], b.flown); ++failures; }
+        if (s == 1 && (b.flown < 175 || b.flown > 185)) { std::printf("FAIL %s: flies %d frames after the note-off, not until the release ends (3 s)\n", names[s], b.flown); ++failures; }
         if (s == 1) continue;
         if (b.early >= a.early) { std::printf("FAIL %s: a slow attack's waves reach as far early on (%d px) as an instant one's (%d)\n", names[s], b.early, a.early); ++failures; }
         if (b.released >= b.held) { std::printf("FAIL %s: the release doesn't draw the waves in (%d px held, %d after)\n", names[s], b.held, b.released); ++failures; }
+    }
+
+    // Stock's directions (amp_curve.h): a larger release word ends the motion
+    // sooner (0.25, 0.5 and 0.996: about 7.9 s, 3 s and 6 ms to -66 dB), and a
+    // larger attack word moves less early on (0, 0.5 and 0.625: one block,
+    // about 1.3 s and 5.4 s).
+    {
+        const double releases[3] = {0.25, 0.5, 0.996}, attacks[3] = {0, 0.5, 0.625};
+        int lasted[3];
+        double swell[3];
+        for (int k = 0; k < 3; ++k) {
+            AmpShape e = short_one;
+            e.release = releases[k];
+            lasted[k] = play(scenes[0], e, 60, 600, false).last_change;
+            e = short_one;
+            e.attack = attacks[k];
+            swell[k] = static_cast<double>(play(scenes[0], e, 60, 60, false).early);
+        }
+        std::printf("envelope: release 0.25, 0.5, 0.996 move on %.2f, %.2f and %.2f s; attack 0, 0.5, 0.625 move %g, %g and %g early on\n",
+                    (lasted[0] + 1) / 60.0, (lasted[1] + 1) / 60.0, (lasted[2] + 1) / 60.0, swell[0], swell[1], swell[2]);
+        for (int k = 0; k < 2; ++k) {
+            if (!(lasted[k] > lasted[k + 1])) { std::printf("FAIL release %.3f doesn't end the motion sooner than %.3f\n", releases[k + 1], releases[k]); ++failures; }
+            if (!(swell[k] > swell[k + 1])) { std::printf("FAIL attack %.3f doesn't swell slower than %.3f\n", attacks[k + 1], attacks[k]); ++failures; }
+        }
     }
 
     // 3. Churn under a held note and its release, at the defaults and the

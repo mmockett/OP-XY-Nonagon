@@ -385,11 +385,11 @@ outlines against the device's drawing rules, and churn kept low;
 The synths' screens follow the track's amp envelope through one helper,
 `tools/amp.h`, copied into each synth's folder as `amp.h`: a note's motion
 swells with the attack, holds at the sustain while keys are held and fades
-over the release, so it lasts as long as the sound. Stock doesn't publish
-how its envelope controls map to times; the helper assumes one curve for
-attack, decay and release, about 2 ms at 0 rising with the cube of the
-control to about 10 s at full (half way is about 1.25 s), with sustain a
-linear level. Without the envelope (an older OS, the builder's preview) each
+over the release, so it lasts as long as the sound. It uses the OP-XY's own
+times and curves (`tools/amp_curve.h`): a larger attack or decay is a longer
+stage, but a larger release is a shorter one. The attack rises quickly and
+rounds off at the top, the decay and release fade exponentially, and the
+sustain is a plain level. Without the envelope (an older OS, the builder's preview) each
 screen keeps its own timing. `tools/amp_sheet.py` draws a synth's screen
 under a short envelope against a long one, at 1:1. The
 animations in `docs/screens` are rendered from the real display code through

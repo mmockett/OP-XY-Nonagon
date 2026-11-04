@@ -256,14 +256,13 @@ gone when the release ends: a short release clears it at once, a long one
 leaves it shrinking on the iron for seconds. A drop whose own life is shorter
 still goes when it evaporates. Without the envelope (an older OS, the
 builder's preview) the screen keeps its own timing. The shared `amp.h`
-follows the envelope; its note gives the curve it assumes for stock's
-envelope times.
+follows the envelope; its note gives stock's envelope times and shapes.
 
 **Churn** (host, 60 fps, nodes changing a frame while drops show): a drop's
 life 3.2, peak 7; three drops 6.7, peak 16; a sizzle 9.5, peak 12 (the
 spray); the ratchet 5.4, peak 8; a 16 s run of everything 2.2 on average
-(6.8 while drops show), peak 17. Under an amp envelope with a 3.4 s release,
-a note 3.5 and a chord 7.8, peak 16. Idle: 0.
+(6.8 while drops show), peak 17. Under an amp envelope with a 3 s release,
+a note 3.3 and a chord 8.5, peak 16. Idle: 0.
 
 ## Level
 
@@ -352,6 +351,7 @@ The figures below are host estimates made during development.
 | `tables.h` | log2/exp2 tables and the liquids (`tools/make_tables.py`) |
 | `display.h`, `display.cpp`, `panel.svg.fragment` | The screen (`tools/make_panel.py`) |
 | `amp.h` | The amp envelope as the screen follows it, a copy of the suite's `tools/amp.h` |
+| `amp_curve.h` | Stock's amp envelope times and shapes, which `amp.h` follows, a copy of the suite's `tools/amp_curve.h` |
 | `tests/sound.cpp`, `tests/screen.cpp`, `tests/frame_rules.cpp`, `tests/envelope.cpp`, `tests/captions.cpp`, `tests/scenes.cpp` | The host checks above |
 | `tools/ears.py` | The presets' listening measurements above |
 | `tools/sweep.py`, `tools/sweep.cpp` | The controls' measurements above |

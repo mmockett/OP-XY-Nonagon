@@ -217,7 +217,7 @@ disk from flat; a short release lays it flat at once, and a long one lets
 it settle as it would, or, at hold, keeps it spinning, leaning lower, until
 the release ends. Without the envelope (an older OS, the builder's preview)
 the screen keeps its own timing. The shared `amp.h` follows the envelope;
-its note gives the curve it assumes for stock's envelope times.
+its note gives stock's envelope times and shapes.
 
 Every control changes the toy at a glance ([`docs/controls.png`](docs/controls.png):
 a row per control at 0, 50 and 100, enlarged; [`docs/controls-1x.png`](docs/controls-1x.png)
@@ -296,6 +296,8 @@ are the ones the host times as dearest. The firmware compile
   after changing a shape, and commit all three.
 - `amp.h`: the amp envelope as the screen follows it, a copy of the
   suite's `tools/amp.h`.
+- `amp_curve.h`: stock's amp envelope times and shapes, which `amp.h`
+  follows, a copy of the suite's `tools/amp_curve.h`.
 - `tests/sound.cpp`: the sound and screen checks, run by `sdk.py test`.
 - `tests/envelope.cpp`: the screen under the amp envelope, run by
   `sdk.py test`: unchanged frames with the envelope unknown, a short

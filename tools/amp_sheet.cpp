@@ -54,9 +54,11 @@ int main(int argc, char** argv) {
     double c[8];
     for (int k = 0; k < 8; ++k) c[k] = std::atof(argv[2 + k]);
     const int page = argc > 10 ? std::atoi(argv[10]) : 0;
-    // A short envelope (instant attack, full sustain, ~40 ms release on
-    // amp.h's curve) and a long one (1.25 s attack, sustain 75%, 3.4 s release).
-    const double envelopes[2][4] = {{0, 0.5, 1, 0.16}, {0.5, 0.5, 0.75, 0.7}};
+    // Stock's words (amp_curve.h), where a larger release is SHORTER: a short
+    // envelope (instant attack, full sustain, release word 0x7f000000, about
+    // 6 ms) and a long one (attack word 0x40000000, about 1.45 s; sustain 75%;
+    // release word 0, stock's longest, about 55 s to -66 dB).
+    const opxy::i32 envelopes[2][4] = {{0, 0x40000000, 0x7fffffff, 0x7f000000}, {0x40000000, 0x40000000, 0x60000000, 0}};
     const char* rows[2] = {"short", "long"};
     // Seconds from the note: held to 1.0 s, then released.
     const double times[7] = {0.1, 0.4, 0.9, 1.1, 1.5, 2.5, 4.0};
@@ -72,10 +74,10 @@ int main(int argc, char** argv) {
         }
         input.track = 1;
         input.elapsed = 17;  // 60 frames a second, Q10 s
-        input.amp.attack = q31(envelopes[e][0]);
-        input.amp.decay = q31(envelopes[e][1]);
-        input.amp.sustain = q31(envelopes[e][2]);
-        input.amp.release = q31(envelopes[e][3]);
+        input.amp.attack = envelopes[e][0];
+        input.amp.decay = envelopes[e][1];
+        input.amp.sustain = envelopes[e][2];
+        input.amp.release = envelopes[e][3];
         for (int t = 0; t < 12; ++t) display(state, input, frame);
         ++input.note_serial;
         input.held_notes = 1;
