@@ -30,7 +30,9 @@ where it started. Recur's square of slices is such a picture.
 ![Recur's screen: the puzzle at rest; one iteration in; the baker's map on 8 x 8 with a chord; hiss](docs/screen.png)
 
 Recur is an OP-XY sample engine, id `recur`. It targets Open-XY
-SDK 1.8, which gives a sample engine its own screen and the sample's overview.
+SDK 1.10: SDK 1.8 gives a sample engine its own screen and the sample's
+overview, and 1.10's `stockShift` hands Shift and three encoders back to the
+stock sampler's start and end markers.
 With no sample loaded, its screen shows a cover reading "load a sample ·
 shift +" and the Sample key's icon.
 
@@ -49,11 +51,28 @@ Press any encoder to switch pages.
 | 3 | slice | depth |
 | 4 | map | chrd |
 
+Holding Shift, encoders 1, 2 and 4 move the stock sampler's markers
+instead, on either page. They trim the stretch of the sample pos ranges
+over: the whole sample when it is newly loaded.
+
+| Shift + | Edits | On the screen |
+| --- | --- | --- |
+| encoder 1 | **start**: where the trim begins | the tape lights the trim, the caliper on its ends; the start's time in the sample |
+| encoder 2 | **window**: start and end together, keeping the trim's length | the lit stretch slides; its length |
+| encoder 3 | its own control: depth in fine steps on page 2; slice on page 1, a choice a detent as ever | as without Shift |
+| encoder 4 | **end**: where the trim ends | the end's time in the sample |
+
+Trim to the bar or phrase that matters, and pos places the window inside
+it: at 0 the window starts on the start marker, so a downbeat set there
+starts every pass. The track saves the markers, as the sampler does, and a
+sample trimmed on the stock sampler plays the same stretch here; gain and
+tuning set there still apply.
+
 The values below are each control at 0, 25, 50, 75 and 100.
 
 | Control | 0 / 25 / 50 / 75 / 100 | Default | Caption | What it does |
 | --- | --- | --- | --- | --- |
-| pos | the window at the sample's start, a quarter, half and three quarters of the way, and ending at its end | 0 | seconds to the window's start (`0.62s`, `12.4s`, `123s`; whole minutes, `17m`, from 1000 s) | Where the window sits, from the start of the sample to its end. A window longer than the sample wraps round it, and pos turns it. |
+| pos | the window at the start marker, a quarter, half and three quarters of the way, and ending at the end marker | 0 | seconds to the window's start (`0.62s`, `12.4s`, `123s`; whole minutes, `17m`, from 1000 s) | Where the window sits, from the start marker to the end marker (Shift's start and end). A window longer than that stretch wraps round it, and pos turns it. |
 | grid | 2x2, 2x2, 4x4, 8x8, 8x8 | 4x4 | `2x2` to `8x8` | Slices a side: 4, 16 or 64 slices to deal. The maps' periods grow with it (the cat: 3, 3, 6). |
 | slice | hiss, 1/64, 1/32, 1/8, 1/4 | 1/16 | `hiss`, `1/64` to `1/4` | Each slice, a 64th to a quarter note at the project's tempo; the window is grid² of them (4 x 4 sixteenths is a bar). hiss makes the cells single samples, on a square 16 times the grid's side (32, 64 or 128). |
 | map | cat, baker, gold, shear, hex (pell between gold and shear) | cat | the map's name | The map that deals the slices. Each has its own pattern and period (below). |
@@ -187,8 +206,12 @@ middle of the tin; beside it are only the instruments that carry a control.
   longer and lit solid, one for each note the chord plays.
 - **pos** moves the lit stretch along the tape at the tin's foot: the whole
   sample as a strip of its peaks, with the window's bars lit solid between
-  the caliper's jaws, from the sample's start to its end. grid and slice set
+  the caliper's jaws, from the start marker to the end marker; the bars
+  between the markers are dim and those outside them dark. grid and slice set
   how much of the tape it covers.
+- **Shift** lights the whole trim on the tape, the caliper's jaws on the
+  start and end markers, and the header's bright row reads start, window and
+  end with the times they mark (encoder 3 keeps its own control).
 - In **hiss** the tiles stay home and dim by how much of each is out of
   place, so the print fades away and comes back.
 - With **no sample**, a cover over everything but the header reads
@@ -253,6 +276,8 @@ sample, depth 50). The estimate varies from run to run.
   every state a permutation;
 - that unscrambled slices play the recording bit for bit, and scrambled slots
   play the slices the map put there, exactly;
+- that the start and end markers bound pos: at 0 the window starts on the
+  start marker, at 100 it ends on the end;
 - that the default comes back bit for bit on its fourth bar;
 - that rate off holds, and slices follow the tempo and don't drift;
 - that every change ramps (1.3% largest step on a constant), and slice seams
@@ -270,9 +295,11 @@ points within an eighth of a pixel (the device merges them), no closing
 edge under a quarter of a pixel, and no outline without area or turning
 straight back at a point (the device draws those as streaks). And it sweeps
 every control in hundredths on each map, grid and slice, with samples from a
-tenth of a second to twenty minutes long, and measures every caption the
-header shows in the OP-XY's face: a value must fit 53 px at 20 px, a title
-56 px at 10 px.
+tenth of a second to twenty minutes long, and Shift's row for those samples
+trimmed anywhere, and measures every caption the header shows in the OP-XY's
+face: a value must fit 53 px at 20 px, a title 56 px at 10 px. With Shift
+held it checks the row's titles and times on both pages, and that the tape
+lights the trim and the caliper holds its ends.
 
 ## Files
 

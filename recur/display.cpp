@@ -84,25 +84,35 @@ void put(Frame& frame, u32 node, i32 x, i32 y, u32 shade, i32 scale = unit, Turn
     turn(frame, node, t);
 }
 
+// Frames as seconds, within the 53 px a value has in the device's face:
+// 0.62s, 12.4s, 123s, and from 1000 s on whole minutes, 17m ("1000s" is too
+// wide).
+void seconds(char* at, u32 frames, u32 rate) {
+    const u32 per = rate / 100 ? rate / 100 : 1, hundredths = frames / per;
+    if (hundredths < 1000) { at = put(at, hundredths / 100); *at++ = '.'; at = put(at, hundredths / 10 % 10); at = put(at, hundredths % 10); }
+    else if (hundredths < 10000) { at = put(at, hundredths / 100); *at++ = '.'; at = put(at, hundredths / 10 % 10); }
+    else if (hundredths < 100000) at = put(at, hundredths / 100);
+    else { at = put(at, hundredths / 6000); *at++ = 'm'; *at = 0; return; }
+    *at++ = 's';
+    *at = 0;
+}
+
+// Shift (resources.stockShift): encoders 1, 2 and 4 turn the stock sampler's
+// start, both markers together (the window, keeping its length) and end;
+// encoder 3 keeps its own fine turn.
+const char* const shift_titles[4] = {"start", "window", nullptr, "end"};
+
 // The header: real values. pos in seconds to the window's start; step the
-// iteration and its fraction; depth the share of the slices that move.
+// iteration and its fraction; depth the share of the slices that move. While
+// Shift is held, the row the encoders turn names what Shift edits, as the
+// stock header does: the sampler's start and end at their times in the
+// sample, the window at its length, and the third column its own control.
 void place_header(DisplayState& state, const Input& input, Frame& frame, const Sample& sample, u32 from, u32 k, u32 ahead16,
                   u32 period, u32 moving_share) {
-    const char* const titles[8] = {"pos", "grid", "slice", "map", "step", "rate", "depth", "chrd"};
+    const char* own[8] = {"pos", "grid", "slice", "map", "step", "rate", "depth", "chrd"};
     char values[8][header_capacity] = {};
-    if (sample.shown) {
-        // Seconds into the sample, within the 53 px a value has in the
-        // device's face: 0.62s, 12.4s, 123s, and from 1000 s on whole
-        // minutes, 17m ("1000s" is too wide).
-        const u32 per_ms = sample.rate / 1000 ? sample.rate / 1000 : 1;
-        const u32 hundredths = from / (per_ms * 10);
-        char* at = values[kPos];
-        if (hundredths < 1000) { at = put(at, hundredths / 100); *at++ = '.'; at = put(at, hundredths / 10 % 10); at = put(at, hundredths % 10); }
-        else if (hundredths < 10000) { at = put(at, hundredths / 100); *at++ = '.'; at = put(at, hundredths / 10 % 10); }
-        else if (hundredths < 100000) at = put(at, hundredths / 100);
-        else { at = put(at, hundredths / 6000); *at++ = 'm'; *at = 0; }
-        if (hundredths < 100000) { *at++ = 's'; *at = 0; }
-    } else header_amount(values[kPos], header_capacity, input.slots[kPos]);
+    if (sample.shown) seconds(values[kPos], from, sample.rate);
+    else header_amount(values[kPos], header_capacity, input.slots[kPos]);
     copy(values[kGrid], header_capacity, grid_names[choice(input.slots[kGrid], grid_count)]);
     copy(values[kSlice], header_capacity, slice_names[choice(input.slots[kSlice], slice_count)]);
     copy(values[kMap], header_capacity, map_names[choice(input.slots[kMap], map_count)]);
@@ -120,6 +130,20 @@ void place_header(DisplayState& state, const Input& input, Frame& frame, const S
     while (*at) ++at;
     *at++ = '%'; *at = 0;
     copy(values[kChrd], header_capacity, chord_names[choice(input.slots[kChrd], chord_count)]);
+    if (input.shift) {
+        u32 page = 0;   // as page_header finds it
+        for (u32 col = 0; col < 4; ++col)
+            if (page_header_slots[1][col] != page_header_slots[0][col] && input.shown[col] == page_header_slots[1][col]) page = 1;
+        const u32 marks[4] = {sample.begin, sample.span, 0, sample.begin + sample.span};
+        for (u32 col = 0; col < 4; ++col) {
+            if (!shift_titles[col]) continue;
+            const u32 slot = page_header_slots[page][col];
+            own[slot] = shift_titles[col];
+            if (sample.shown) seconds(values[slot], marks[col], sample.rate);
+            else copy(values[slot], header_capacity, "-");
+        }
+    }
+    const char* const titles[8] = {own[0], own[1], own[2], own[3], own[4], own[5], own[6], own[7]};
     page_header(state.header, input, frame, titles, values, 0);
 }
 
@@ -303,13 +327,21 @@ u32 bin_peak(const SampleOverview& o, u32 b) {
     return scaled > 255 ? 255 : scaled;
 }
 
+// What the tape lights and the caliper holds: the window pos picks, or while
+// Shift is held the whole region its start and end markers trim, which Shift
+// is then editing.
+void tape_span(const Sample& sample, const Input& input, u32 bits, u32 slice, bool hiss, u32 hiss_bits, u32& from, u32& to) {
+    if (input.shift && sample.span) { from = 0; to = sample.span; return; }
+    window(sample, input, bits, slice, hiss, hiss_bits, from, to);
+}
+
 // The tape: a bar for each stretch of the sample, as tall as the root of its
 // peak against the loudest (so quiet stretches still show); the window's bars
 // lit solid, the rest of the region dim and what lies outside it dark.
 void place_tape(const Input& input, Frame& frame, const SampleOverview& overview, const Sample& sample, u32 bits, u32 slice,
                 bool hiss, u32 hiss_bits, bool snap, u32 budget) {
     u32 from, to;
-    window(sample, input, bits, slice, hiss, hiss_bits, from, to);
+    tape_span(sample, input, bits, slice, hiss, hiss_bits, from, to);
     const bool wraps = to <= from;
     const i32 width = (rule_x1 - rule_x0) * unit;
     u32 loudest = 1;
@@ -368,10 +400,10 @@ void place_works(DisplayState& state, const Input& input, Frame& frame, const Sa
         place(frame, teeth_first + t, (comb_x + i32(t) * comb_pitch) * unit, comb_y * unit, lit ? plucked : unit,
               lit ? tooth_lit : tooth_dark, lit ? fill_and_stroke : stroke);
     }
-    // The caliper: the window pos picks, on the tape.
+    // The caliper: the window pos picks, on the tape (with Shift, the trim).
     const u32 frames = sample.frames;
     u32 from, to;
-    window(sample, input, bits, slice, hiss, hiss_bits, from, to);
+    tape_span(sample, input, bits, slice, hiss, hiss_bits, from, to);
     const i32 width = rule_x1 - rule_x0;
     const i32 x0 = rule_x0 * unit + i32(scaled(sample.begin + from, u32(width) * 64, frames)) * 16;
     i32 x1 = rule_x0 * unit + i32(scaled(sample.begin + to, u32(width) * 64, frames)) * 16;

@@ -207,6 +207,26 @@ int main() {
         for (u32 i = 0; i < pass; ++i) exact = exact && r.heard[i] == played(voice_like[i]);
         check(exact, "the unscrambled window is the recording, bit for bit");
     }
+    {   // Shift's start and end (stockShift) trim the region pos ranges over: at
+        // pos 0 the window starts on the start marker, at pos 1 it ends on the end.
+        const u32 begin = 3 * 44100 + 123, end = begin + 2 * pass + 777;
+        for (u32 far = 0; far < 2; ++far) {
+            Rig r(voice_like, frames);
+            r.block.region.begin = begin;
+            r.block.region.end = end;
+            r.set(recur::kRate, off, recur::rate_count);
+            r.parameters[recur::kPos] = at(far);
+            r.run(pass / opxy::block_frames + 2);
+            // pos's top is a 16-bit fraction of the room, so the window may end a frame or two short.
+            bool exact = false;
+            for (u32 short_by = 0; short_by <= (far ? 3u : 0u) && !exact; ++short_by) {
+                const u32 from = far ? end - pass - short_by : begin;
+                exact = true;
+                for (u32 i = 0; i < pass; ++i) exact = exact && r.heard[i] == played(voice_like[from + i]);
+            }
+            check(exact, far ? "pos 1 plays the window ending on the end marker" : "pos 0 plays the window from the start marker");
+        }
+    }
     {   // Scrambled, each slot plays a slice of the recording exactly, after its
         // crossfade in: the slice the map put there.
         for (u32 map = 0; map < recur::map_count; ++map) {

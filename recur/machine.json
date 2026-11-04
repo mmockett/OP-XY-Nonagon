@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "sdk": "1.8",
+  "sdk": "1.10",
   "kind": "sample",
   "description": "A window of the sample laid out as a square and scrambled by Arnold's cat map, until it returns exactly.",
   "base": "sampler",

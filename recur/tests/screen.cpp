@@ -271,6 +271,26 @@ int main() {
                                 collect_captions(frame);
                             }
                         }
+        // Shift's row (stockShift): start, window and end in seconds, on
+        // either page, for samples of every length trimmed anywhere.
+        for (u32 length : lengths)
+            for (u32 a = 0; a <= 20; ++a)
+                for (u32 b = a; b <= 20; ++b)
+                    for (u32 page = 0; page < 2; ++page) {
+                        opxy::draw::Input input = {};
+                        for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
+                        for (u32 i = 0; i < 4; ++i) input.shown[i] = opxy::u8(4 * page + i);
+                        input.track = 1;
+                        input.elapsed = 17;
+                        input.shift = 1;
+                        overview.frames = length;
+                        overview.begin = u32((unsigned long long)(length) * a / 20);
+                        overview.end = u32((unsigned long long)(length) * b / 20);
+                        recur::display(state, input, frame);
+                        ++frames;
+                        collect_captions(frame);
+                    }
+        overview.begin = 0;
         overview.frames = overview.end = 176400;
         overview.assigned = 0;
         opxy::draw::Input input = {};
@@ -297,6 +317,55 @@ int main() {
         }
         std::printf("%zu captions, the widest %.1f of 53 px; %zu titles, the widest %.1f of 56 px\n", values_seen.size(), widest,
                     titles_seen.size(), widest_title);
+    }
+    {   // Shift (stockShift): the header's row names the stock sampler's start,
+        // window and end with their times, encoder 3 keeps its own control, and
+        // the tape lights the region they trim, the caliper at its ends.
+        overview.assigned = overview.loaded = 1;
+        overview.frames = 176400; overview.begin = 22050; overview.end = 154350;
+        opxy::draw::Input input = {};
+        for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
+        for (u32 i = 0; i < 4; ++i) input.shown[i] = opxy::u8(i);
+        input.track = 1;
+        input.elapsed = 17;
+        frame = recur::Frame();
+        recur::display_reset(state);
+        for (u32 f = 0; f < 30; ++f) recur::display(state, input, frame);
+        const auto text = [&](u32 slot) { return std::string(frame.texts[slot].chars); };
+        if (text(0) != "pos" || text(4) != "0.00s") { std::printf("FAIL: without Shift the header shows pos at the trim's start\n"); ++failures; }
+        u32 lit_bars = 0;
+        for (u32 i = 0; i < recur::bar_count; ++i) lit_bars += frame.nodes[recur::bar_first + i].shade == 15;
+        input.shift = 1;
+        for (u32 f = 0; f < 60; ++f) recur::display(state, input, frame);
+        if (text(0) != "start" || text(1) != "window" || text(2) != "slice" || text(3) != "end" ||
+            text(4) != "0.50s" || text(5) != "3.00s" || text(7) != "3.50s") {
+            std::printf("FAIL: Shift's row reads %s %s %s %s / %s %s %s\n", text(0).c_str(), text(1).c_str(), text(2).c_str(),
+                        text(3).c_str(), text(4).c_str(), text(5).c_str(), text(7).c_str());
+            ++failures;
+        }
+        u32 shift_lit = 0, trimmed = 0;
+        for (u32 i = 0; i < recur::bar_count; ++i) {
+            shift_lit += frame.nodes[recur::bar_first + i].shade == 15;
+            trimmed += overview.frames * (i + 1) / recur::bar_count > overview.begin && overview.frames * i / recur::bar_count < overview.end;
+        }
+        if (shift_lit != trimmed || shift_lit <= lit_bars) {
+            std::printf("FAIL: Shift lights %u of the tape's %u bars, not the %u the trim spans; the window lit %u\n", shift_lit,
+                        recur::bar_count, trimmed, lit_bars);
+            ++failures;
+        }
+        const i32 x0 = frame.nodes[recur::jaw_first].x / 1024, x1 = frame.nodes[recur::jaw_first + 1].x / 1024;
+        const i32 eighth = (recur::rule_x1 - recur::rule_x0) / 8;
+        if (std::abs(x0 - (recur::rule_x0 + eighth)) > 1 || std::abs(x1 - (recur::rule_x1 - eighth)) > 1) {
+            std::printf("FAIL: with Shift the caliper holds %d..%d, not the trim\n", x0, x1);
+            ++failures;
+        }
+        for (u32 i = 0; i < 4; ++i) input.shown[i] = opxy::u8(4 + i);
+        for (u32 f = 0; f < 30; ++f) recur::display(state, input, frame);
+        if (text(0) != "start" || text(2) != "depth" || text(3) != "end") {
+            std::printf("FAIL: page 2's Shift row reads %s .. %s %s\n", text(0).c_str(), text(2).c_str(), text(3).c_str());
+            ++failures;
+        }
+        overview.begin = 0; overview.end = 176400;
     }
     if (invalid) { std::printf("FAIL: %u invalid frames\n", invalid); ++failures; }
     std::printf("%u frames; every print piece inside its tile's square, at worst %.2f px inside its edge\n", frames, -worst);

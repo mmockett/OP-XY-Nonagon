@@ -206,6 +206,12 @@
   },
   "resources": {
     "voiceCapacity": 256,
+    "stockShift": [
+      "start",
+      "window",
+      "",
+      "end"
+    ],
     "display": {
       "stateBytes": 384,
       "stateAlignment": 4,
