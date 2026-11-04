@@ -129,14 +129,14 @@ struct Session {
     void run(double seconds, const char* shot = 0) {
         const u32 count = u32(seconds * fps + 0.5);
         for (u32 k = 0; k < count; ++k) {
-            if (every && frames % every == 0) {
+            input.elapsed = i32(1024 / fps);
+            for (u32 i = 0; i < 4; ++i) input.parameters[i] = input.slots[input.shown[i]];
+            ghost::display(state, input, frame);
+            if (every && frames % every == 0) {   // after display, so the first isn't the blank frame
                 char name[32];
                 std::snprintf(name, sizeof name, "/frame-%04u.json", dumped++);
                 dump(frame, folder + name);
             }
-            input.elapsed = i32(1024 / fps);
-            for (u32 i = 0; i < 4; ++i) input.parameters[i] = input.slots[input.shown[i]];
-            ghost::display(state, input, frame);
             if (!valid(frame)) ++invalid;
             check_outlines(frame, folder.c_str());
             const u32 c = frames ? count_changes() : 0;
