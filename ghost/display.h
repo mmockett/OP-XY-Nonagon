@@ -20,6 +20,9 @@ const opxy::i32 front_feet = 187;   // the nearest feet: clear of the footlights
 const opxy::i32 path_x = 240, path_y = 174;   // the chalk path's origin, drawn at twice its points
 const opxy::i32 strip_x0 = 90, strip_x1 = 390, strip_y = 209;   // the sample's slot under the apron
 
+// The amp envelope's level as the screen follows it (display.cpp, follow()).
+struct Swell { opxy::u32 level, from, stage; };   // level and from (the release's start) Q16; stage 0 idle, 1 attack, 2 decay, 3 release
+
 struct DisplayState {
     opxy::draw::PageHeader header;
     opxy::draw::NoteTracker notes;
@@ -33,5 +36,6 @@ struct DisplayState {
     opxy::u32 beat_ms;        // time held, for the beat's tremble and the halos' breath
     opxy::u32 step_ms, step;  // the hem's ripple and the bed's scroll, a step every 100 ms while held
     opxy::u32 bar_sweep;      // where the sample's bars' changes begin this frame
+    Swell swell;              // the amp envelope's level: the figure swells, holds and fades with it
 };
 }

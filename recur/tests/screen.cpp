@@ -5,6 +5,7 @@
 // can draw, across a sweep of every control on each map, the scrambles and
 // the cover with no sample; and every frame is valid.
 #include "../display.cpp"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -473,6 +474,39 @@ int main() {
             ++failures;
         }
         std::printf("fit on the tape: the stretch read %.1f px at fit 0, %.1f at fit 100\n", widths[0], widths[1]);
+        overview.frames = 176400; overview.begin = 0; overview.end = 176400;
+    }
+    {   // The amp envelope (input.amp, SDK 1.10): the scramble and the pendulum
+        // play on while the note sounds. Unknown, they stop as the note is let
+        // go, as before; with a long release they keep going, the pendulum
+        // narrowing; a short one stops them at once; a long attack swells the
+        // pendulum's swing in.
+        overview.frames = 352800; overview.begin = 0; overview.end = 88200;
+        struct Run { u32 held_ms; i32 swing; };
+        auto play = [&](const opxy::draw::Envelope& amp, u32 held_frames, u32 after_frames) {
+            opxy::draw::Input input = {};
+            for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
+            input.slots[recur::kSlice] = choice_of(5, recur::slice_count);   // 1/4: the pendulum swings its widest
+            input.track = 1; input.elapsed = 17; input.amp = amp;
+            frame = recur::Frame();
+            recur::display_reset(state);
+            recur::display(state, input, frame);
+            input.note_serial = 1; input.held_notes = 1;
+            i32 widest = 0;
+            for (u32 f = 0; f < held_frames; ++f) { recur::display(state, input, frame); widest = std::max(widest, std::abs(state.swing)); }
+            input.held_notes = 0; input.note_off_serial = 1;
+            for (u32 f = 0; f < after_frames; ++f) recur::display(state, input, frame);
+            return Run{state.held_ms, after_frames ? std::abs(state.swing) : widest};
+        };
+        const i32 unknown = opxy::draw::envelope_unavailable;
+        const opxy::draw::Envelope none = {unknown, unknown, unknown, unknown}, quick = {0, 0, 0x7fffffff, 0},
+                                   long_release = {0, 0, 0x7fffffff, 0x66666666}, long_attack = {0x66666666, 0, 0x7fffffff, 0};
+        const Run a = play(none, 120, 30), b = play(quick, 120, 30), c = play(long_release, 120, 30), d = play(quick, 15, 0), e = play(long_attack, 15, 0);
+        std::printf("envelope: half a second after release, %u ms of motion (unknown), %u (short release), %u (long); "
+                    "the swing a quarter second in %d (fast attack) and %d (slow) tenths of a degree\n", a.held_ms, b.held_ms, c.held_ms, d.swing, e.swing);
+        if (a.held_ms || b.held_ms) { std::printf("FAIL: the motion outlasts a note with no or a short release\n"); ++failures; }
+        if (c.held_ms < 2400) { std::printf("FAIL: a long release doesn't keep the motion going\n"); ++failures; }
+        if (e.swing * 2 > d.swing) { std::printf("FAIL: a long attack doesn't swell the swing in\n"); ++failures; }
         overview.frames = 176400; overview.begin = 0; overview.end = 176400;
     }
     if (invalid) { std::printf("FAIL: %u invalid frames\n", invalid); ++failures; }

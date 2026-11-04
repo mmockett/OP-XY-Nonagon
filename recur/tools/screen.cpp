@@ -107,6 +107,9 @@ int main(int argc, char** argv) {
     static recur::DisplayState state;
     static recur::Frame frame;
     opxy::draw::Input input = {};
+    input.amp = opxy::draw::Envelope{-1, -1, -1, -1};   // unknown, unless a frame sets it
+    // ENVELOPE=1: the session with a known amp envelope, a short attack and a long (0.8) release.
+    const opxy::draw::Envelope session_amp = std::getenv("ENVELOPE") ? opxy::draw::Envelope{0x08000000, 0, 0x7fffffff, 0x66666666} : input.amp;
     const double defaults[8] = {0, 0.5, 0.583333, 0.083333, 0, 0.4375, 0.7, 0.071429};
     for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
     input.track = 1;
@@ -177,6 +180,29 @@ int main(int argc, char** argv) {
         }
         overview.gain = 0;
         input.shift = 0;
+        // The amp envelope: a note held 2 s on the defaults, then half a second
+        // after its release with a short release and a long one (0.8, about
+        // 1.9 s); and a quarter second into a slow attack (0.8).
+        const i32 full = 0x7fffffff, slow = 0x66666666;
+        const opxy::draw::Envelope envelopes[3] = {{0, 0, full, 0}, {0, 0, full, slow}, {slow, 0, full, 0}};
+        for (u32 v = 0; v <= 2; ++v) {
+            for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
+            input.slots[recur::kDepth] = at(1);
+            input.slots[recur::kRate] = choice_of(5, recur::rate_count);   // an iteration a 1/4, so the tiles move
+            input.amp = envelopes[v];
+            frame = recur::Frame();
+            recur::display_reset(state);
+            recur::display(state, input, frame);
+            input.note_serial += 1; input.held_notes = 1;
+            for (u32 f = 0; f < (v == 2 ? 15u : 120u); ++f) recur::display(state, input, frame);
+            if (v < 2) { input.held_notes = 0; input.note_off_serial += 1; for (u32 f = 0; f < 30; ++f) recur::display(state, input, frame); }
+            input.held_notes = 0;
+            char name[64];
+            std::snprintf(name, sizeof name, "/sheet-env-%u.json", v * 50);
+            dump(frame, folder + name);
+        }
+        input.amp = opxy::draw::Envelope{-1, -1, -1, -1};
+        for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
         overview.assigned = 0;
         frame = recur::Frame();
         recur::display_reset(state);
@@ -184,6 +210,7 @@ int main(int argc, char** argv) {
         dump(frame, folder + "/sheet-empty.json");
         return 0;
     }
+    input.amp = session_amp;
     Counter counter, playing;
     u32 serial = 0, offs = 0, t = 0, written = 0;
     auto frame_at = [&](bool held, bool count_playing) {
