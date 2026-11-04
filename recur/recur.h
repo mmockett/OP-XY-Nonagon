@@ -10,7 +10,7 @@ using opxy::u32;
 using opxy::u8;
 
 // The controls, by saved parameter index (definition.json).
-enum Control : unsigned { kPos, kGrid, kSlice, kMap, kStep, kRate, kDepth, kChrd };
+enum Control : unsigned { kFit, kGrid, kSlice, kMap, kStep, kRate, kDepth, kChrd };
 // The maps, in map's order: Arnold's cat, the baker's map, the golden map
 // (Fibonacci's matrix, the cat's square root), Pell's (2 + sqrt 3), a shear and
 // the order-six turn.

@@ -54,8 +54,9 @@ void save(const std::string& path, const std::vector<opxy::i16>& out) {
 
 i32 at(double v) { return i32(v * 2147483647.0); }
 
-// A held chord of notes (semitones from the sample's root) with a preset's controls.
-struct Take { const char* file; const Preset* preset; double seconds; int notes[3]; u32 count; };
+// A held chord of notes (semitones from the sample's root) with a preset's
+// controls, over its trim (the preset's own, within the source), at a tempo.
+struct Take { const char* file; const Preset* preset; double seconds; int notes[3]; u32 count; u32 bpm_x10; };
 
 // The render of a take: its voices summed, then a 3 ms fade in and 30 ms out.
 std::vector<opxy::i16> render(const Take& take) {
@@ -71,8 +72,11 @@ std::vector<opxy::i16> render(const Take& take) {
         for (u32 i = 0; i < opxy::block_frames; ++i) pitch[i] = u32(25480119.0 * ratio + 0.5);
         opxy::SampleBlock block = opxy::SampleBlock();
         block.output = out; block.parameters = parameters; block.pitch = pitch;
-        block.region.begin = 0; block.region.end = frames; block.region.level = opxy::sample_unity_level;
-        block.transport.bpm_x10 = 1200;
+        const u32 end = take.preset->end < frames ? take.preset->end : frames;
+        block.region.begin = take.preset->begin < end ? take.preset->begin : 0;
+        block.region.end = end;
+        block.region.level = opxy::sample_unity_level;
+        block.transport.bpm_x10 = take.bpm_x10;
         block.output_channels = 1;
         static recur::Voice voice;
         const opxy::SampleView view = {data.data(), frames, rate, channels};
@@ -99,7 +103,9 @@ int main(int argc, char** argv) {
     if (argc < 3) { std::fprintf(stderr, "usage: render <folder of sources> <out folder> [sweep]\n"); return 1; }
     if (argc > 3 && std::string(argv[3]) == "sweep") {
         // Each control in steps of 5% (or 25%, with "sweep 4") over Recur's preset, on the
-        // drums, as sweep-<control>-<percent>.wav: tools/sweep.py measures them.
+        // drums' first bar, as sweep-<control>-<percent>.wav: tools/sweep.py measures them.
+        // fit is swept at 90 BPM, where the bar's sixteenths are shorter than the
+        // project's: at 120 BPM they fill their slots already, and fit changes nothing.
         if (!load((std::string(argv[1]) + "/source-drums.wav").c_str())) return 1;
         const u32 steps = argc > 4 ? u32(std::atoi(argv[4])) : 20;
         for (u32 c = 0; c < 8; ++c)
@@ -107,7 +113,8 @@ int main(int argc, char** argv) {
                 static Preset p;
                 p = presets[0];
                 p.values[c] = double(v) / steps;
-                const Take take = {"", &p, 8.2, {0, 0, 0}, 1};
+                Take take = {"", &p, 8.2, {0, 0, 0}, 1, 1200};
+                if (c == recur::kFit) take.bpm_x10 = 900;
                 char name[64];
                 std::snprintf(name, sizeof name, "/sweep-%u-%u.wav", c, v * 100 / steps);
                 save(std::string(argv[2]) + name, render(take));
@@ -122,10 +129,10 @@ int main(int argc, char** argv) {
     for (const Preset& p : presets) {
         std::snprintf(files[n], sizeof files[n], "recur-%s", p.name);
         for (char* c = files[n]; *c; ++c) if (*c >= 'A' && *c <= 'Z') *c += 'a' - 'A';
-        takes.push_back(Take{files[n], &p, seconds[n], {0, 0, 0}, 1});
+        takes.push_back(Take{files[n], &p, seconds[n], {0, 0, 0}, 1, 1200});
         ++n;
     }
-    takes.push_back(Take{"recur-triad", &presets[2], 8.2, {0, 3, 7}, 3});   // Phrase played as a minor triad
+    takes.push_back(Take{"recur-triad", &presets[2], 8.2, {0, 3, 7}, 3, 1200});   // Phrase played as a minor triad
     for (const Take& take : takes) {
         data.clear();
         const std::string source = std::string(argv[1]) + "/source-" + take.preset->source + ".wav";

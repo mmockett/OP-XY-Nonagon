@@ -178,6 +178,17 @@ int sheet(const std::string& dir) {
             std::snprintf(name, sizeof name, "sheet-%s-%u", names[c], u32(values[v] * 100));
             s.run(0.7, name);
         }
+    const opxy::i32 gains[3] = {-30, 0, 20};
+    for (u32 v = 0; v < 3; ++v) {   // Shift held on a trim of the middle half, at gain -30, 0 and +20
+        Session s(dir, 60);
+        load();
+        overview.begin = overview.frames / 4; overview.end = overview.frames * 3 / 4; overview.gain = gains[v];
+        s.input.shift = 1;
+        char name[48];
+        std::snprintf(name, sizeof name, "sheet-shift-%u", v * 50);
+        s.run(0.7, name);
+        overview.begin = 0; overview.end = overview.frames; overview.gain = 0;
+    }
     overview.assigned = overview.loaded = 0;
     for (u32 v = 0; v < 3; ++v) {   // no sample: the hint, and bed is Ghost's own whisper
         Session s(dir, 60);
@@ -233,6 +244,7 @@ int clear() {
             s.run(1.0 / 30);
             for (u32 i = 0; i < ghost::Frame::node_count; ++i) {
                 if ((i >= ghost::header_first && i < ghost::header_first + 8) || i == ghost::hint_cover || i == ghost::mask || i == ghost::twin_mask) continue;   // the silhouettes lie inside the figures
+                if (i >= ghost::bar_first) continue;   // the sample's strip and markers: the slot under the apron, by design
                 const Node& d = s.frame.nodes[i];
                 if (d.x == hidden_x * unit && d.y == hidden_y * unit) continue;
                 // The node's outline: its path, or the shape make_panel.py draws it with.
@@ -288,6 +300,13 @@ int main(int argc, char** argv) {
     // A bed with a sample loaded.
     overview.assigned = overview.loaded = 1; overview.frames = 441000; overview.rate = 44100; overview.end = 441000;
     s.turn(ghost::kBed, 1.0, 0.4); s.press(); s.run(1.2, "bed"); s.release(); s.run(0.6);
+    // Shift held: the trim slid along the sample in tenths, then the gain stepped down and back.
+    s.input.shift = 1; s.run(0.3);
+    for (u32 t = 1; t <= 5; ++t) { overview.begin = overview.frames / 10 * t; overview.end = overview.begin + overview.frames / 4; s.run(0.1); }
+    for (opxy::i32 g = 0; g >= -12; g -= 2) { overview.gain = g; s.run(0.05); }
+    for (opxy::i32 g = -12; g <= 0; g += 2) { overview.gain = g; s.run(0.05); }
+    s.run(0.3, "shift"); s.input.shift = 0;
+    overview.begin = 0; overview.end = overview.frames; s.run(0.5);
     s.page(0); s.run(0.3);
     // Reduced motion: notes snap, nothing moves while held.
     s.input.reduced_motion = 1; s.press(); s.run(1.0, "reduced"); s.release(); s.run(0.5);

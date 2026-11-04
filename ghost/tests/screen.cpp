@@ -160,17 +160,51 @@ int main() {
         for (int k = 0; k < 4; ++k) input.shown[k] = opxy::u8(k);
         input.shift = 1;
         for (int t = 0; t < 20; ++t) ghost::display(state, input, frame);
-        // Encoder 3 turns nothing with Shift (stockShift "none"): its cell is blank.
-        const char* expect[8] = {"start", "window", "", "end", "0.60s", "3.00s", "", "3.60s"};
+        // Encoder 3 with Shift is the sample's gain (stockShift "gain", #400), in stock's steps.
+        const char* expect[8] = {"start", "window", "gain", "end", "0.60s", "3.00s", "+0", "3.60s"};
         for (u32 t = 0; t < 8; ++t)
             if (std::strcmp(frame.texts[t].chars, expect[t]))
                 fail("Shift's row", frame.texts[t].chars, 0, 0);
-        if (frame.header[2][0]) fail("Shift's header cell 3", frame.header[2], 0, 0);
+        if (std::strcmp(frame.header[2], "+0")) fail("Shift's header cell 3", frame.header[2], 0, 0);
+        // The trim's markers stand on the start and end, lit while Shift is held.
+        const double x0 = frame.nodes[ghost::mark_first].x / 1024.0, x1 = frame.nodes[ghost::mark_first + 1].x / 1024.0;
+        const double width = ghost::strip_x1 - ghost::strip_x0;
+        if (std::fabs(x0 - (ghost::strip_x0 + width * 26460 / overview.frames)) > 0.5 ||
+            std::fabs(x1 - (ghost::strip_x0 + width * 158760 / overview.frames)) > 0.5 || frame.nodes[ghost::mark_first].shade != 15)
+            fail("the trim's markers", "Shift", 0, 0);
+        // Bars within the trim lit solid, those outside dim.
+        u32 lit = 0, dark = 0;
+        for (u32 i = 0; i < ghost::bar_count; ++i) (frame.nodes[ghost::bar_first + i].paint == opxy::draw::fill_and_stroke ? lit : dark) += 1;
+        if (!lit || !dark) fail("the strip lights the trim", "bars", 0, 0);
         for (int k = 0; k < 4; ++k) input.shown[k] = opxy::u8(4 + k);
         for (int t = 0; t < 20; ++t) ghost::display(state, input, frame);
-        if (std::strcmp(frame.texts[0].chars, "start") || frame.texts[2].chars[0] || std::strcmp(frame.texts[3].chars, "end") ||
-            frame.texts[6].chars[0] || frame.header[2][0])
+        if (std::strcmp(frame.texts[0].chars, "start") || std::strcmp(frame.texts[2].chars, "gain") || std::strcmp(frame.texts[3].chars, "end") ||
+            std::strcmp(frame.texts[6].chars, "+0"))
             fail("page 2's Shift row", frame.texts[2].chars, 0, 0);
+        // Every gain from -30 to +20 reads signed; the strip's bars grow with it.
+        double last = 0;
+        for (opxy::i32 g = -30; g <= 20; g += 10) {
+            overview.gain = g;
+            for (int t = 0; t < 20; ++t) ghost::display(state, input, frame);
+            char want[8];
+            std::snprintf(want, sizeof want, "%c%d", g < 0 ? '-' : '+', g < 0 ? -g : g);
+            if (std::strcmp(frame.texts[6].chars, want)) fail("the gain's caption", frame.texts[6].chars, 0, 0);
+            double total = 0;
+            for (u32 i = 0; i < ghost::bar_count; ++i) total += frame.nodes[ghost::bar_first + i].scale;
+            if (total <= last) fail("the strip grows with the gain", want, 0, 0);
+            last = total;
+        }
+        // With no gain known (gain_unavailable), its cell shows nothing.
+        overview.gain = opxy::draw::gain_unavailable;
+        for (int t = 0; t < 20; ++t) ghost::display(state, input, frame);
+        if (frame.texts[2].chars[0] || frame.texts[6].chars[0] || frame.header[2][0]) fail("an unknown gain shows", frame.texts[6].chars, 0, 0);
+        overview.gain = 0;
+        // With no sample, the strip goes and the hint shows.
+        overview.assigned = 0;
+        for (int t = 0; t < 2; ++t) ghost::display(state, input, frame);
+        for (u32 n = ghost::bar_first; n < ghost::mark_first + 2; ++n)
+            if (frame.nodes[n].x != opxy::draw::hidden_x * 1024) fail("the strip without a sample", "shown", 0, 0);
+        overview.assigned = 1;
     }
     std::printf("screen: %ld frames; sharpest turn %.2f degrees from straight back; %ld faults\n", frames_checked, sharpest, failures);
     return failures ? 1 : 0;

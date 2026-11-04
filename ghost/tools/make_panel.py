@@ -361,6 +361,21 @@ dynamic += [
 # Two more apparitions for a second and third held note: the bowed figure, smaller.
 small = outline([(x * 0.8, y * 0.8) for x, y in bowed])
 dynamic += [f'<path id="{ID}_node_{n}" d="{small}" fill="#000000" stroke="#555555" stroke-width="0.5"/>' for n in (15, 16)]
+# With a sample, the sample in the slot under the apron, over the hint's cover:
+# 40 bars (nodes 24..63), each a stretch of the whole sample as tall as its
+# peak, placed and sized by display.cpp, so authored at the origin; and the
+# trim's start and end markers (64, 65), each a bar with a flag at its top
+# pointing into the trim, as Grains marks them, starting at the flag's
+# corner where both its edges are long.
+STRIP_X0, STRIP_X1, STRIP_Y, BARS = 90, 390, 209, 40
+bar = outline([(-1.2, -6), (1.2, -6), (1.2, 6), (-1.2, 6)])
+dynamic += [f'<path id="{ID}_node_{24 + i}" d="{bar}" fill="none" stroke="#666666" stroke-width="0.5"/>' for i in range(BARS)]
+dynamic += [
+    f'<path id="{ID}_node_64" transform="matrix(1 0 0 1 {STRIP_X0} {STRIP_Y})" d="{outline([(-0.6, -9), (4, -9), (0.6, -5.6), (0.6, 9), (-0.6, 9)])}" '
+    f'fill="#e6e6e6" stroke="#e6e6e6" stroke-width="0.5"/>',
+    f'<path id="{ID}_node_65" transform="matrix(1 0 0 1 {STRIP_X1} {STRIP_Y})" d="{outline([(0.6, -9), (0.6, 9), (-0.6, 9), (-0.6, -5.6), (-4, -9)])}" '
+    f'fill="#e6e6e6" stroke="#e6e6e6" stroke-width="0.5"/>',
+]
 
 palette = []
 for i in range(16):

@@ -44,6 +44,8 @@ def svg(name, scale):
             e.set("stroke", grey)
         if paint == 2:
             e.set("fill", grey)
+    for i, points in enumerate(frame.get("paths", [])):
+        by_id[f"recur_node_{i}"].set("d", "M" + " L".join(f"{x / 1024:.4f},{y / 1024:.4f}" for x, y in points) + " Z")
     for t, (x, y, s, chars) in enumerate(frame["texts"]):
         e = by_id[f"recur_text_{t}"]
         e.set("transform", f"matrix({s / 1024:.4f} 0 0 {s / 1024:.4f} {x / 1024:.4f} {y / 1024:.4f})")
@@ -77,9 +79,11 @@ def shoot(html, size, out):
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-controls = ["pos", "grid", "slice", "step", "rate", "depth", "chrd"]
+controls = ["fit", "grid", "slice", "step", "rate", "depth", "chrd"]
 rows = [("map", [f"sheet-map-{v}" for v in range(6)])]
 rows += [(c, [f"sheet-{c}-{v}" for v in (0, 50, 100)]) for c in controls]
+rows.append(("fit, 1/8", [f"sheet-fit8-{v}" for v in (0, 50, 100)]))
+rows.append(("shift: gain -30, 0, +20", [f"sheet-shift-{v}" for v in (0, 50, 100)]))
 rows.append(("empty", ["sheet-empty", "no sample: the header stays, a cover says how to load one"]))
 columns = ["0 (map: cat)", "50 (map: baker)", "100 (map: gold)", "map: pell", "map: shear", "map: hex"]
 for scale, name in ((1, "controls-1x.png"), (2, "controls.png")):

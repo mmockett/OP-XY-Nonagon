@@ -337,6 +337,18 @@ int main() {
                         if (w > widest) { widest = w; opxy::draw::copy(which, sizeof which, values[c]); }
                     }
                 }
+        // ...and the gain in stock's steps (#400), -30 to +20.
+        for (opxy::i32 g = -30; g <= 20; ++g) {
+            o.gain = g;
+            opxy::draw::Input input = {};
+            input.shift = 1;
+            const char* titles[8] = {};
+            char values[8][opxy::draw::header_capacity] = {};
+            ghost::captions::shift_row(input, pages, o, titles, values);
+            const double w = Width::of(values[2], 20);
+            if (w > widest) { widest = w; opxy::draw::copy(which, sizeof which, values[2]); }
+        }
+        o.gain = 0;
         double widest_title = 0;
         for (const char* title : ghost::captions::titles) widest_title = std::fmax(widest_title, Width::of(title, 10));
         for (const char* title : ghost::captions::shift_titles) if (title) widest_title = std::fmax(widest_title, Width::of(title, 10));

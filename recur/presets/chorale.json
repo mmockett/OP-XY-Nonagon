@@ -90,13 +90,13 @@
       "gain": 0,
       "hikey": 60,
       "loop.crossfade": 0,
-      "loop.end": 352800,
+      "loop.end": 88200,
       "loop.onrelease": true,
       "loop.start": 0,
       "pitch.keycenter": 60,
       "reverse": false,
       "sample": "content/samples/recur/break.wav",
-      "sample.end": 352800,
+      "sample.end": 88200,
       "sample.start": 0,
       "tune": 0
     }

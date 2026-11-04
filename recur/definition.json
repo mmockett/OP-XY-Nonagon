@@ -4,8 +4,8 @@
   "name": "Recur",
   "parameters": [
     {
-      "id": "pos",
-      "label": "pos",
+      "id": "fit",
+      "label": "fit",
       "default": 0,
       "mapping": {
         "kind": "linear",
@@ -124,7 +124,7 @@
   ],
   "presets": {
     "Recur": {
-      "pos": 0,
+      "fit": 0,
       "grid": 0.5,
       "slice": 0.583333,
       "map": 0.083333,
@@ -134,7 +134,7 @@
       "chrd": 0.071429
     },
     "Stutter": {
-      "pos": 0,
+      "fit": 0,
       "grid": 0.833333,
       "slice": 0.416667,
       "map": 0.75,
@@ -144,7 +144,7 @@
       "chrd": 0.071429
     },
     "Phrase": {
-      "pos": 0,
+      "fit": 0,
       "grid": 0.5,
       "slice": 0.75,
       "map": 0.416667,
@@ -154,7 +154,7 @@
       "chrd": 0.071429
     },
     "Riffle": {
-      "pos": 0,
+      "fit": 0,
       "grid": 0.5,
       "slice": 0.583333,
       "map": 0.25,
@@ -164,7 +164,7 @@
       "chrd": 0.071429
     },
     "Glitch": {
-      "pos": 0,
+      "fit": 0,
       "grid": 0.833333,
       "slice": 0.25,
       "map": 0.583333,
@@ -174,7 +174,7 @@
       "chrd": 0.071429
     },
     "Chorale": {
-      "pos": 0,
+      "fit": 0,
       "grid": 0.166667,
       "slice": 0.916667,
       "map": 0.916667,
@@ -184,7 +184,7 @@
       "chrd": 0.785714
     },
     "Frozen": {
-      "pos": 0,
+      "fit": 0,
       "grid": 0.833333,
       "slice": 0.416667,
       "map": 0.083333,
@@ -194,7 +194,7 @@
       "chrd": 0.071429
     },
     "Shred": {
-      "pos": 0.1,
+      "fit": 0,
       "grid": 0.5,
       "slice": 0.083333,
       "map": 0.083333,
@@ -209,15 +209,15 @@
     "stockShift": [
       "start",
       "window",
-      "none",
+      "gain",
       "end"
     ],
     "display": {
-      "stateBytes": 384,
+      "stateBytes": 388,
       "stateAlignment": 4,
-      "paths": 0,
-      "points": 0,
-      "nodes": 252,
+      "paths": 4,
+      "points": 64,
+      "nodes": 299,
       "texts": 16,
       "palette": 16
     }
