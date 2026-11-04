@@ -74,8 +74,8 @@ inline void fill(const Input& input, bool has_sample, char (&values)[8][header_c
 
 // Shift (resources.stockShift): encoders 1, 2 and 4 turn the stock sampler's
 // start, both markers together (the window, keeping its length) and end, the
-// stretch of the sample the bed plays; encoder 3 keeps its own fine turn.
-const char* const shift_titles[4] = {"start", "window", nullptr, "end"};
+// stretch of the sample the bed plays; encoder 3 turns nothing.
+const char* const shift_titles[4] = {"start", "window", "", "end"};
 
 // Frames as seconds: 0.62s, 12.4s, 123s, and from 1000 s whole minutes, 17m.
 inline void seconds(char (&value)[header_capacity], u32 frames, u32 rate) {
@@ -88,8 +88,9 @@ inline void seconds(char (&value)[header_capacity], u32 frames, u32 rate) {
 }
 
 // While Shift is held, the row the encoders turn names what Shift edits, as
-// the stock header does: the start and end at their times in the sample, and
-// the window at its length. titles and values are indexed by slot.
+// the stock header does: the start and end at their times in the sample and
+// the window at its length; encoder 3's cell is blank. titles and values are
+// indexed by slot.
 inline void shift_row(const Input& input, const opxy::u8 (&pages)[2][4], const SampleOverview& o, const char* (&titles)[8],
                       char (&values)[8][header_capacity]) {
     if (!input.shift) return;
@@ -100,10 +101,10 @@ inline void shift_row(const Input& input, const opxy::u8 (&pages)[2][4], const S
     const u32 end = o.end && o.end <= o.frames ? o.end : o.frames, begin = o.begin < end ? o.begin : 0;
     const u32 marks[4] = {begin, end - begin, 0, end};
     for (u32 col = 0; col < 4; ++col) {
-        if (!shift_titles[col]) continue;
         const u32 slot = pages[page][col];
         titles[slot] = shift_titles[col];
-        if (known) seconds(values[slot], marks[col], o.rate);
+        if (!*shift_titles[col]) values[slot][0] = 0;
+        else if (known) seconds(values[slot], marks[col], o.rate);
         else copy(values[slot], header_capacity, "-");
     }
 }

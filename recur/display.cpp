@@ -99,14 +99,14 @@ void seconds(char* at, u32 frames, u32 rate) {
 
 // Shift (resources.stockShift): encoders 1, 2 and 4 turn the stock sampler's
 // start, both markers together (the window, keeping its length) and end;
-// encoder 3 keeps its own fine turn.
-const char* const shift_titles[4] = {"start", "window", nullptr, "end"};
+// encoder 3 turns nothing, and its cell is blank.
+const char* const shift_titles[4] = {"start", "window", "", "end"};
 
 // The header: real values. pos in seconds to the window's start; step the
 // iteration and its fraction; depth the share of the slices that move. While
 // Shift is held, the row the encoders turn names what Shift edits, as the
 // stock header does: the sampler's start and end at their times in the
-// sample, the window at its length, and the third column its own control.
+// sample, the window at its length, and the third column blank.
 void place_header(DisplayState& state, const Input& input, Frame& frame, const Sample& sample, u32 from, u32 k, u32 ahead16,
                   u32 period, u32 moving_share) {
     const char* own[8] = {"pos", "grid", "slice", "map", "step", "rate", "depth", "chrd"};
@@ -136,10 +136,10 @@ void place_header(DisplayState& state, const Input& input, Frame& frame, const S
             if (page_header_slots[1][col] != page_header_slots[0][col] && input.shown[col] == page_header_slots[1][col]) page = 1;
         const u32 marks[4] = {sample.begin, sample.span, 0, sample.begin + sample.span};
         for (u32 col = 0; col < 4; ++col) {
-            if (!shift_titles[col]) continue;
             const u32 slot = page_header_slots[page][col];
             own[slot] = shift_titles[col];
-            if (sample.shown) seconds(values[slot], marks[col], sample.rate);
+            if (!*shift_titles[col]) values[slot][0] = 0;
+            else if (sample.shown) seconds(values[slot], marks[col], sample.rate);
             else copy(values[slot], header_capacity, "-");
         }
     }

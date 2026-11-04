@@ -319,7 +319,7 @@ int main() {
                     titles_seen.size(), widest_title);
     }
     {   // Shift (stockShift): the header's row names the stock sampler's start,
-        // window and end with their times, encoder 3 keeps its own control, and
+        // window and end with their times, encoder 3's cell is blank, and
         // the tape lights the region they trim, the caliper at its ends.
         overview.assigned = overview.loaded = 1;
         overview.frames = 176400; overview.begin = 22050; overview.end = 154350;
@@ -337,8 +337,8 @@ int main() {
         for (u32 i = 0; i < recur::bar_count; ++i) lit_bars += frame.nodes[recur::bar_first + i].shade == 15;
         input.shift = 1;
         for (u32 f = 0; f < 60; ++f) recur::display(state, input, frame);
-        if (text(0) != "start" || text(1) != "window" || text(2) != "slice" || text(3) != "end" ||
-            text(4) != "0.50s" || text(5) != "3.00s" || text(7) != "3.50s") {
+        if (text(0) != "start" || text(1) != "window" || text(2) != "" || text(3) != "end" ||
+            text(4) != "0.50s" || text(5) != "3.00s" || text(6) != "" || text(7) != "3.50s" || frame.header[2][0]) {
             std::printf("FAIL: Shift's row reads %s %s %s %s / %s %s %s\n", text(0).c_str(), text(1).c_str(), text(2).c_str(),
                         text(3).c_str(), text(4).c_str(), text(5).c_str(), text(7).c_str());
             ++failures;
@@ -361,7 +361,7 @@ int main() {
         }
         for (u32 i = 0; i < 4; ++i) input.shown[i] = opxy::u8(4 + i);
         for (u32 f = 0; f < 30; ++f) recur::display(state, input, frame);
-        if (text(0) != "start" || text(2) != "depth" || text(3) != "end") {
+        if (text(0) != "start" || text(2) != "" || text(6) != "" || text(3) != "end" || frame.header[2][0]) {
             std::printf("FAIL: page 2's Shift row reads %s .. %s %s\n", text(0).c_str(), text(2).c_str(), text(3).c_str());
             ++failures;
         }

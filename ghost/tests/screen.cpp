@@ -160,13 +160,16 @@ int main() {
         for (int k = 0; k < 4; ++k) input.shown[k] = opxy::u8(k);
         input.shift = 1;
         for (int t = 0; t < 20; ++t) ghost::display(state, input, frame);
-        const char* expect[8] = {"start", "window", "split", "end", "0.60s", "3.00s", nullptr, "3.60s"};
+        // Encoder 3 turns nothing with Shift (stockShift "none"): its cell is blank.
+        const char* expect[8] = {"start", "window", "", "end", "0.60s", "3.00s", "", "3.60s"};
         for (u32 t = 0; t < 8; ++t)
-            if (expect[t] && std::strcmp(frame.texts[t].chars, expect[t]))
+            if (std::strcmp(frame.texts[t].chars, expect[t]))
                 fail("Shift's row", frame.texts[t].chars, 0, 0);
+        if (frame.header[2][0]) fail("Shift's header cell 3", frame.header[2], 0, 0);
         for (int k = 0; k < 4; ++k) input.shown[k] = opxy::u8(4 + k);
         for (int t = 0; t < 20; ++t) ghost::display(state, input, frame);
-        if (std::strcmp(frame.texts[0].chars, "start") || std::strcmp(frame.texts[2].chars, "near") || std::strcmp(frame.texts[3].chars, "end"))
+        if (std::strcmp(frame.texts[0].chars, "start") || frame.texts[2].chars[0] || std::strcmp(frame.texts[3].chars, "end") ||
+            frame.texts[6].chars[0] || frame.header[2][0])
             fail("page 2's Shift row", frame.texts[2].chars, 0, 0);
     }
     std::printf("screen: %ld frames; sharpest turn %.2f degrees from straight back; %ld faults\n", frames_checked, sharpest, failures);
