@@ -448,6 +448,10 @@ release word, and swelling in slower for a larger attack word.
 - `tables.h`: the crossfade, semitone and bit-reversal tables, written by
   `tools/make_tables.py`.
 - `display.cpp`, `display.h`, `layout.h`: the screen.
+- `sample_view.h`, with its artwork in `tools/sample_view.py`: the sample's
+  waveform, the trim's markers and the swap hint, shared byte for byte with
+  Ghost and Grains (`tools/check_shared.py` at the repository's root checks
+  the copies). Change every copy together.
 - `panel.svg.fragment`: the screen's artwork, written with `layout.h` by
   `tools/make_panel.py`. Run the script after changing a shape, and commit
   all three.

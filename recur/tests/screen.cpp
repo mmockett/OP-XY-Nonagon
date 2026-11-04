@@ -366,7 +366,7 @@ int main() {
         // and nothing but it, the markers and the header changes, then nothing.
         const auto hint_shown = [&](bool want) {
             bool ok = true;
-            for (u32 k = 0; k < recur::sample_hint_nodes; ++k) {
+            for (u32 k = 0; k < recur::sample_view::sample_hint_nodes; ++k) {
                 const opxy::draw::Node& n = frame.nodes[recur::swap_first + k];
                 ok = ok && (want ? n.x == recur::swap_x * 1024 && n.y == recur::swap_y * 1024 : !shown(n));
             }
@@ -375,15 +375,15 @@ int main() {
             else ok = ok && !a.chars[0] && !b.chars[0] && a.x == opxy::draw::hidden_x * 1024;
             return ok;
         };
-        if (!hint_shown(true) || recur::swap_x < recur::rule_x1 + 24 || recur::swap_x + recur::sample_hint_width > 480 ||
-            recur::swap_y + recur::sample_hint_height > 220) { std::printf("FAIL: Shift doesn't show the swap hint in its place\n"); ++failures; }
+        if (!hint_shown(true) || recur::swap_x < recur::rule_x1 + 24 || recur::swap_x + recur::sample_view::sample_hint_width > 480 ||
+            recur::swap_y + recur::sample_view::sample_hint_height > 220) { std::printf("FAIL: Shift doesn't show the swap hint in its place\n"); ++failures; }
         {
             const recur::Frame held = frame;
             input.shift = 0;
             recur::display(state, input, frame);
             if (!hint_shown(false)) { std::printf("FAIL: the swap hint stays after Shift\n"); ++failures; }
             for (u32 n = recur::header_first + 8; n < recur::node_total; ++n)
-                if (std::memcmp(&held.nodes[n], &frame.nodes[n], sizeof(opxy::draw::Node)) && !(n >= recur::mark_first && n < recur::swap_first + recur::sample_hint_nodes)) {
+                if (std::memcmp(&held.nodes[n], &frame.nodes[n], sizeof(opxy::draw::Node)) && !(n >= recur::mark_first && n < recur::swap_first + recur::sample_view::sample_hint_nodes)) {
                     std::printf("FAIL: letting go of Shift moves node %u\n", n); ++failures; break;
                 }
             const recur::Frame after = frame;
@@ -426,7 +426,7 @@ int main() {
         input.elapsed = 17;
         const auto column = [&](u32 b, double& top, double& bottom) {
             const opxy::draw::Node& n = frame.nodes[recur::sample_line + 1 + b];
-            const double h = n.scale / 1024.0 * recur::sample_column_half;
+            const double h = n.scale / 1024.0 * 32.0;
             top = n.y / 1024.0 - h; bottom = n.y / 1024.0 + h;
             return shown(n);
         };
@@ -438,7 +438,7 @@ int main() {
             recur::display_reset(state);
             recur::display(state, input, frame);
             double tallest = 0;
-            for (u32 b = 0; b < recur::sample_columns; ++b) {
+            for (u32 b = 0; b < recur::sample_view::sample_columns; ++b) {
                 double top, bottom;
                 if (column(b, top, bottom)) tallest = std::fmax(tallest, std::fmax(recur::rule_y - top, bottom - recur::rule_y));
             }
@@ -457,7 +457,7 @@ int main() {
         frame = recur::Frame();
         recur::display_reset(state);
         recur::display(state, input, frame);
-        if (std::memcmp(&unknown.nodes[recur::sample_line], &frame.nodes[recur::sample_line], sizeof(opxy::draw::Node) * (1 + recur::sample_columns))) {
+        if (std::memcmp(&unknown.nodes[recur::sample_line], &frame.nodes[recur::sample_line], sizeof(opxy::draw::Node) * (1 + recur::sample_view::sample_columns))) {
             std::printf("FAIL: an unknown gain changes the waveform\n"); ++failures;
         }
         // Both signs: positive values stand above the centre line, negative ones
@@ -485,7 +485,7 @@ int main() {
             const recur::Frame was = frame;
             recur::display(state, input, frame);
             u32 changed = 0;
-            for (u32 n = 0; n <= recur::sample_columns; ++n)
+            for (u32 n = 0; n <= recur::sample_view::sample_columns; ++n)
                 changed += std::memcmp(&was.nodes[recur::sample_line + n], &frame.nodes[recur::sample_line + n], sizeof(opxy::draw::Node)) != 0;
             most = std::max(most, changed);
             taken += changed != 0;

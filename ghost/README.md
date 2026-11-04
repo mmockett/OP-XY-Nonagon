@@ -400,6 +400,10 @@ Not yet checked on the device:
 - `tables.h`: the sine, exp2, head-shadow and formant tables, written by
   `tools/gen_tables.py`.
 - `display.cpp`, `display.h`, `captions.h`, `figure.h`: the screen.
+- `sample_view.h`, with its artwork in `tools/sample_view.py`: the sample's
+  waveform, the trim's markers and the swap hint, shared byte for byte with
+  Recur and Grains (`tools/check_shared.py` at the repository's root checks
+  the copies). Change every copy together.
 - `panel.svg.fragment`: the screen's artwork, written with `figure.h` (the
   apparition's two poses) by `tools/make_panel.py`. Run the script after
   changing a shape, and commit all three.

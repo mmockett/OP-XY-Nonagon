@@ -22,72 +22,8 @@ FRONT_Y = 198.0                         # the apron's edge; the figures' feet st
 LINE = "#9a9a9a"   # the default stroke
 
 
-# --- sample view (to be shared) ---
-# The artwork display.cpp's sample view places (its own "sample view" block):
-# a centre line, 96 columns, the trim's two markers, and the swap hint's
-# icon and two texts. Every part is authored off screen, at (640, 320), so
-# nothing shows before the first frame places it, and every outline starts
-# where its closing edge is long: the device draws a short one as a sliver.
-SAMPLE_COLUMNS, SAMPLE_COLUMN_HALF, SAMPLE_COLUMN_WIDTH = 96, 32, 4.8
-SAMPLE_HINT_NODES = 3
-SAMPLE_PARKED = ' transform="matrix(1 0 0 1 640 320)"'
-
-
-def sample_view_number(v):
-    text = f"{round(v, 4):.4f}".rstrip("0").rstrip(".")
-    return "0" if text in ("", "-0") else text
-
-
-def sample_view_path(prefix, node, points, stroke, width, fill="none"):
-    d = "M" + " L".join(f"{sample_view_number(x)},{sample_view_number(y)}" for x, y in points) + " Z"
-    return (f'<path id="{prefix}_node_{node}"{SAMPLE_PARKED} d="{d}" fill="{fill}" stroke="{stroke}" '
-            f'stroke-width="{sample_view_number(width)}"/>')
-
-
-def sample_view_artwork(prefix, line, length, marks=None):
-    """The centre line (node line, a ribbon length px long and 0.3 px tall)
-    and the 96 columns after it (rectangles with a fill, 4.8 px wide and 64
-    tall, which display.cpp scales to each bin). marks, if given: the start
-    and end markers' nodes and outlines (each machine draws its own)."""
-    h = length / 2
-    out = [sample_view_path(prefix, line, [(h, 0.15), (-h, 0.15), (-h, -0.15), (h, -0.15)], "#333333", 0.5, "#333333")]
-    w, t = SAMPLE_COLUMN_WIDTH / 2, SAMPLE_COLUMN_HALF
-    column = [(-w, t), (-w, -t), (w, -t), (w, t)]
-    out += [sample_view_path(prefix, line + 1 + b, column, "#999999", 0.5, "#999999") for b in range(SAMPLE_COLUMNS)]
-    for node, points in marks or []:
-        out.append(sample_view_path(prefix, node, points, "#e6e6e6", 0.5, "#e6e6e6"))
-    return out
-
-
-def sample_view_hint(prefix, first, text_slot):
-    """The swap hint, about its top left corner: "swap" (10 px, #CBCBCB) over
-    "shift +" (10 px, #7D7D7D) in text slots text_slot and text_slot + 1, and
-    beside both, Grains' Sample key icon at 14 px in nodes first..first + 2,
-    in the empty state's grey, each with its own paint (display.cpp keeps it)."""
-    font = 'font-family="UniversNextPro-Light" font-size="10px"'
-    out = [f'<text id="{prefix}_text_{text_slot}"{SAMPLE_PARKED} fill="#CBCBCB" {font}>swap</text>',
-           f'<text id="{prefix}_text_{text_slot + 1}"{SAMPLE_PARKED} fill="#7D7D7D" {font}>shift +</text>']
-    k = 14 / 28
-    key = lambda x, y: (38 + (x - 256) * k, 4 + (y - 129) * k)
-    # The key: a rounded square, begun along its top so it closes over a long edge.
-    square = [(282.5763, 129), (284, 130.4237), (284, 155.5763), (282.5763, 157), (257.4237, 157), (256, 155.5763),
-              (256, 130.4237), (257.4237, 129)]
-    out.append(sample_view_path(prefix, first, [key(x, y) for x, y in square], "#7D7D7D", 0.8))
-    ring = [(270 + 9.0763 * math.cos(2 * math.pi * i / 20), 142.8814 + 9.0763 * math.sin(2 * math.pi * i / 20)) for i in range(20)]
-    out.append(sample_view_path(prefix, first + 1, [key(x, y) for x, y in ring], "#7D7D7D", 0.6))
-    # Its seven bars, a little waveform, as one filled outline: along their
-    # tops, then back along their bottoms, joined by a hairline at their middle.
-    bars = ((265.6254, 142.2881, 143.5932), (267.0492, 142.2881, 143.5932), (268.5322, 139.2627, 146.5593), (269.9559, 140.8644, 145.0763),
-            (271.439, 142.2881, 143.5932), (272.922, 142.2881, 143.5932), (274.3458, 142.2881, 143.5932))
-    middle, joint = 142.9407, 0.3
-    tops, bottoms = [], []
-    for x, top, bottom in bars:
-        tops += [(x, middle - joint), (x, top), (x + 0.8, top), (x + 0.8, middle - joint)]
-        bottoms += [(x, middle + joint), (x, bottom), (x + 0.8, bottom), (x + 0.8, middle + joint)]
-    wave = tops[1:-1] + bottoms[::-1][1:-1]
-    out.append(sample_view_path(prefix, first + 2, [key(x, y) for x, y in wave], "#7D7D7D", 0.5, "#7D7D7D"))
-    return out
-# --- end of sample view ---
+# The sample's view (sample_view.h's artwork), shared with the other sample engines.
+from sample_view import COLUMNS as SAMPLE_COLUMNS, HINT_NODES as SAMPLE_HINT_NODES, artwork as sample_view_artwork, hint as sample_view_hint
 
 
 
@@ -438,7 +374,7 @@ dynamic += [f'<path id="{ID}_node_{n}" d="{small}" fill="#000000" stroke="#55555
 # its edges are long; and, beside the slot's right end, the hint that Shift
 # and the Sample key swap the sample (nodes 123..125, text slots 16 and 17).
 STRIP_X0, STRIP_X1, STRIP_Y = 66, 358, 209
-dynamic += sample_view_artwork(ID, 24, STRIP_X1 - STRIP_X0, [
+dynamic += sample_view_artwork(ID, 24, STRIP_X1 - STRIP_X0, 8, [
     (121, [(-0.6, -9), (4, -9), (0.6, -5.6), (0.6, 9), (-0.6, 9)]),
     (122, [(0.6, -9), (0.6, 9), (-0.6, 9), (-0.6, -5.6), (-4, -9)])])
 dynamic += sample_view_hint(ID, 123, 16)

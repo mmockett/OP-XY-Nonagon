@@ -96,15 +96,15 @@ void play(const double* c, u32 notes, int frames, const char* when) {
 // markers and inside the pilaster, or all off screen with no words.
 void check_hint(bool shown, const char* when) {
     bool ok = true;
-    for (u32 k = 0; k < ghost::sample_hint_nodes; ++k) {
+    for (u32 k = 0; k < ghost::sample_view::sample_hint_nodes; ++k) {
         const Node& n = frame.nodes[ghost::swap_first + k];
         ok = ok && (shown ? n.x == ghost::swap_x * unit && n.y == ghost::swap_y * unit : n.x == hidden_x * unit && n.y == hidden_y * unit);
     }
     const Text& a = frame.texts[ghost::swap_text], &b = frame.texts[ghost::swap_text + 1];
     if (shown) {
         ok = ok && !std::strcmp(a.chars, "swap") && !std::strcmp(b.chars, "shift +") && a.x == ghost::swap_x * unit && b.x == ghost::swap_x * unit;
-        ok = ok && ghost::swap_x >= ghost::strip_x1 + 6 && ghost::swap_x + ghost::sample_hint_width <= 420 &&
-             ghost::swap_y >= 200 && ghost::swap_y + ghost::sample_hint_height <= 220;
+        ok = ok && ghost::swap_x >= ghost::strip_x1 + 6 && ghost::swap_x + ghost::sample_view::sample_hint_width <= 420 &&
+             ghost::swap_y >= 200 && ghost::swap_y + ghost::sample_view::sample_hint_height <= 220;
     } else ok = ok && !a.chars[0] && !b.chars[0] && a.x == hidden_x * unit && b.x == hidden_x * unit;
     if (!ok) fail(shown ? "the swap hint isn't shown in its place" : "the swap hint shows", when, 0, 0);
 }
@@ -193,7 +193,7 @@ int main() {
         // the swap hint: "swap" over "shift +" and the Sample key's icon, by the
         // slot's right end, clear of the columns, the markers and the pilaster.
         u32 lit = 0, dark = 0;
-        for (u32 b = 0; b < ghost::sample_columns; ++b) {
+        for (u32 b = 0; b < ghost::sample_view::sample_columns; ++b) {
             const Node& n = frame.nodes[ghost::sample_line + 1 + b];
             if (n.x != hidden_x * unit) (n.shade == 9 ? lit : dark) += 1;
         }
@@ -213,11 +213,11 @@ int main() {
             std::snprintf(want, sizeof want, "%c%d", g < 0 ? '-' : '+', g < 0 ? -g : g);
             if (std::strcmp(frame.texts[6].chars, want)) fail("the gain's caption", frame.texts[6].chars, 0, 0);
             double total = 0, tallest = 0;
-            for (u32 b = 0; b < ghost::sample_columns; ++b) {
+            for (u32 b = 0; b < ghost::sample_view::sample_columns; ++b) {
                 const Node& n = frame.nodes[ghost::sample_line + 1 + b];
                 if (n.x == hidden_x * unit) continue;
                 total += n.scale;
-                tallest = std::fmax(tallest, n.scale / 1024.0 * ghost::sample_column_half);
+                tallest = std::fmax(tallest, n.scale / 1024.0 * 32.0);
             }
             if (total < last || (g > -30 && total <= last)) fail("the columns grow with the gain", want, 0, 0);   // at -30 a quiet sample may be only the line
             if (tallest > 8.01) fail("a column reaches past the slot", want, 0, 0);
@@ -231,7 +231,7 @@ int main() {
         // With no sample, the strip goes and the hint shows.
         overview.assigned = 0;
         for (int t = 0; t < 2; ++t) ghost::display(state, input, frame);
-        for (u32 n = ghost::sample_line; n < ghost::swap_first + ghost::sample_hint_nodes; ++n)
+        for (u32 n = ghost::sample_line; n < ghost::swap_first + ghost::sample_view::sample_hint_nodes; ++n)
             if (frame.nodes[n].x != opxy::draw::hidden_x * 1024) fail("the strip without a sample", "shown", 0, 0);
         check_hint(false, "no sample, Shift held");
         overview.assigned = 1;
@@ -243,7 +243,7 @@ int main() {
         ghost::display(state, input, frame);
         check_hint(false, "Shift let go");
         for (u32 n = ghost::header_first + 8; n < ghost::Frame::node_count; ++n)
-            if (std::memcmp(&held.nodes[n], &frame.nodes[n], sizeof(Node)) && !(n >= ghost::mark_first && n < ghost::swap_first + ghost::sample_hint_nodes))
+            if (std::memcmp(&held.nodes[n], &frame.nodes[n], sizeof(Node)) && !(n >= ghost::mark_first && n < ghost::swap_first + ghost::sample_view::sample_hint_nodes))
                 fail("letting go of Shift moves more than the hint and markers", "Shift", 0, n);
         held = frame;
         ghost::display(state, input, frame);
@@ -267,7 +267,7 @@ int main() {
         for (int t = 0; t < 3; ++t) ghost::display(state, input, frame);
         const auto span = [&](u32 b, double& top, double& bottom) {
             const Node& n = frame.nodes[ghost::sample_line + 1 + b];
-            const double h = n.scale / 1024.0 * ghost::sample_column_half;
+            const double h = n.scale / 1024.0 * 32.0;
             top = n.y / 1024.0 - h; bottom = n.y / 1024.0 + h;
             return n.x != hidden_x * unit;
         };
@@ -288,7 +288,7 @@ int main() {
             was = frame;
             ghost::display(state, input, frame);
             u32 changed = 0;
-            for (u32 b = 0; b <= ghost::sample_columns; ++b)
+            for (u32 b = 0; b <= ghost::sample_view::sample_columns; ++b)
                 changed += std::memcmp(&was.nodes[ghost::sample_line + b], &frame.nodes[ghost::sample_line + b], sizeof(Node)) != 0;
             most = changed > most ? changed : most;
             frames_taken += changed != 0;

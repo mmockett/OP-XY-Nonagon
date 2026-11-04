@@ -55,5 +55,11 @@ screen done:
   The device only fills a node whose artwork has a fill, and its SVG loader
   takes one subpath of at most 64 points per path.
 
+Ghost and Recur draw their samples with `sample_view.h` (and its artwork,
+`tools/sample_view.py`), shared byte for byte with each other and with
+Grains, as `amp_curve.h` is. Change every copy together, and run
+`python3 tools/check_shared.py` (it also checks `../opxy-grains-release` when
+that is beside this repository).
+
 When a change reaches the device, ask for a photo of the screen, and check
 each machine at its heaviest settings before calling it finished.
