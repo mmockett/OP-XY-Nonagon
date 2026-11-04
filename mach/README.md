@@ -28,7 +28,9 @@ gone. Releasing fades it, as sound already in the air cannot be called back.
 
 **Status: experimental.** Mach passes the SDK's tests and runs on an
 OP-XY, where its CPU is
-measured (below).
+measured (below). Its screen now follows the track's amp envelope, which
+needs version 1.10 of the Open-XY SDK: this version can't ship until SDK 1.10
+is released.
 
 ## Controls
 
@@ -163,6 +165,17 @@ on the line of flight show where the sound you hear now left the projectile;
 after the cone they part, one forwards and one backwards. Releasing every
 note eases the photograph back. Reduced motion shows the end state at once.
 
+Where the OP-XY tells the screen the track's amp envelope (SDK 1.10), the
+flight lasts as long as the sound: it flies on after the keys are up until
+the envelope's release ends it, or the flight ends on its own. The sound
+waves reach as far as the sound is loud: they spread further as the attack
+swells, hold at the sustain while keys are held and draw in over the
+release. A short release ends the flight at once; a long one keeps the
+projectile crossing the field, its waves fading, until the sound ends.
+Without the envelope (an older OS, the builder's preview) the screen keeps
+its own timing. The shared `amp.h` follows the envelope; its note gives the
+curve it assumes for stock's envelope times.
+
 The screen cannot hear the engine: it derives the flight from the controls
 and time through `flight.h`, which the engine shares.
 
@@ -283,6 +296,12 @@ The figures below are host estimates made during development.
   Every header caption, each control swept in 400ths and all of them at
   their ends and middles together, fits its column in the OP-XY's font
   (a value at most 53 px at 20 px, a title 56 at 10).
+- **Amp envelope** (`tests/envelope.cpp`): with the envelope unknown every
+  frame is as before; a short envelope ends the flight within a tenth of a
+  second of the note-off and a long one flies it until its 3.4 s release
+  ends; a slow attack's waves reach less far at first, and the release draws
+  them in; churn stays at most 6.5 nodes a frame on average (peak 18, none
+  at rest); and every outline draws cleanly.
 
 ## Files
 
@@ -292,9 +311,11 @@ The figures below are host estimates made during development.
 | `wide.h` | 64-bit products, quotients and roots from 32-bit words |
 | `flight.h` | the controls' laws and the flight's timeline, shared with the screen |
 | `display.cpp`, `display.h`, `plate.h` | the photograph |
+| `amp.h` | the amp envelope as the screen follows it, a copy of the suite's `tools/amp.h` |
 | `tables.h` ← `tools/make_tables.py` | wavetables, sine, the bell's rings, the voice's pulse, small curves |
 | `panel.svg.fragment`, `plate.h` ← `tools/make_panel.py` | the artwork |
 | `tests/sound.cpp`, `tests/screen.cpp` | host checks; `screen` also prints frames (`tour` for the GIF, `still:` for the contact sheet) |
+| `tests/envelope.cpp` | the screen under the amp envelope: unchanged frames without it, short against long, churn |
 | `tools/render.cc`, `render_phrases.py`, `measure.py`, `pitch.py`, `control_table.py` | renders, their measurements and the control table |
 | `tools/frame2svg.py`, `make_gif.py`, `make_contact.py` | frames to SVG, `docs/mach.gif`, and the contact sheets `docs/controls-1x.png` (1:1) and `docs/controls.png` (2x) |
 

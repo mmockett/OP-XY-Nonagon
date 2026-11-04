@@ -259,6 +259,8 @@ static Churn run(const char* scenario, double fps, const std::vector<double>& sn
     static mach::Frame last;
     mach::display_reset(state);
     opxy::draw::Input input = {};
+    // The envelope unknown, as before SDK 1.10 (tests/envelope.cpp follows one).
+    input.amp.attack = input.amp.decay = input.amp.sustain = input.amp.release = opxy::draw::envelope_unavailable;
     input.track = 1;
     input.held_notes = 0;
     for (unsigned i = 0; i < 4; ++i) input.shown[i] = static_cast<opxy::u8>(i);

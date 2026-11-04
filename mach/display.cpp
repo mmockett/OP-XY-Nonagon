@@ -42,6 +42,13 @@
 // backwards after the cone. Releasing every note eases the photograph back.
 // The screen cannot hear the engine: it derives the flight from the controls
 // and time through flight.h, as the engine does.
+//
+// Where the OP-XY tells the screen its amp envelope (SDK 1.10, amp.h), a
+// flight flies on after the keys are up, as the voice does, until the
+// envelope ends the sound or the flight its own; and the sound waves reach
+// as far as the sound is loud: they spread further as the attack swells,
+// hold at the sustain and draw in over the release. Without it, the screen
+// keeps its own timing: a flight ends as the last key is released.
 namespace mach {
 namespace screen {
 using opxy::draw::unit;
@@ -212,6 +219,7 @@ inline void display_reset(DisplayState& state) {
     state = DisplayState();
     state.header.reset();
     state.notes.reset();
+    nonagon_amp::reset(state.amp);
     state.boom_age = state.echo_age = -1;
 }
 
@@ -256,9 +264,15 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         e.reach = ease(e.reach, target.reach, dt);
     }
 
-    // A note launches a flight, fixed at note-on; releasing every note, or
-    // the flight's last sound arriving, ends it.
-    if (input.note_serial != state.serial) {
+    // A note launches a flight, fixed at note-on; releasing every note (with
+    // the amp envelope known, the envelope's end), or the flight's last sound
+    // arriving, ends it. heard is the envelope's level in sixteenths (all of
+    // it without one).
+    const bool started = input.note_serial != state.serial;
+    const bool follows = nonagon_amp::follow(state.amp, input, started);
+    const i32 heard = follows ? nonagon_amp::level_steps(state.amp, 16) : 16;
+    const bool let_go = follows ? !nonagon_amp::sounding(state.amp) || heard <= 0 : events.hold_ended;
+    if (started) {
         state.serial = input.note_serial;
         if (!input.reduced_motion) {
             state.flying = 1;
@@ -286,7 +300,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         if (state.boom_age >= 0) state.boom_age += dt;
         if (state.echo_age >= 0) state.echo_age += dt;
     }
-    if (state.flying && (events.hold_ended || input.reduced_motion || (state.elapsed << 6) > state.line.length + 22938)) {
+    if (state.flying && (let_go || input.reduced_motion || (state.elapsed << 6) > state.line.length + 22938)) {
         state.flying = 0;
         state.boom_age = state.echo_age = -1;
     }
@@ -356,7 +370,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     // while its tangent point lies on the cone's drawn arm, r sqrt(M^2 - 1)
     // within its reach, so the cone holds every ring ---
     const i32 air = flight::amount(input.slots[AIR]);
-    const i32 extent = radius * unit - ((radius * unit) >> 10) * ((air * 655) >> 15);
+    i32 extent = radius * unit - ((radius * unit) >> 10) * ((air * 655) >> 15);
+    if (state.flying && follows) extent = extent * heard / 16;               // as far as the sound is loud
     i32 contain = 1 << 20;                                                     // the largest ring the cone holds, pixels
     if (sc.mach > flight::one + 256) {
         const i32 rt = static_cast<i32>(flight::isqrt(static_cast<u32>(flight::mul16(sc.mach, sc.mach) - flight::one) << 12)) << 2;   // sqrt(M^2 - 1), Q16
