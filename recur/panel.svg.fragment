@@ -2,14 +2,14 @@
 <path d="M0,0 L480,0 L480,220 L0,220 Z" fill="#000000"/>
 <!-- SDK two-page header: keep this block before machine artwork below y=38. -->
 <path d="M0,0 L480,0 L480,38 L0,38 Z" fill="#000000"/>
-<path id="recur_node_4" transform="matrix(1 0 0 1 0 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#000000" stroke="#000000" stroke-width="0.5"/>
-<path id="recur_node_5" transform="matrix(1 0 0 1 60 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#323232" stroke="#323232" stroke-width="0.5"/>
-<path id="recur_node_6" transform="matrix(1 0 0 1 120 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#4B4B4B" stroke="#4B4B4B" stroke-width="0.5"/>
-<path id="recur_node_7" transform="matrix(1 0 0 1 180 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#646464" stroke="#646464" stroke-width="0.5"/>
-<path id="recur_node_8" transform="matrix(1 0 0 1 240 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#7D7D7D" stroke="#7D7D7D" stroke-width="0.5"/>
-<path id="recur_node_9" transform="matrix(1 0 0 1 300 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#969696" stroke="#969696" stroke-width="0.5"/>
-<path id="recur_node_10" transform="matrix(1 0 0 1 360 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#AFAFAF" stroke="#AFAFAF" stroke-width="0.5"/>
-<path id="recur_node_11" transform="matrix(1 0 0 1 420 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#CDCDCD" stroke="#CDCDCD" stroke-width="0.5"/>
+<path id="recur_node_1" transform="matrix(1 0 0 1 0 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#000000" stroke="#000000" stroke-width="0.5"/>
+<path id="recur_node_2" transform="matrix(1 0 0 1 60 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#323232" stroke="#323232" stroke-width="0.5"/>
+<path id="recur_node_3" transform="matrix(1 0 0 1 120 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#4B4B4B" stroke="#4B4B4B" stroke-width="0.5"/>
+<path id="recur_node_4" transform="matrix(1 0 0 1 180 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#646464" stroke="#646464" stroke-width="0.5"/>
+<path id="recur_node_5" transform="matrix(1 0 0 1 240 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#7D7D7D" stroke="#7D7D7D" stroke-width="0.5"/>
+<path id="recur_node_6" transform="matrix(1 0 0 1 300 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#969696" stroke="#969696" stroke-width="0.5"/>
+<path id="recur_node_7" transform="matrix(1 0 0 1 360 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#AFAFAF" stroke="#AFAFAF" stroke-width="0.5"/>
+<path id="recur_node_8" transform="matrix(1 0 0 1 420 0)" d="M0,0 L60,0 L60,20 L0,20 Z" fill="#CDCDCD" stroke="#CDCDCD" stroke-width="0.5"/>
 <text id="recur_text_0" transform="matrix(1 0 0 1 5 10)" fill="#CBCBCB" font-family="UniversNextPro-Light" font-size="10px">-</text>
 <text id="recur_text_1" transform="matrix(1 0 0 1 125 10)" fill="#CBCBCB" font-family="UniversNextPro-Light" font-size="10px">-</text>
 <text id="recur_text_2" transform="matrix(1 0 0 1 245 10)" fill="#000000" font-family="UniversNextPro-Light" font-size="10px">-</text>
@@ -26,7 +26,7 @@
 <text id="recur_text_13" transform="matrix(1 0 0 1 185 33)" fill="#707070" font-family="UniversNextPro-Light" font-size="13px">-</text>
 <text id="recur_text_14" transform="matrix(1 0 0 1 305 33)" fill="#707070" font-family="UniversNextPro-Light" font-size="13px">-</text>
 <text id="recur_text_15" transform="matrix(1 0 0 1 425 33)" fill="#707070" font-family="UniversNextPro-Light" font-size="13px">-</text>
-<path d="M413,46 L415.68,46.53 L417.95,48.05 L419.47,50.32 L420,53 L420,209 L419.47,211.68 L417.95,213.95 L415.68,215.47 L413,216 L67,216 L64.32,215.47 L62.05,213.95 L60.53,211.68 L60,209 L60,53 L60.53,50.32 L62.05,48.05 L64.32,46.53 L67,46 Z" fill="none" stroke="#9a9a9a" stroke-width="0.8"/>
+<path d="M413,46 L415.68,46.53 L417.95,48.05 L419.47,50.32 L420,53 L420,212 L419.47,214.68 L417.95,216.95 L415.68,218.47 L413,219 L67,219 L64.32,218.47 L62.05,216.95 L60.53,214.68 L60,212 L60,53 L60.53,50.32 L62.05,48.05 L64.32,46.53 L67,46 Z" fill="none" stroke="#9a9a9a" stroke-width="0.8"/>
 <path d="M169,51 L311,51 L311,193 L169,193 Z" fill="none" stroke="#9a9a9a" stroke-width="0.8"/>
 <path d="M104,194 L124,194 L118,186 L110,186 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
 <path d="M124,172.5 L130,172.5 L130,171.5 L124,171.5 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
@@ -46,12 +46,9 @@
 <path d="M400.76,167.93 L405.95,164.93 L405.45,164.07 L400.26,167.07 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
 <path d="M331.11,171.49 L333.75,166.92 L336.98,162.77 L340.77,159.12 L345.02,156.03 L349.67,153.56 L354.61,151.76 L359.75,150.67 L365,150.3 L370.25,150.67 L375.39,151.76 L380.33,153.56 L384.98,156.03 L389.23,159.12 L393.02,162.77 L396.25,166.92 L398.89,171.49 L399.41,171.19 L396.75,166.58 L393.46,162.37 L389.62,158.66 L385.3,155.52 L380.58,153.01 L375.56,151.18 L370.33,150.07 L365,149.7 L359.67,150.07 L354.44,151.18 L349.42,153.01 L344.7,155.52 L340.38,158.66 L336.54,162.37 L333.25,166.58 L330.59,171.19 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
 <circle cx="365" cy="188" r="3" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
-<path d="M396.5,196 L397.46,196.19 L398.27,196.73 L398.81,197.54 L399,198.5 L399,211.5 L398.81,212.46 L398.27,213.27 L397.46,213.81 L396.5,214 L83.5,214 L82.54,213.81 L81.73,213.27 L81.19,212.46 L81,211.5 L81,198.5 L81.19,197.54 L81.73,196.73 L82.54,196.19 L83.5,196 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
-<path id="recur_node_0" transform="matrix(1 0 0 1 136 205)" d="M-52,-0.6 L-48.65,-0.9 L-45.29,-0.6 L-41.94,-0.9 L-38.58,-0.6 L-35.23,-0.9 L-31.87,-0.6 L-28.52,-0.9 L-25.16,-0.6 L-21.81,-0.9 L-18.45,-0.6 L-15.1,-0.9 L-11.74,-0.6 L-8.39,-0.9 L-5.03,-0.6 L-1.68,-0.9 L1.68,-0.6 L5.03,-0.9 L8.39,-0.6 L11.74,-0.9 L15.1,-0.6 L18.45,-0.9 L21.81,-0.6 L25.16,-0.9 L28.52,-0.6 L31.87,-0.9 L35.23,-0.6 L38.58,-0.9 L41.94,-0.6 L45.29,-0.9 L48.65,-0.6 L52,-0.9 L52,0.9 L48.65,0.6 L45.29,0.9 L41.94,0.6 L38.58,0.9 L35.23,0.6 L31.87,0.9 L28.52,0.6 L25.16,0.9 L21.81,0.6 L18.45,0.9 L15.1,0.6 L11.74,0.9 L8.39,0.6 L5.03,0.9 L1.68,0.6 L-1.68,0.9 L-5.03,0.6 L-8.39,0.9 L-11.74,0.6 L-15.1,0.9 L-18.45,0.6 L-21.81,0.9 L-25.16,0.6 L-28.52,0.9 L-31.87,0.6 L-35.23,0.9 L-38.58,0.6 L-41.94,0.9 L-45.29,0.6 L-48.65,0.9 L-52,0.6 Z" fill="none" stroke="#6a6a6a" stroke-width="0.5"/>
-<path id="recur_node_1" transform="matrix(1 0 0 1 240 205)" d="M-52,-0.6 L-48.65,-0.9 L-45.29,-0.6 L-41.94,-0.9 L-38.58,-0.6 L-35.23,-0.9 L-31.87,-0.6 L-28.52,-0.9 L-25.16,-0.6 L-21.81,-0.9 L-18.45,-0.6 L-15.1,-0.9 L-11.74,-0.6 L-8.39,-0.9 L-5.03,-0.6 L-1.68,-0.9 L1.68,-0.6 L5.03,-0.9 L8.39,-0.6 L11.74,-0.9 L15.1,-0.6 L18.45,-0.9 L21.81,-0.6 L25.16,-0.9 L28.52,-0.6 L31.87,-0.9 L35.23,-0.6 L38.58,-0.9 L41.94,-0.6 L45.29,-0.9 L48.65,-0.6 L52,-0.9 L52,0.9 L48.65,0.6 L45.29,0.9 L41.94,0.6 L38.58,0.9 L35.23,0.6 L31.87,0.9 L28.52,0.6 L25.16,0.9 L21.81,0.6 L18.45,0.9 L15.1,0.6 L11.74,0.9 L8.39,0.6 L5.03,0.9 L1.68,0.6 L-1.68,0.9 L-5.03,0.6 L-8.39,0.9 L-11.74,0.6 L-15.1,0.9 L-18.45,0.6 L-21.81,0.9 L-25.16,0.6 L-28.52,0.9 L-31.87,0.6 L-35.23,0.9 L-38.58,0.6 L-41.94,0.9 L-45.29,0.6 L-48.65,0.9 L-52,0.6 Z" fill="none" stroke="#6a6a6a" stroke-width="0.5"/>
-<path id="recur_node_2" transform="matrix(1 0 0 1 344 205)" d="M-52,-0.6 L-48.65,-0.9 L-45.29,-0.6 L-41.94,-0.9 L-38.58,-0.6 L-35.23,-0.9 L-31.87,-0.6 L-28.52,-0.9 L-25.16,-0.6 L-21.81,-0.9 L-18.45,-0.6 L-15.1,-0.9 L-11.74,-0.6 L-8.39,-0.9 L-5.03,-0.6 L-1.68,-0.9 L1.68,-0.6 L5.03,-0.9 L8.39,-0.6 L11.74,-0.9 L15.1,-0.6 L18.45,-0.9 L21.81,-0.6 L25.16,-0.9 L28.52,-0.6 L31.87,-0.9 L35.23,-0.6 L38.58,-0.9 L41.94,-0.6 L45.29,-0.9 L48.65,-0.6 L52,-0.9 L52,0.9 L48.65,0.6 L45.29,0.9 L41.94,0.6 L38.58,0.9 L35.23,0.6 L31.87,0.9 L28.52,0.6 L25.16,0.9 L21.81,0.6 L18.45,0.9 L15.1,0.6 L11.74,0.9 L8.39,0.6 L5.03,0.9 L1.68,0.6 L-1.68,0.9 L-5.03,0.6 L-8.39,0.9 L-11.74,0.6 L-15.1,0.9 L-18.45,0.6 L-21.81,0.9 L-25.16,0.6 L-28.52,0.9 L-31.87,0.6 L-35.23,0.9 L-38.58,0.6 L-41.94,0.9 L-45.29,0.6 L-48.65,0.9 L-52,0.6 Z" fill="none" stroke="#6a6a6a" stroke-width="0.5"/>
-<path id="recur_node_3" transform="matrix(1 0 0 1 89 205)" d="M-5,-8 L-4.38,-8 L-3.75,-8 L-3.12,-8 L-2.5,-8 L-1.88,-8 L-1.25,-8 L-0.62,-8 L0,-8 L0.62,-8 L1.25,-8 L1.88,-8 L2.5,-8 L3.12,-8 L3.75,-8 L4.38,-8 L5,-8 L5,-7 L5,-6 L5,-5 L5,-4 L5,-3 L5,-2 L5,-1 L5,0 L5,1 L5,2 L5,3 L5,4 L5,5 L5,6 L5,7 L5,8 L4.38,8 L3.75,8 L3.12,8 L2.5,8 L1.88,8 L1.25,8 L0.62,8 L0,8 L-0.62,8 L-1.25,8 L-1.88,8 L-2.5,8 L-3.12,8 L-3.75,8 L-4.38,8 L-5,8 L-5,7 L-5,6 L-5,5 L-5,4 L-5,3 L-5,2 L-5,1 L-5,0 L-5,-1 L-5,-2 L-5,-3 L-5,-4 L-5,-5 L-5,-6 L-5,-7 Z" fill="none" stroke="#e6e6e6" stroke-width="0.6"/>
-<path id="recur_node_297" transform="matrix(1 0 0 1 0 0)" d="M0,39 L480,39 L480,220 L0,220 Z" fill="#000000" stroke="#000000" stroke-width="0.5"/>
+<path d="M396.5,196 L397.46,196.19 L398.27,196.73 L398.81,197.54 L399,198.5 L399,213.5 L398.81,214.46 L398.27,215.27 L397.46,215.81 L396.5,216 L83.5,216 L82.54,215.81 L81.73,215.27 L81.19,214.46 L81,213.5 L81,198.5 L81.19,197.54 L81.73,196.73 L82.54,196.19 L83.5,196 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
+<path id="recur_node_0" transform="matrix(1 0 0 1 89 206)" d="M-5,-9 L-4.38,-9 L-3.75,-9 L-3.12,-9 L-2.5,-9 L-1.88,-9 L-1.25,-9 L-0.62,-9 L0,-9 L0.62,-9 L1.25,-9 L1.88,-9 L2.5,-9 L3.12,-9 L3.75,-9 L4.38,-9 L5,-9 L5,-7.88 L5,-6.75 L5,-5.62 L5,-4.5 L5,-3.38 L5,-2.25 L5,-1.12 L5,0 L5,1.12 L5,2.25 L5,3.38 L5,4.5 L5,5.62 L5,6.75 L5,7.88 L5,9 L4.38,9 L3.75,9 L3.12,9 L2.5,9 L1.88,9 L1.25,9 L0.62,9 L0,9 L-0.62,9 L-1.25,9 L-1.88,9 L-2.5,9 L-3.12,9 L-3.75,9 L-4.38,9 L-5,9 L-5,7.88 L-5,6.75 L-5,5.62 L-5,4.5 L-5,3.38 L-5,2.25 L-5,1.12 L-5,0 L-5,-1.12 L-5,-2.25 L-5,-3.38 L-5,-4.5 L-5,-5.62 L-5,-6.75 L-5,-7.88 Z" fill="none" stroke="#e6e6e6" stroke-width="0.6"/>
+<path id="recur_node_394" transform="matrix(1 0 0 1 0 0)" d="M0,39 L480,39 L480,220 L0,220 Z" fill="#000000" stroke="#000000" stroke-width="0.5"/>
 <text transform="matrix(1 0 0 1 177 112)" fill="#CBCBCB" font-family="UniversNextPro-Light" font-size="20px">load a sample</text>
 <text transform="matrix(1 0 0 1 204 146)" fill="#7D7D7D" font-family="UniversNextPro-Light" font-size="14px">shift +</text>
 <path d="M255.12,130 L274.88,130 L276,131.12 L276,150.88 L274.88,152 L255.12,152 L254,150.88 L254,131.12 Z" fill="none" stroke="#7D7D7D" stroke-width="0.8"/>
@@ -63,7 +60,10 @@
 <path d="M266.09,140.44 L266.79,140.44 L266.79,141.47 L266.09,141.47 Z" fill="#7D7D7D" stroke="#7D7D7D" stroke-width="0.25"/>
 <path d="M267.26,140.44 L267.96,140.44 L267.96,141.47 L267.26,141.47 Z" fill="#7D7D7D" stroke="#7D7D7D" stroke-width="0.25"/>
 <path d="M268.38,140.44 L269.08,140.44 L269.08,141.47 L268.38,141.47 Z" fill="#7D7D7D" stroke="#7D7D7D" stroke-width="0.25"/>
-<path id="recur_node_298" transform="matrix(1 0 0 1 0 0)" d="M173,88 L307,88 L307,160 L173,160 Z" fill="#000000" stroke="#000000" stroke-width="0.5"/>
+<path id="recur_node_395" transform="matrix(1 0 0 1 0 0)" d="M173,88 L307,88 L307,160 L173,160 Z" fill="#000000" stroke="#000000" stroke-width="0.5"/>
+<path id="recur_node_9" d="M-6.9,-6.9 L6.9,-6.9 L6.9,6.9 L-6.9,6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_10" d="M-6.9,-6.9 L6.9,-6.9 L6.9,6.9 L-6.9,6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_11" d="M-6.9,-6.9 L6.9,-6.9 L6.9,6.9 L-6.9,6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
 <path id="recur_node_12" d="M-6.9,-6.9 L6.9,-6.9 L6.9,6.9 L-6.9,6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
 <path id="recur_node_13" d="M-6.9,-6.9 L6.9,-6.9 L6.9,6.9 L-6.9,6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
 <path id="recur_node_14" d="M-6.9,-6.9 L6.9,-6.9 L6.9,6.9 L-6.9,6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
@@ -125,139 +125,139 @@
 <path id="recur_node_70" d="M-6.9,-6.9 L6.9,-6.9 L6.9,6.9 L-6.9,6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
 <path id="recur_node_71" d="M-6.9,-6.9 L6.9,-6.9 L6.9,6.9 L-6.9,6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
 <path id="recur_node_72" d="M-6.9,-6.9 L6.9,-6.9 L6.9,6.9 L-6.9,6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_73" d="M-6.9,-6.9 L6.9,-6.9 L6.9,6.9 L-6.9,6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_74" d="M-6.9,-6.9 L6.9,-6.9 L6.9,6.9 L-6.9,6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_75" d="M-6.9,-6.9 L6.9,-6.9 L6.9,6.9 L-6.9,6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_73" d="M-30.8,-30.8 L30.8,-30.8 L30.8,30.8 L-30.8,30.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.9"/>
+<path id="recur_node_74" d="M-30.8,-30.8 L30.8,-30.8 L30.8,30.8 L-30.8,30.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.9"/>
+<path id="recur_node_75" d="M-30.8,-30.8 L30.8,-30.8 L30.8,30.8 L-30.8,30.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.9"/>
 <path id="recur_node_76" d="M-30.8,-30.8 L30.8,-30.8 L30.8,30.8 L-30.8,30.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.9"/>
-<path id="recur_node_77" d="M-30.8,-30.8 L30.8,-30.8 L30.8,30.8 L-30.8,30.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.9"/>
-<path id="recur_node_78" d="M-30.8,-30.8 L30.8,-30.8 L30.8,30.8 L-30.8,30.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.9"/>
-<path id="recur_node_79" d="M-30.8,-30.8 L30.8,-30.8 L30.8,30.8 L-30.8,30.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.9"/>
-<path id="recur_node_80" d="M4.4,7.7 L0.8,3.8 L-0.2,7.9 L0.8,8.1 L0.8,4.8 L3.6,8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_81" d="M0.2,7.9 L-0.8,3.8 L-4.4,7.7 L-3.6,8.3 L-0.8,4.8 L-0.8,8.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_82" d="M8.4,-4.6 L5.2,-8.3 L4.5,-7.7 L7.6,-4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_83" d="M-0.3,-8.1 L-2.6,7.9 L-1.6,8.1 L0.7,-7.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_84" d="M7.9,-0.4 L2.6,0.2 L-3,2.1 L-7.6,-3.5 L-8.4,-2.8 L-3.3,3 L2.8,1.2 L8.1,0.6 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_85" d="M7.6,-3.5 L3,2.1 L-2.6,0.2 L-7.9,-0.4 L-8.1,0.6 L-2.8,1.2 L3.3,3 L8.4,-2.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_86" d="M2.6,7.9 L0.3,-8.1 L-0.7,-7.9 L1.6,8.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_87" d="M-5.2,-8.3 L-8.4,-4.6 L-7.6,-4 L-4.5,-7.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_88" d="M-2.7,-8.1 L-3.1,-5.4 L-5.8,3.3 L-5.8,8 L-4.8,8 L-4.8,3.5 L-2.1,-5.1 L-1.7,-7.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_89" d="M7.8,3.6 L6.6,4.1 L4,6.7 L3.5,7.8 L4.5,8.2 L4.7,7.3 L7.2,4.9 L8.2,4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_90" d="M2.4,8.2 L2.9,6.2 L1.3,4.1 L-2.1,2.6 L-6.3,2.5 L-8.2,3.2 L-7.8,4.1 L-6.2,3.5 L-2.3,3.6 L0.8,5 L2,6.5 L1.4,7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_91" d="M8.2,3.2 L6.3,2.5 L2.1,2.6 L-1.3,4.1 L-2.9,6.2 L-2.4,8.2 L-1.4,7.8 L-2,6.5 L-0.8,5 L2.3,3.6 L6.2,3.5 L7.8,4.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_92" d="M5.8,8 L5.8,3.3 L3.1,-5.4 L2.7,-8.1 L1.7,-7.9 L2.1,-5.1 L4.8,3.5 L4.8,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_93" d="M-3.5,7.8 L-4,6.7 L-6.6,4.1 L-7.8,3.6 L-8.2,4.5 L-7.2,4.9 L-4.7,7.3 L-4.5,8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_94" d="M-5.8,-8 L-5.8,-4.4 L-5,2 L-2.7,8.1 L-1.8,7.7 L-4,1.8 L-4.8,-4.5 L-4.8,-8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_95" d="M3.2,-8.2 L3.2,-7.6 L4.7,-5.7 L7.8,-4.3 L8.2,-5.2 L5.3,-6.5 L4,-8.2 L4.1,-7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_96" d="M-8,-4.1 L-4.5,-4.1 L-0.6,-5.6 L1.6,-7.6 L0.9,-8.4 L-1.1,-6.4 L-4.7,-5 L-8,-5.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_97" d="M8.4,4.2 L3.3,-1.6 L8,-1.1 L8,-2.1 L2.3,-1.6 L7.6,4.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_98" d="M-1.6,-7.6 L0.6,-5.6 L4.5,-4.1 L8,-4.1 L8,-5.1 L4.7,-5 L1.1,-6.4 L-0.9,-8.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_99" d="M-8,-1.1 L-3.3,-1.6 L-8.4,4.2 L-7.6,4.8 L-2.3,-1.6 L-8,-2.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_100" d="M2.6,8.3 L5,2 L5.8,-4.4 L5.8,-8 L4.8,-8 L4.8,-4.5 L4,1.8 L1.8,7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_101" d="M-7.8,-4.3 L-4.7,-5.7 L-3.2,-7.6 L-3.2,-8.2 L-4.1,-7.8 L-4,-8.2 L-5.3,-6.5 L-8.2,-5.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_102" d="M-2,-7.7 L1.1,-3.3 L6,1.3 L7.7,2.4 L8.3,1.5 L6.6,0.6 L1.8,-3.9 L-1.1,-8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_103" d="M-8.3,3 L-5,4.8 L1.5,7 L7.9,7.6 L8.1,6.7 L1.8,6 L-4.7,3.9 L-7.7,2.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_104" d="M-7.9,7.6 L-1.5,7 L5,4.8 L8.3,3 L7.7,2.1 L4.7,3.9 L-1.8,6 L-8.1,6.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_105" d="M-7.7,2.4 L-6,1.3 L-1.1,-3.3 L2,-7.7 L1.1,-8.3 L-1.8,-3.9 L-6.6,0.6 L-8.3,1.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_106" d="M7.8,-2.4 L5.5,-1.5 L-2.3,4.4 L-4.7,7.7 L-3.9,8.3 L-1.6,5.2 L6.1,-0.7 L8.2,-1.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_107" d="M7.9,-6.5 L-1.9,-5.3 L-8.2,-2.8 L-7.8,-1.9 L-1.7,-4.3 L8.1,-5.6 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_108" d="M8.2,-2.8 L1.9,-5.3 L-7.9,-6.5 L-8.1,-5.6 L1.7,-4.3 L7.8,-1.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_109" d="M4.7,7.7 L2.3,4.4 L-5.5,-1.5 L-7.8,-2.4 L-8.2,-1.5 L-6.1,-0.7 L1.6,5.2 L3.9,8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_110" d="M7.5,0.2 L6.4,3.8 L6.5,8 L7.5,8 L7.4,4 L8.5,0.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_111" d="M-5.4,-8.3 L-7.9,-4.9 L-8.5,-3 L-7.5,-2.7 L-7,-4.4 L-4.6,-7.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_112" d="M0.4,1.1 L6.1,-7.7 L5.3,-8.3 L-0.4,0.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_113" d="M0.4,1.1 L6.1,-7.7 L5.3,-8.3 L-0.4,0.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_114" d="M8.5,-3 L7.9,-4.9 L5.4,-8.3 L4.6,-7.7 L7,-4.4 L7.5,-2.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_115" d="M-6.5,8 L-6.4,3.8 L-7.5,0.2 L-8.5,0.5 L-7.4,4 L-7.5,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_116" d="M6.6,-8 L6.7,-4.1 L7.9,-3.7 L8.1,-4.7 L7.7,-4.4 L7.6,-8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_117" d="M-8.1,-3.5 L0.9,-2.6 L0.8,8 L1.8,8 L1.7,-3.2 L-7.9,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_118" d="M-0.8,8 L-0.9,-2.6 L8.1,-3.5 L7.9,-4.5 L-1.7,-3.2 L-1.8,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_119" d="M-7.9,-3.7 L-6.7,-4.1 L-6.6,-8 L-7.6,-8 L-7.7,-4.4 L-8.1,-4.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_120" d="M0.8,-8 L0.8,8 L1.8,8 L1.8,-8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_121" d="M-0.8,8 L-0.8,-8 L-1.8,-8 L-1.8,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_122" d="M0.8,-8 L1.3,-7.2 L8,-7.2 L8,-8.2 L1.4,-8.2 L1.8,-8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_123" d="M-8,-7.2 L8,-7.2 L8,-8.2 L-8,-8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_124" d="M-8,-7.2 L8,-7.2 L8,-8.2 L-8,-8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_125" d="M-8,-7.2 L-1.3,-7.2 L-0.8,-8 L-1.8,-8 L-1.4,-8.2 L-8,-8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_126" d="M7.8,6.2 L4.7,7.5 L5.1,8.5 L8.2,7.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_127" d="M-1.3,8 L-1,3.6 L-2,3.5 L-2.3,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_128" d="M-1.7,3 L-8.2,5.8 L-7.8,6.7 L-1.3,4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_129" d="M8,-3.4 L3.6,-3.3 L-2.3,-0.8 L-7.3,4.3 L-8.5,7 L-7.5,7.4 L-6.5,4.9 L-1.7,0.1 L3.9,-2.3 L8,-2.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_130" d="M2.4,8 L2.3,5.2 L0.5,1.5 L-2.8,-1.6 L-7.5,-3.4 L-8,-3.4 L-8,-2.4 L-3.3,-0.7 L-0.3,2.1 L1.3,5.5 L1.4,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_131" d="M7.8,3.7 L1.8,6.2 L2.2,7.1 L8.2,4.6 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_132" d="M7.8,-3.6 L-8.2,3.2 L-7.8,4.2 L8.2,-2.6 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_133" d="M2.4,-8.5 L-8.2,-4 L-7.8,-3.1 L2.8,-7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_134" d="M-2.8,8 L-1.4,-8 L-2.4,-8 L-3.8,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_135" d="M7.5,-7.7 L6.5,-5.1 L6.4,3.8 L7.5,6.9 L8.5,6.5 L7.4,3.7 L7.5,-5 L8.5,-7.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_136" d="M7.5,-7.2 L7.3,-6.2 L7.5,-4.8 L7.6,-4.5 L8.4,-5 L8.3,-6.2 L8.5,-6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_137" d="M-8.3,-2.9 L-7.2,-2 L-5.2,-1.4 L-2.8,-1.6 L-0.5,-2.8 L1.4,-5 L2.4,-7.8 L1.4,-8.2 L0.5,-5.5 L-1.1,-3.6 L-3.1,-2.6 L-5.1,-2.4 L-6.8,-2.9 L-7.7,-3.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_138" d="M6.1,8.2 L8.4,3.5 L7.6,3.1 L5.2,7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_139" d="M-7.6,1.5 L-2.9,-7.6 L-2.9,-8 L-3.9,-8 L-8.4,1.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_140" d="M-8.5,-7.5 L-6.9,-3.6 L0.9,4.7 L7.8,7.9 L8.2,7 L1.5,3.9 L-6.1,-4.2 L-7.5,-7.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_141" d="M-0.3,8.5 L8.1,5.5 L7.7,4.6 L-0.7,7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_142" d="M-7.7,4.5 L4.8,-6.4 L5.5,-7.8 L4.7,-8.2 L4.1,-7.1 L-8.3,3.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_143" d="M-5.9,-7.5 L-4.4,-6.9 L8,-6.3 L8,-7.3 L-4.3,-7.9 L-5.5,-8.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_144" d="M-8,-6.2 L-7,-6.2 L-3.2,-7.5 L-3.5,-8.5 L-7.3,-7.2 L-8,-7.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_145" d="M7.6,3.7 L5.8,5.7 L4.7,7.8 L5.6,8.2 L6.6,6.3 L8.4,4.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_146" d="M7.9,-7.5 L4.9,-6.8 L-4.1,-1.8 L-8.4,2.7 L-7.6,3.4 L-3.5,-1 L5.3,-5.9 L8.1,-6.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_147" d="M8,-8 L2.9,-8.5 L2.8,-7.5 L8,-7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_148" d="M-4.1,-8.5 L-8.1,-7.7 L-7.9,-6.7 L-3.9,-7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_149" d="M-7.6,6.6 L-5.8,3.2 L0.5,-3 L8.2,-6.9 L7.8,-7.8 L-0.1,-3.8 L-6.6,2.6 L-8.4,6.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_150" d="M4.2,-8.2 L1.1,-2 L-0.5,7.9 L0.5,8.1 L2.1,-1.8 L5.1,-7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_151" d="M6.3,7.9 L5.6,2.8 L7.1,-6 L8,-7.8 L7.2,-8.2 L6.1,-6.2 L4.6,2.8 L5.3,8.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_152" d="M7.7,-2 L3,1.8 L4.9,7.5 L0,4 L-4.9,7.5 L-3,1.8 L-7.7,-2 L-8.3,-1.3 L-4,2.1 L-5.4,8.3 L0,5 L5.4,8.3 L4,2.1 L8.3,-1.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_153" d="M-8,-1.4 L-1.9,-1.8 L0,-7.5 L1.9,-1.8 L8,-1.4 L8,-2.4 L2.5,-2.6 L0,-8.5 L-2.5,-2.6 L-8,-2.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_154" d="M-0.4,-7.9 L1,1.4 L4.2,8.2 L5.1,7.8 L1.9,1.1 L0.6,-8.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_155" d="M8.5,-1.9 L6.8,-5.4 L6.4,-8.1 L5.4,-7.9 L5.8,-5.1 L7.5,-1.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_156" d="M-1.6,7.7 L-6.4,2.5 L-7.5,0.2 L-8.5,0.6 L-7.2,3.2 L-2.3,8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_157" d="M4.6,-7.8 L5.4,-6.2 L7.6,-3.8 L8.4,-4.5 L6.2,-6.8 L5.5,-8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_158" d="M-8.4,-2.7 L-4.6,1.4 L4.3,6.6 L7.9,7.4 L8.1,6.4 L4.7,5.7 L-4,0.6 L-7.6,-3.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_159" d="M-8.1,7.6 L-4.4,8.5 L-4.2,7.5 L-7.9,6.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_160" d="M2.8,8.5 L7.7,8.1 L8.2,8 L7.8,7 L2.8,7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_161" d="M8.1,-3.6 L7.5,-3.7 L-0.4,-8 L-0.7,-8.3 L-1.4,-7.7 L-0.9,-7.2 L7,-2.8 L7.9,-2.6 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_162" d="M-7.8,7.6 L0.4,4.3 L8.3,-2.1 L7.7,-2.9 L-0.1,3.4 L-8.2,6.6 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_163" d="M7.9,-3 L-0.9,-2 L-7.9,-3.4 L-8.1,-2.4 L-0.9,-1 L8.1,-2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_164" d="M-3.6,7.7 L-7.6,2.3 L-8.4,2.9 L-4.4,8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_165" d="M4.4,8.3 L8.4,2.9 L7.6,2.3 L3.6,7.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_166" d="M8.4,6.8 L-2.8,-8.3 L-3.7,-7.7 L7.6,7.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_167" d="M-7.6,7.4 L3.7,-7.7 L2.8,-8.3 L-8.4,6.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_168" d="M4.7,7.7 L-7.2,-8.3 L-8,-7.7 L3.9,8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_169" d="M-3.9,8.3 L8,-7.7 L7.2,-8.3 L-4.7,7.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_170" d="M0.4,8.3 L8.4,-2.4 L7.6,-3 L-0.4,7.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_171" d="M8.4,-4.4 L5.5,-8.3 L4.7,-7.7 L7.6,-3.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_172" d="M-7.6,-3.8 L-4.7,-7.7 L-5.5,-8.3 L-8.4,-4.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_173" d="M0.4,7.7 L-7.6,-3 L-8.4,-2.4 L-0.4,8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_174" d="M8.1,-5.4 L6.6,-5.8 L1.1,-4.3 L-3,-0.2 L-4.5,5.3 L-3.7,8.1 L-2.8,7.9 L-3.5,5.4 L-2.1,0.2 L1.6,-3.5 L6.7,-4.8 L7.9,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_175" d="M0,8.1 L0.8,5.3 L-0.7,-0.2 L-4.8,-4.3 L-7.9,-5.2 L-8.1,-4.2 L-5.3,-3.5 L-1.6,0.2 L-0.2,5.4 L-0.9,7.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_176" d="M-3.3,-3.7 L-0.3,-7.7 L-1.1,-8.3 L-4.1,-4.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_177" d="M7.9,-5.2 L4.8,-4.3 L0.7,-0.2 L-0.8,5.3 L-0,8.1 L0.9,7.9 L0.2,5.4 L1.6,0.2 L5.3,-3.5 L8.1,-4.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_178" d="M4.1,-4.3 L1.1,-8.3 L0.3,-7.7 L3.3,-3.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_179" d="M3.7,8.1 L4.5,5.3 L3,-0.2 L-1.1,-4.3 L-6.6,-5.8 L-8.1,-5.4 L-7.9,-4.5 L-6.7,-4.8 L-1.6,-3.5 L2.1,0.2 L3.5,5.4 L2.8,7.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_180" d="M-3.5,-7.9 L-3,-6.1 L1.1,-2.1 L6.6,-0.6 L8.1,-0.9 L7.9,-1.9 L6.7,-1.6 L1.6,-2.9 L-2.2,-6.7 L-2.5,-8.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_181" d="M-7.9,-1.2 L-4.8,-2.1 L-0.8,-6.1 L-0.2,-7.9 L-1.2,-8.1 L-1.6,-6.7 L-5.3,-2.9 L-8.1,-2.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_182" d="M0.2,-7.9 L0.8,-6.1 L4.8,-2.1 L7.9,-1.2 L8.1,-2.2 L5.3,-2.9 L1.6,-6.7 L1.2,-8.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_183" d="M-8.1,-0.9 L-6.6,-0.6 L-1.1,-2.1 L3,-6.1 L3.5,-7.9 L2.5,-8.1 L2.2,-6.7 L-1.6,-2.9 L-6.7,-1.6 L-7.9,-1.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_184" d="M8,4.1 L-0.2,4.1 L-2.4,7.8 L-1.6,8.2 L0.2,5 L8,5.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_185" d="M0.4,4.3 L-3.6,-2.6 L-4.4,-2.1 L-0.4,4.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_186" d="M8,4.1 L-8,4.1 L-8,5.1 L8,5.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_187" d="M2.4,7.8 L0.2,4.1 L-8,4.1 L-8,5.1 L-0.2,5 L1.6,8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_188" d="M0.4,4.8 L4.4,-2.1 L3.6,-2.6 L-0.4,4.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_189" d="M7.6,2.9 L4.8,7.8 L5.6,8.2 L8.4,3.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_190" d="M-3,-8.2 L-8.4,1.2 L-7.6,1.7 L-2.1,-7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_191" d="M8.4,1.2 L3,-8.2 L2.1,-7.8 L7.6,1.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_192" d="M-4.8,7.8 L-7.6,2.9 L-8.4,3.4 L-5.6,8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_193" d="M4.2,-8.2 L-0.5,0 L4.2,8.2 L5.1,7.8 L0.5,0 L5.1,-7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_194" d="M0,-0.5 L-8,-0.5 L-8,0.5 L0,0.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_195" d="M-4.2,8.2 L0.5,0 L-4.2,-8.2 L-5.1,-7.8 L-0.5,0 L-5.1,7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_196" d="M0,0.5 L8,0.5 L8,-0.5 L0,-0.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_197" d="M4.8,-7.8 L7.6,-2.9 L8.4,-3.4 L5.6,-8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_198" d="M-8.4,-1.2 L-3,8.2 L-2.1,7.8 L-7.6,-1.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_199" d="M3,8.2 L8.4,-1.2 L7.6,-1.7 L2.1,7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_200" d="M-7.6,-2.9 L-4.8,-7.8 L-5.6,-8.2 L-8.4,-3.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_201" d="M-2.4,-7.8 L-0.2,-4.1 L8,-4.1 L8,-5.1 L0.2,-5 L-1.6,-8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_202" d="M-0.4,-4.8 L-4.4,2.1 L-3.6,2.6 L0.4,-4.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_203" d="M-8,-4.1 L8,-4.1 L8,-5.1 L-8,-5.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_204" d="M-8,-4.1 L0.2,-4.1 L2.4,-7.8 L1.6,-8.2 L-0.2,-5 L-8,-5.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_205" d="M-0.4,-4.3 L3.6,2.6 L4.4,2.1 L0.4,-4.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_77" d="M4.4,7.7 L0.8,3.8 L-0.2,7.9 L0.8,8.1 L0.8,4.8 L3.6,8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_78" d="M0.2,7.9 L-0.8,3.8 L-4.4,7.7 L-3.6,8.3 L-0.8,4.8 L-0.8,8.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_79" d="M8.4,-4.6 L5.2,-8.3 L4.5,-7.7 L7.6,-4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_80" d="M-0.3,-8.1 L-2.6,7.9 L-1.6,8.1 L0.7,-7.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_81" d="M7.9,-0.4 L2.6,0.2 L-3,2.1 L-7.6,-3.5 L-8.4,-2.8 L-3.3,3 L2.8,1.2 L8.1,0.6 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_82" d="M7.6,-3.5 L3,2.1 L-2.6,0.2 L-7.9,-0.4 L-8.1,0.6 L-2.8,1.2 L3.3,3 L8.4,-2.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_83" d="M2.6,7.9 L0.3,-8.1 L-0.7,-7.9 L1.6,8.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_84" d="M-5.2,-8.3 L-8.4,-4.6 L-7.6,-4 L-4.5,-7.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_85" d="M-2.7,-8.1 L-3.1,-5.4 L-5.8,3.3 L-5.8,8 L-4.8,8 L-4.8,3.5 L-2.1,-5.1 L-1.7,-7.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_86" d="M7.8,3.6 L6.6,4.1 L4,6.7 L3.5,7.8 L4.5,8.2 L4.7,7.3 L7.2,4.9 L8.2,4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_87" d="M2.4,8.2 L2.9,6.2 L1.3,4.1 L-2.1,2.6 L-6.3,2.5 L-8.2,3.2 L-7.8,4.1 L-6.2,3.5 L-2.3,3.6 L0.8,5 L2,6.5 L1.4,7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_88" d="M8.2,3.2 L6.3,2.5 L2.1,2.6 L-1.3,4.1 L-2.9,6.2 L-2.4,8.2 L-1.4,7.8 L-2,6.5 L-0.8,5 L2.3,3.6 L6.2,3.5 L7.8,4.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_89" d="M5.8,8 L5.8,3.3 L3.1,-5.4 L2.7,-8.1 L1.7,-7.9 L2.1,-5.1 L4.8,3.5 L4.8,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_90" d="M-3.5,7.8 L-4,6.7 L-6.6,4.1 L-7.8,3.6 L-8.2,4.5 L-7.2,4.9 L-4.7,7.3 L-4.5,8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_91" d="M-5.8,-8 L-5.8,-4.4 L-5,2 L-2.7,8.1 L-1.8,7.7 L-4,1.8 L-4.8,-4.5 L-4.8,-8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_92" d="M3.2,-8.2 L3.2,-7.6 L4.7,-5.7 L7.8,-4.3 L8.2,-5.2 L5.3,-6.5 L4,-8.2 L4.1,-7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_93" d="M-8,-4.1 L-4.5,-4.1 L-0.6,-5.6 L1.6,-7.6 L0.9,-8.4 L-1.1,-6.4 L-4.7,-5 L-8,-5.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_94" d="M8.4,4.2 L3.3,-1.6 L8,-1.1 L8,-2.1 L2.3,-1.6 L7.6,4.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_95" d="M-1.6,-7.6 L0.6,-5.6 L4.5,-4.1 L8,-4.1 L8,-5.1 L4.7,-5 L1.1,-6.4 L-0.9,-8.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_96" d="M-8,-1.1 L-3.3,-1.6 L-8.4,4.2 L-7.6,4.8 L-2.3,-1.6 L-8,-2.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_97" d="M2.6,8.3 L5,2 L5.8,-4.4 L5.8,-8 L4.8,-8 L4.8,-4.5 L4,1.8 L1.8,7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_98" d="M-7.8,-4.3 L-4.7,-5.7 L-3.2,-7.6 L-3.2,-8.2 L-4.1,-7.8 L-4,-8.2 L-5.3,-6.5 L-8.2,-5.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_99" d="M-2,-7.7 L1.1,-3.3 L6,1.3 L7.7,2.4 L8.3,1.5 L6.6,0.6 L1.8,-3.9 L-1.1,-8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_100" d="M-8.3,3 L-5,4.8 L1.5,7 L7.9,7.6 L8.1,6.7 L1.8,6 L-4.7,3.9 L-7.7,2.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_101" d="M-7.9,7.6 L-1.5,7 L5,4.8 L8.3,3 L7.7,2.1 L4.7,3.9 L-1.8,6 L-8.1,6.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_102" d="M-7.7,2.4 L-6,1.3 L-1.1,-3.3 L2,-7.7 L1.1,-8.3 L-1.8,-3.9 L-6.6,0.6 L-8.3,1.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_103" d="M7.8,-2.4 L5.5,-1.5 L-2.3,4.4 L-4.7,7.7 L-3.9,8.3 L-1.6,5.2 L6.1,-0.7 L8.2,-1.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_104" d="M7.9,-6.5 L-1.9,-5.3 L-8.2,-2.8 L-7.8,-1.9 L-1.7,-4.3 L8.1,-5.6 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_105" d="M8.2,-2.8 L1.9,-5.3 L-7.9,-6.5 L-8.1,-5.6 L1.7,-4.3 L7.8,-1.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_106" d="M4.7,7.7 L2.3,4.4 L-5.5,-1.5 L-7.8,-2.4 L-8.2,-1.5 L-6.1,-0.7 L1.6,5.2 L3.9,8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_107" d="M7.5,0.2 L6.4,3.8 L6.5,8 L7.5,8 L7.4,4 L8.5,0.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_108" d="M-5.4,-8.3 L-7.9,-4.9 L-8.5,-3 L-7.5,-2.7 L-7,-4.4 L-4.6,-7.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_109" d="M0.4,1.1 L6.1,-7.7 L5.3,-8.3 L-0.4,0.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_110" d="M0.4,1.1 L6.1,-7.7 L5.3,-8.3 L-0.4,0.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_111" d="M8.5,-3 L7.9,-4.9 L5.4,-8.3 L4.6,-7.7 L7,-4.4 L7.5,-2.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_112" d="M-6.5,8 L-6.4,3.8 L-7.5,0.2 L-8.5,0.5 L-7.4,4 L-7.5,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_113" d="M6.6,-8 L6.7,-4.1 L7.9,-3.7 L8.1,-4.7 L7.7,-4.4 L7.6,-8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_114" d="M-8.1,-3.5 L0.9,-2.6 L0.8,8 L1.8,8 L1.7,-3.2 L-7.9,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_115" d="M-0.8,8 L-0.9,-2.6 L8.1,-3.5 L7.9,-4.5 L-1.7,-3.2 L-1.8,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_116" d="M-7.9,-3.7 L-6.7,-4.1 L-6.6,-8 L-7.6,-8 L-7.7,-4.4 L-8.1,-4.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_117" d="M0.8,-8 L0.8,8 L1.8,8 L1.8,-8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_118" d="M-0.8,8 L-0.8,-8 L-1.8,-8 L-1.8,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_119" d="M0.8,-8 L1.3,-7.2 L8,-7.2 L8,-8.2 L1.4,-8.2 L1.8,-8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_120" d="M-8,-7.2 L8,-7.2 L8,-8.2 L-8,-8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_121" d="M-8,-7.2 L8,-7.2 L8,-8.2 L-8,-8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_122" d="M-8,-7.2 L-1.3,-7.2 L-0.8,-8 L-1.8,-8 L-1.4,-8.2 L-8,-8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_123" d="M7.8,6.2 L4.7,7.5 L5.1,8.5 L8.2,7.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_124" d="M-1.3,8 L-1,3.6 L-2,3.5 L-2.3,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_125" d="M-1.7,3 L-8.2,5.8 L-7.8,6.7 L-1.3,4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_126" d="M8,-3.4 L3.6,-3.3 L-2.3,-0.8 L-7.3,4.3 L-8.5,7 L-7.5,7.4 L-6.5,4.9 L-1.7,0.1 L3.9,-2.3 L8,-2.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_127" d="M2.4,8 L2.3,5.2 L0.5,1.5 L-2.8,-1.6 L-7.5,-3.4 L-8,-3.4 L-8,-2.4 L-3.3,-0.7 L-0.3,2.1 L1.3,5.5 L1.4,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_128" d="M7.8,3.7 L1.8,6.2 L2.2,7.1 L8.2,4.6 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_129" d="M7.8,-3.6 L-8.2,3.2 L-7.8,4.2 L8.2,-2.6 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_130" d="M2.4,-8.5 L-8.2,-4 L-7.8,-3.1 L2.8,-7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_131" d="M-2.8,8 L-1.4,-8 L-2.4,-8 L-3.8,8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_132" d="M7.5,-7.7 L6.5,-5.1 L6.4,3.8 L7.5,6.9 L8.5,6.5 L7.4,3.7 L7.5,-5 L8.5,-7.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_133" d="M7.5,-7.2 L7.3,-6.2 L7.5,-4.8 L7.6,-4.5 L8.4,-5 L8.3,-6.2 L8.5,-6.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_134" d="M-8.3,-2.9 L-7.2,-2 L-5.2,-1.4 L-2.8,-1.6 L-0.5,-2.8 L1.4,-5 L2.4,-7.8 L1.4,-8.2 L0.5,-5.5 L-1.1,-3.6 L-3.1,-2.6 L-5.1,-2.4 L-6.8,-2.9 L-7.7,-3.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_135" d="M6.1,8.2 L8.4,3.5 L7.6,3.1 L5.2,7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_136" d="M-7.6,1.5 L-2.9,-7.6 L-2.9,-8 L-3.9,-8 L-8.4,1.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_137" d="M-8.5,-7.5 L-6.9,-3.6 L0.9,4.7 L7.8,7.9 L8.2,7 L1.5,3.9 L-6.1,-4.2 L-7.5,-7.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_138" d="M-0.3,8.5 L8.1,5.5 L7.7,4.6 L-0.7,7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_139" d="M-7.7,4.5 L4.8,-6.4 L5.5,-7.8 L4.7,-8.2 L4.1,-7.1 L-8.3,3.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_140" d="M-5.9,-7.5 L-4.4,-6.9 L8,-6.3 L8,-7.3 L-4.3,-7.9 L-5.5,-8.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_141" d="M-8,-6.2 L-7,-6.2 L-3.2,-7.5 L-3.5,-8.5 L-7.3,-7.2 L-8,-7.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_142" d="M7.6,3.7 L5.8,5.7 L4.7,7.8 L5.6,8.2 L6.6,6.3 L8.4,4.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_143" d="M7.9,-7.5 L4.9,-6.8 L-4.1,-1.8 L-8.4,2.7 L-7.6,3.4 L-3.5,-1 L5.3,-5.9 L8.1,-6.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_144" d="M8,-8 L2.9,-8.5 L2.8,-7.5 L8,-7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_145" d="M-4.1,-8.5 L-8.1,-7.7 L-7.9,-6.7 L-3.9,-7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_146" d="M-7.6,6.6 L-5.8,3.2 L0.5,-3 L8.2,-6.9 L7.8,-7.8 L-0.1,-3.8 L-6.6,2.6 L-8.4,6.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_147" d="M4.2,-8.2 L1.1,-2 L-0.5,7.9 L0.5,8.1 L2.1,-1.8 L5.1,-7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_148" d="M6.3,7.9 L5.6,2.8 L7.1,-6 L8,-7.8 L7.2,-8.2 L6.1,-6.2 L4.6,2.8 L5.3,8.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_149" d="M7.7,-2 L3,1.8 L4.9,7.5 L0,4 L-4.9,7.5 L-3,1.8 L-7.7,-2 L-8.3,-1.3 L-4,2.1 L-5.4,8.3 L0,5 L5.4,8.3 L4,2.1 L8.3,-1.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_150" d="M-8,-1.4 L-1.9,-1.8 L0,-7.5 L1.9,-1.8 L8,-1.4 L8,-2.4 L2.5,-2.6 L0,-8.5 L-2.5,-2.6 L-8,-2.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_151" d="M-0.4,-7.9 L1,1.4 L4.2,8.2 L5.1,7.8 L1.9,1.1 L0.6,-8.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_152" d="M8.5,-1.9 L6.8,-5.4 L6.4,-8.1 L5.4,-7.9 L5.8,-5.1 L7.5,-1.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_153" d="M-1.6,7.7 L-6.4,2.5 L-7.5,0.2 L-8.5,0.6 L-7.2,3.2 L-2.3,8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_154" d="M4.6,-7.8 L5.4,-6.2 L7.6,-3.8 L8.4,-4.5 L6.2,-6.8 L5.5,-8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_155" d="M-8.4,-2.7 L-4.6,1.4 L4.3,6.6 L7.9,7.4 L8.1,6.4 L4.7,5.7 L-4,0.6 L-7.6,-3.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_156" d="M-8.1,7.6 L-4.4,8.5 L-4.2,7.5 L-7.9,6.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_157" d="M2.8,8.5 L7.7,8.1 L8.2,8 L7.8,7 L2.8,7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_158" d="M8.1,-3.6 L7.5,-3.7 L-0.4,-8 L-0.7,-8.3 L-1.4,-7.7 L-0.9,-7.2 L7,-2.8 L7.9,-2.6 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_159" d="M-7.8,7.6 L0.4,4.3 L8.3,-2.1 L7.7,-2.9 L-0.1,3.4 L-8.2,6.6 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_160" d="M7.9,-3 L-0.9,-2 L-7.9,-3.4 L-8.1,-2.4 L-0.9,-1 L8.1,-2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_161" d="M-3.6,7.7 L-7.6,2.3 L-8.4,2.9 L-4.4,8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_162" d="M4.4,8.3 L8.4,2.9 L7.6,2.3 L3.6,7.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_163" d="M8.4,6.8 L-2.8,-8.3 L-3.7,-7.7 L7.6,7.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_164" d="M-7.6,7.4 L3.7,-7.7 L2.8,-8.3 L-8.4,6.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_165" d="M4.7,7.7 L-7.2,-8.3 L-8,-7.7 L3.9,8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_166" d="M-3.9,8.3 L8,-7.7 L7.2,-8.3 L-4.7,7.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_167" d="M0.4,8.3 L8.4,-2.4 L7.6,-3 L-0.4,7.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_168" d="M8.4,-4.4 L5.5,-8.3 L4.7,-7.7 L7.6,-3.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_169" d="M-7.6,-3.8 L-4.7,-7.7 L-5.5,-8.3 L-8.4,-4.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_170" d="M0.4,7.7 L-7.6,-3 L-8.4,-2.4 L-0.4,8.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_171" d="M8.1,-5.4 L6.6,-5.8 L1.1,-4.3 L-3,-0.2 L-4.5,5.3 L-3.7,8.1 L-2.8,7.9 L-3.5,5.4 L-2.1,0.2 L1.6,-3.5 L6.7,-4.8 L7.9,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_172" d="M0,8.1 L0.8,5.3 L-0.7,-0.2 L-4.8,-4.3 L-7.9,-5.2 L-8.1,-4.2 L-5.3,-3.5 L-1.6,0.2 L-0.2,5.4 L-0.9,7.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_173" d="M-3.3,-3.7 L-0.3,-7.7 L-1.1,-8.3 L-4.1,-4.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_174" d="M7.9,-5.2 L4.8,-4.3 L0.7,-0.2 L-0.8,5.3 L-0,8.1 L0.9,7.9 L0.2,5.4 L1.6,0.2 L5.3,-3.5 L8.1,-4.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_175" d="M4.1,-4.3 L1.1,-8.3 L0.3,-7.7 L3.3,-3.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_176" d="M3.7,8.1 L4.5,5.3 L3,-0.2 L-1.1,-4.3 L-6.6,-5.8 L-8.1,-5.4 L-7.9,-4.5 L-6.7,-4.8 L-1.6,-3.5 L2.1,0.2 L3.5,5.4 L2.8,7.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_177" d="M-3.5,-7.9 L-3,-6.1 L1.1,-2.1 L6.6,-0.6 L8.1,-0.9 L7.9,-1.9 L6.7,-1.6 L1.6,-2.9 L-2.2,-6.7 L-2.5,-8.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_178" d="M-7.9,-1.2 L-4.8,-2.1 L-0.8,-6.1 L-0.2,-7.9 L-1.2,-8.1 L-1.6,-6.7 L-5.3,-2.9 L-8.1,-2.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_179" d="M0.2,-7.9 L0.8,-6.1 L4.8,-2.1 L7.9,-1.2 L8.1,-2.2 L5.3,-2.9 L1.6,-6.7 L1.2,-8.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_180" d="M-8.1,-0.9 L-6.6,-0.6 L-1.1,-2.1 L3,-6.1 L3.5,-7.9 L2.5,-8.1 L2.2,-6.7 L-1.6,-2.9 L-6.7,-1.6 L-7.9,-1.9 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_181" d="M8,4.1 L-0.2,4.1 L-2.4,7.8 L-1.6,8.2 L0.2,5 L8,5.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_182" d="M0.4,4.3 L-3.6,-2.6 L-4.4,-2.1 L-0.4,4.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_183" d="M8,4.1 L-8,4.1 L-8,5.1 L8,5.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_184" d="M2.4,7.8 L0.2,4.1 L-8,4.1 L-8,5.1 L-0.2,5 L1.6,8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_185" d="M0.4,4.8 L4.4,-2.1 L3.6,-2.6 L-0.4,4.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_186" d="M7.6,2.9 L4.8,7.8 L5.6,8.2 L8.4,3.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_187" d="M-3,-8.2 L-8.4,1.2 L-7.6,1.7 L-2.1,-7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_188" d="M8.4,1.2 L3,-8.2 L2.1,-7.8 L7.6,1.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_189" d="M-4.8,7.8 L-7.6,2.9 L-8.4,3.4 L-5.6,8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_190" d="M4.2,-8.2 L-0.5,0 L4.2,8.2 L5.1,7.8 L0.5,0 L5.1,-7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_191" d="M0,-0.5 L-8,-0.5 L-8,0.5 L0,0.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_192" d="M-4.2,8.2 L0.5,0 L-4.2,-8.2 L-5.1,-7.8 L-0.5,0 L-5.1,7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_193" d="M0,0.5 L8,0.5 L8,-0.5 L0,-0.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_194" d="M4.8,-7.8 L7.6,-2.9 L8.4,-3.4 L5.6,-8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_195" d="M-8.4,-1.2 L-3,8.2 L-2.1,7.8 L-7.6,-1.7 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_196" d="M3,8.2 L8.4,-1.2 L7.6,-1.7 L2.1,7.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_197" d="M-7.6,-2.9 L-4.8,-7.8 L-5.6,-8.2 L-8.4,-3.4 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_198" d="M-2.4,-7.8 L-0.2,-4.1 L8,-4.1 L8,-5.1 L0.2,-5 L-1.6,-8.2 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_199" d="M-0.4,-4.8 L-4.4,2.1 L-3.6,2.6 L0.4,-4.3 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_200" d="M-8,-4.1 L8,-4.1 L8,-5.1 L-8,-5.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_201" d="M-8,-4.1 L0.2,-4.1 L2.4,-7.8 L1.6,-8.2 L-0.2,-5 L-8,-5.1 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_202" d="M-0.4,-4.3 L3.6,2.6 L4.4,2.1 L0.4,-4.8 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<circle id="recur_node_203" cx="0" cy="0" r="3.2" fill="none" stroke="#bdbdbd" stroke-width="0.8"/>
+<circle id="recur_node_204" cx="0" cy="0" r="3.2" fill="none" stroke="#bdbdbd" stroke-width="0.8"/>
+<circle id="recur_node_205" cx="0" cy="0" r="3.2" fill="none" stroke="#bdbdbd" stroke-width="0.8"/>
 <circle id="recur_node_206" cx="0" cy="0" r="3.2" fill="none" stroke="#bdbdbd" stroke-width="0.8"/>
 <circle id="recur_node_207" cx="0" cy="0" r="3.2" fill="none" stroke="#bdbdbd" stroke-width="0.8"/>
 <circle id="recur_node_208" cx="0" cy="0" r="3.2" fill="none" stroke="#bdbdbd" stroke-width="0.8"/>
@@ -271,84 +271,183 @@
 <circle id="recur_node_216" cx="0" cy="0" r="3.2" fill="none" stroke="#bdbdbd" stroke-width="0.8"/>
 <circle id="recur_node_217" cx="0" cy="0" r="3.2" fill="none" stroke="#bdbdbd" stroke-width="0.8"/>
 <circle id="recur_node_218" cx="0" cy="0" r="3.2" fill="none" stroke="#bdbdbd" stroke-width="0.8"/>
-<circle id="recur_node_219" cx="0" cy="0" r="3.2" fill="none" stroke="#bdbdbd" stroke-width="0.8"/>
-<circle id="recur_node_220" cx="0" cy="0" r="3.2" fill="none" stroke="#bdbdbd" stroke-width="0.8"/>
-<circle id="recur_node_221" cx="0" cy="0" r="3.2" fill="none" stroke="#bdbdbd" stroke-width="0.8"/>
-<path id="recur_node_222" d="M-0.4,-7.5 L0.4,-7.5 L0.4,7.5 L-0.4,7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_223" d="M-0.4,-7.5 L0.4,-7.5 L0.4,7.5 L-0.4,7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_224" d="M-0.4,-7.5 L0.4,-7.5 L0.4,7.5 L-0.4,7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_225" d="M-0.4,-7.5 L0.4,-7.5 L0.4,7.5 L-0.4,7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_226" d="M-0.4,-7.5 L0.4,-7.5 L0.4,7.5 L-0.4,7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_227" d="M-0.4,-7.5 L0.4,-7.5 L0.4,7.5 L-0.4,7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_228" d="M-0.4,-7.5 L0.4,-7.5 L0.4,7.5 L-0.4,7.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_229" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_230" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_231" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_232" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_233" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_234" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_235" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_236" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_237" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_238" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_239" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_240" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_241" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_242" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_243" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_244" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_245" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_246" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_247" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_248" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_249" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_250" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_251" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_252" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_253" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_254" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_255" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_256" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_257" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_258" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_259" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_260" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_261" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_262" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_263" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_264" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_265" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_266" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_267" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_268" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_269" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_270" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_271" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_272" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_273" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_274" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_275" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_276" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_277" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_278" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_279" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_280" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_281" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_282" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_283" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_284" d="M-0.4,-7.5 L0.4,-7.5 L0.4,-3.5 L-0.4,-3.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
-<path id="recur_node_285" transform="matrix(1 0 0 1 365 188)" d="M-2.4,1.5 L-1,-3 L-0.8,-33 L-2.2,-35 L0,-42 L2.2,-35 L0.8,-33 L1,-3 L2.4,1.5 L0,4 Z" fill="none" stroke="#e6e6e6" stroke-width="0.6"/>
-<path id="recur_node_286" transform="matrix(1 0 0 1 338 58)" d="M-1.6,0 L-1.6,34 L1.6,34 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
-<path id="recur_node_287" transform="matrix(1 0 0 1 347 58)" d="M-1.6,0 L-1.6,31.4 L1.6,31.4 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
-<path id="recur_node_288" transform="matrix(1 0 0 1 356 58)" d="M-1.6,0 L-1.6,28.8 L1.6,28.8 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
-<path id="recur_node_289" transform="matrix(1 0 0 1 365 58)" d="M-1.6,0 L-1.6,26.2 L1.6,26.2 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
-<path id="recur_node_290" transform="matrix(1 0 0 1 374 58)" d="M-1.6,0 L-1.6,23.6 L1.6,23.6 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
-<path id="recur_node_291" transform="matrix(1 0 0 1 383 58)" d="M-1.6,0 L-1.6,21 L1.6,21 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
-<path id="recur_node_292" transform="matrix(1 0 0 1 392 58)" d="M-1.6,0 L-1.6,18.4 L1.6,18.4 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
-<path id="recur_node_293" transform="matrix(1 0 0 1 114 188)" d="M-0.8,0 L-0.8,-110 L0,-112 L0.8,-110 L0.8,0 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
-<path id="recur_node_294" transform="matrix(1 0 0 1 114 118)" d="M-7,-3.5 L7,-3.5 L5,3.5 L-5,3.5 Z" fill="none" stroke="#e6e6e6" stroke-width="0.8"/>
-<path id="recur_node_295" transform="matrix(1 0 0 1 84 205)" d="M-0.6,-10 L4,-10 L0.6,-6.6 L0.6,9 L-0.6,9 Z" fill="#e6e6e6" stroke="#e6e6e6" stroke-width="0.5"/>
-<path id="recur_node_296" transform="matrix(1 0 0 1 396 205)" d="M0.6,-10 L0.6,9 L-0.6,9 L-0.6,-6.6 L-4,-10 Z" fill="#e6e6e6" stroke="#e6e6e6" stroke-width="0.5"/>
+<path id="recur_node_219" transform="matrix(1 0 0 1 640 320)" d="M156,0.15 L-156,0.15 L-156,-0.15 L156,-0.15 Z" fill="#333333" stroke="#333333" stroke-width="0.5"/>
+<path id="recur_node_220" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_221" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_222" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_223" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_224" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_225" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_226" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_227" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_228" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_229" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_230" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_231" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_232" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_233" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_234" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_235" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_236" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_237" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_238" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_239" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_240" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_241" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_242" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_243" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_244" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_245" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_246" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_247" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_248" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_249" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_250" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_251" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_252" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_253" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_254" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_255" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_256" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_257" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_258" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_259" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_260" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_261" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_262" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_263" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_264" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_265" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_266" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_267" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_268" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_269" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_270" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_271" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_272" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_273" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_274" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_275" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_276" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_277" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_278" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_279" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_280" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_281" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_282" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_283" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_284" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_285" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_286" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_287" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_288" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_289" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_290" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_291" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_292" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_293" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_294" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_295" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_296" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_297" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_298" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_299" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_300" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_301" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_302" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_303" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_304" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_305" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_306" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_307" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_308" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_309" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_310" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_311" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_312" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_313" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_314" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_315" transform="matrix(1 0 0 1 640 320)" d="M-2.4,32 L-2.4,-32 L2.4,-32 L2.4,32 Z" fill="#999999" stroke="#999999" stroke-width="0.5"/>
+<path id="recur_node_316" d="M-0.4,-8.5 L0.4,-8.5 L0.4,8.5 L-0.4,8.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_317" d="M-0.4,-8.5 L0.4,-8.5 L0.4,8.5 L-0.4,8.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_318" d="M-0.4,-8.5 L0.4,-8.5 L0.4,8.5 L-0.4,8.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_319" d="M-0.4,-8.5 L0.4,-8.5 L0.4,8.5 L-0.4,8.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_320" d="M-0.4,-8.5 L0.4,-8.5 L0.4,8.5 L-0.4,8.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_321" d="M-0.4,-8.5 L0.4,-8.5 L0.4,8.5 L-0.4,8.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_322" d="M-0.4,-8.5 L0.4,-8.5 L0.4,8.5 L-0.4,8.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_323" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_324" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_325" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_326" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_327" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_328" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_329" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_330" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_331" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_332" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_333" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_334" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_335" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_336" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_337" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_338" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_339" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_340" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_341" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_342" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_343" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_344" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_345" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_346" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_347" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_348" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_349" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_350" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_351" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_352" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_353" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_354" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_355" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_356" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_357" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_358" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_359" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_360" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_361" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_362" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_363" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_364" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_365" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_366" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_367" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_368" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_369" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_370" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_371" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_372" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_373" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_374" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_375" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_376" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_377" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_378" d="M-0.4,-8.5 L0.4,-8.5 L0.4,-4.5 L-0.4,-4.5 Z" fill="none" stroke="#cfcfcf" stroke-width="0.5"/>
+<path id="recur_node_379" transform="matrix(1 0 0 1 365 188)" d="M-2.4,1.5 L-1,-3 L-0.8,-33 L-2.2,-35 L0,-42 L2.2,-35 L0.8,-33 L1,-3 L2.4,1.5 L0,4 Z" fill="none" stroke="#e6e6e6" stroke-width="0.6"/>
+<path id="recur_node_380" transform="matrix(1 0 0 1 338 58)" d="M-1.6,0 L-1.6,34 L1.6,34 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
+<path id="recur_node_381" transform="matrix(1 0 0 1 347 58)" d="M-1.6,0 L-1.6,31.4 L1.6,31.4 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
+<path id="recur_node_382" transform="matrix(1 0 0 1 356 58)" d="M-1.6,0 L-1.6,28.8 L1.6,28.8 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
+<path id="recur_node_383" transform="matrix(1 0 0 1 365 58)" d="M-1.6,0 L-1.6,26.2 L1.6,26.2 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
+<path id="recur_node_384" transform="matrix(1 0 0 1 374 58)" d="M-1.6,0 L-1.6,23.6 L1.6,23.6 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
+<path id="recur_node_385" transform="matrix(1 0 0 1 383 58)" d="M-1.6,0 L-1.6,21 L1.6,21 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
+<path id="recur_node_386" transform="matrix(1 0 0 1 392 58)" d="M-1.6,0 L-1.6,18.4 L1.6,18.4 L1.6,0 Z" fill="none" stroke="#6a6a6a" stroke-width="0.6"/>
+<path id="recur_node_387" transform="matrix(1 0 0 1 114 188)" d="M-0.8,0 L-0.8,-110 L0,-112 L0.8,-110 L0.8,0 Z" fill="none" stroke="#cfcfcf" stroke-width="0.6"/>
+<path id="recur_node_388" transform="matrix(1 0 0 1 114 118)" d="M-7,-3.5 L7,-3.5 L5,3.5 L-5,3.5 Z" fill="none" stroke="#e6e6e6" stroke-width="0.8"/>
+<path id="recur_node_389" transform="matrix(1 0 0 1 84 206)" d="M-0.6,-11 L4,-11 L0.6,-7.6 L0.6,10 L-0.6,10 Z" fill="#e6e6e6" stroke="#e6e6e6" stroke-width="0.5"/>
+<path id="recur_node_390" transform="matrix(1 0 0 1 396 206)" d="M0.6,-11 L0.6,10 L-0.6,10 L-0.6,-7.6 L-4,-11 Z" fill="#e6e6e6" stroke="#e6e6e6" stroke-width="0.5"/>
+<text id="recur_text_16" transform="matrix(1 0 0 1 640 320)" fill="#CBCBCB" font-family="UniversNextPro-Light" font-size="10px">swap</text>
+<text id="recur_text_17" transform="matrix(1 0 0 1 640 320)" fill="#7D7D7D" font-family="UniversNextPro-Light" font-size="10px">shift +</text>
+<path id="recur_node_391" transform="matrix(1 0 0 1 640 320)" d="M51.2882,4 L52,4.7118 L52,17.2882 L51.2882,18 L38.7118,18 L38,17.2882 L38,4.7118 L38.7118,4 Z" fill="none" stroke="#7D7D7D" stroke-width="0.8"/>
+<path id="recur_node_392" transform="matrix(1 0 0 1 640 320)" d="M49.5382,10.9407 L49.316,12.3431 L48.6714,13.6082 L47.6675,14.6121 L46.4024,15.2567 L45,15.4789 L43.5976,15.2567 L42.3325,14.6121 L41.3286,13.6082 L40.684,12.3431 L40.4618,10.9407 L40.684,9.5383 L41.3286,8.2732 L42.3325,7.2693 L43.5976,6.6247 L45,6.4026 L46.4024,6.6247 L47.6675,7.2693 L48.6714,8.2732 L49.316,9.5383 Z" fill="none" stroke="#7D7D7D" stroke-width="0.6"/>
+<path id="recur_node_393" transform="matrix(1 0 0 1 640 320)" d="M42.8127,10.644 L43.2127,10.644 L43.2127,10.8203 L43.5246,10.8203 L43.5246,10.644 L43.9246,10.644 L43.9246,10.8203 L44.2661,10.8203 L44.2661,9.1313 L44.6661,9.1313 L44.6661,10.8203 L44.9779,10.8203 L44.9779,9.9322 L45.3779,9.9322 L45.3779,10.8203 L45.7195,10.8203 L45.7195,10.644 L46.1195,10.644 L46.1195,10.8203 L46.461,10.8203 L46.461,10.644 L46.861,10.644 L46.861,10.8203 L47.1729,10.8203 L47.1729,10.644 L47.5729,10.644 L47.5729,11.2966 L47.1729,11.2966 L47.1729,11.1204 L46.861,11.1204 L46.861,11.2966 L46.461,11.2966 L46.461,11.1204 L46.1195,11.1204 L46.1195,11.2966 L45.7195,11.2966 L45.7195,11.1204 L45.3779,11.1204 L45.3779,12.0382 L44.9779,12.0382 L44.9779,11.1204 L44.6661,11.1204 L44.6661,12.7797 L44.2661,12.7797 L44.2661,11.1204 L43.9246,11.1204 L43.9246,11.2966 L43.5246,11.2966 L43.5246,11.1204 L43.2127,11.1204 L43.2127,11.2966 L42.8127,11.2966 Z" fill="#7D7D7D" stroke="#7D7D7D" stroke-width="0.5"/>
 <circle id="recur_palette_0" cx="640" cy="0" r="1" fill="#000000" stroke="#000000" stroke-width="1"/>
 <circle id="recur_palette_1" cx="640" cy="0" r="1" fill="#111111" stroke="#111111" stroke-width="1"/>
 <circle id="recur_palette_2" cx="640" cy="0" r="1" fill="#222222" stroke="#222222" stroke-width="1"/>

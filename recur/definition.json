@@ -215,10 +215,10 @@
     "display": {
       "stateBytes": 400,
       "stateAlignment": 4,
-      "paths": 4,
+      "paths": 1,
       "points": 64,
-      "nodes": 299,
-      "texts": 16,
+      "nodes": 396,
+      "texts": 18,
       "palette": 16
     }
   }

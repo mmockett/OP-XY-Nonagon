@@ -20,7 +20,7 @@ opxy::draw::SampleOverview overview;
 const opxy::draw::SampleOverview* opxy_sample_overview() { return &overview; }
 
 namespace {
-// The overview of a 16-bit mono WAV: its length and 96 peaks, trimmed to a bar.
+// The overview of a 16-bit mono WAV: its length and 96 bins' smallest and largest values, trimmed to a bar.
 bool load(const char* path) {
     FILE* f = std::fopen(path, "rb");
     if (!f) return false;
@@ -35,10 +35,10 @@ bool load(const char* path) {
             const u32 frames = length / 2;
             overview.assigned = overview.loaded = overview.generation = 1;
             overview.frames = frames; overview.rate = 44100; overview.begin = 0; overview.end = frames < 88200 ? frames : 88200;
-            for (u32 b = 0; b < 96; ++b) {
-                i32 peak = 0;
-                for (u32 i = b * frames / 96; i < (b + 1) * frames / 96; ++i) peak = data[i] < 0 ? (-data[i] > peak ? -data[i] : peak) : (data[i] > peak ? data[i] : peak);
-                overview.high[b] = opxy::i16(peak > 32767 ? 32767 : peak); overview.low[b] = opxy::i16(-overview.high[b]);
+            for (u32 b = 0; b < 96; ++b) {   // each bin's smallest and largest value, as the OP-XY's overview has them
+                opxy::i16 low = 0, high = 0;
+                for (u32 i = b * frames / 96; i < (b + 1) * frames / 96; ++i) { low = data[i] < low ? data[i] : low; high = data[i] > high ? data[i] : high; }
+                overview.high[b] = high; overview.low[b] = low;
             }
             return true;
         }

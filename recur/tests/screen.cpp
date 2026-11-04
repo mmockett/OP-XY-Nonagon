@@ -361,6 +361,37 @@ int main() {
             ++failures;
         }
         if (frame.nodes[recur::mark_first].shade <= unlit) { std::printf("FAIL: Shift doesn't light the trim's markers\n"); ++failures; }
+        // While Shift is held, the swap hint: "swap" over "shift +" and the Sample
+        // key's icon, outside the tin by the tape's right end; let go, it goes,
+        // and nothing but it, the markers and the header changes, then nothing.
+        const auto hint_shown = [&](bool want) {
+            bool ok = true;
+            for (u32 k = 0; k < recur::sample_hint_nodes; ++k) {
+                const opxy::draw::Node& n = frame.nodes[recur::swap_first + k];
+                ok = ok && (want ? n.x == recur::swap_x * 1024 && n.y == recur::swap_y * 1024 : !shown(n));
+            }
+            const opxy::draw::Text& a = frame.texts[recur::swap_text], &b = frame.texts[recur::swap_text + 1];
+            if (want) ok = ok && text(recur::swap_text) == "swap" && text(recur::swap_text + 1) == "shift +" && a.x == recur::swap_x * 1024 && b.x == a.x;
+            else ok = ok && !a.chars[0] && !b.chars[0] && a.x == opxy::draw::hidden_x * 1024;
+            return ok;
+        };
+        if (!hint_shown(true) || recur::swap_x < recur::rule_x1 + 24 || recur::swap_x + recur::sample_hint_width > 480 ||
+            recur::swap_y + recur::sample_hint_height > 220) { std::printf("FAIL: Shift doesn't show the swap hint in its place\n"); ++failures; }
+        {
+            const recur::Frame held = frame;
+            input.shift = 0;
+            recur::display(state, input, frame);
+            if (!hint_shown(false)) { std::printf("FAIL: the swap hint stays after Shift\n"); ++failures; }
+            for (u32 n = recur::header_first + 8; n < recur::node_total; ++n)
+                if (std::memcmp(&held.nodes[n], &frame.nodes[n], sizeof(opxy::draw::Node)) && !(n >= recur::mark_first && n < recur::swap_first + recur::sample_hint_nodes)) {
+                    std::printf("FAIL: letting go of Shift moves node %u\n", n); ++failures; break;
+                }
+            const recur::Frame after = frame;
+            recur::display(state, input, frame);
+            if (std::memcmp(&after, &frame, sizeof frame)) { std::printf("FAIL: the screen changes at rest after Shift\n"); ++failures; }
+            input.shift = 1;
+            recur::display(state, input, frame);
+        }
         for (u32 i = 0; i < 4; ++i) input.shown[i] = opxy::u8(4 + i);
         for (u32 f = 0; f < 30; ++f) recur::display(state, input, frame);
         if (text(0) != "start" || text(2) != "gain" || text(6) != "+0" || text(3) != "end") {
@@ -384,12 +415,21 @@ int main() {
         overview.gain = 0;
         overview.begin = 0; overview.end = 176400;
     }
-    {   // The gain scales the tape's waveform: taller as it rises (the loudest
-        // bins meet the slot's edge from about +10), never past the slot.
+    {   // The gain scales the tape's waveform: its columns taller as it rises
+        // (the loudest meet the slot's edge from about +10), never past the
+        // slot; an unknown gain draws it as at +0. Each column runs from its
+        // bin's smallest value to its largest, both signs, and a new gain
+        // redraws at most 12 a frame.
         opxy::draw::Input input = {};
         for (u32 i = 0; i < 8; ++i) input.slots[i] = at(defaults[i]);
         input.track = 1;
         input.elapsed = 17;
+        const auto column = [&](u32 b, double& top, double& bottom) {
+            const opxy::draw::Node& n = frame.nodes[recur::sample_line + 1 + b];
+            const double h = n.scale / 1024.0 * recur::sample_column_half;
+            top = n.y / 1024.0 - h; bottom = n.y / 1024.0 + h;
+            return shown(n);
+        };
         double last = 0;
         bool rising = true, inside = true;
         for (i32 g = -30; g <= 20; g += 10) {
@@ -398,10 +438,13 @@ int main() {
             recur::display_reset(state);
             recur::display(state, input, frame);
             double tallest = 0;
-            for (u32 h = 0; h < recur::waves; ++h)
-                for (const opxy::draw::Point& q : frame.paths[h].points) tallest = std::fmax(tallest, std::fabs(q.y / 1024.0));
-            rising = rising && (g <= 0 ? tallest > last + 0.2 : tallest >= last);
-            inside = inside && tallest < 7.5;
+            for (u32 b = 0; b < recur::sample_columns; ++b) {
+                double top, bottom;
+                if (column(b, top, bottom)) tallest = std::fmax(tallest, std::fmax(recur::rule_y - top, bottom - recur::rule_y));
+            }
+            // At -30 a quiet sample may be only the centre line.
+            rising = rising && (g == -30 ? true : g <= 0 ? tallest > last + 0.2 : tallest >= last);
+            inside = inside && tallest < 8.01;
             last = tallest;
         }
         if (!rising || !inside) { std::printf("FAIL: the waveform doesn't grow with the gain within the slot\n"); ++failures; }
@@ -414,10 +457,44 @@ int main() {
         frame = recur::Frame();
         recur::display_reset(state);
         recur::display(state, input, frame);
-        bool same = true;
-        for (u32 h = 0; h < recur::waves; ++h)
-            for (u32 i = 0; i < 64; ++i) same = same && unknown.paths[h].points[i].y == frame.paths[h].points[i].y;
-        if (!same) { std::printf("FAIL: an unknown gain changes the waveform\n"); ++failures; }
+        if (std::memcmp(&unknown.nodes[recur::sample_line], &frame.nodes[recur::sample_line], sizeof(opxy::draw::Node) * (1 + recur::sample_columns))) {
+            std::printf("FAIL: an unknown gain changes the waveform\n"); ++failures;
+        }
+        // Both signs: positive values stand above the centre line, negative ones
+        // hang below it, a lopsided bin sits off centre, a silent one leaves the line.
+        const opxy::i16 keep[4][2] = {{overview.high[10], overview.low[10]}, {overview.high[11], overview.low[11]},
+                                      {overview.high[12], overview.low[12]}, {overview.high[13], overview.low[13]}};
+        overview.high[10] = 20000; overview.low[10] = 4000;
+        overview.high[11] = -4000; overview.low[11] = -20000;
+        overview.high[12] = 24000; overview.low[12] = -6000;
+        overview.high[13] = 0; overview.low[13] = 0;
+        overview.generation = 2;
+        frame = recur::Frame();
+        recur::display_reset(state);
+        recur::display(state, input, frame);
+        double t, b;
+        const double y = recur::rule_y;
+        if (!column(10, t, b) || b > y || t > y - 4) { std::printf("FAIL: a bin of positive values doesn't stand above the line\n"); ++failures; }
+        if (!column(11, t, b) || t < y || b < y + 4) { std::printf("FAIL: a bin of negative values doesn't hang below the line\n"); ++failures; }
+        if (!column(12, t, b) || !(t < y && b > y && y - t > (b - y) * 1.5)) { std::printf("FAIL: a lopsided bin isn't off centre\n"); ++failures; }
+        if (column(13, t, b)) { std::printf("FAIL: a silent bin shows a column\n"); ++failures; }
+        if (!shown(frame.nodes[recur::sample_line])) { std::printf("FAIL: no centre line\n"); ++failures; }
+        overview.gain = 10;
+        u32 most = 0, taken = 0;
+        for (u32 f = 0; f < 20; ++f) {
+            const recur::Frame was = frame;
+            recur::display(state, input, frame);
+            u32 changed = 0;
+            for (u32 n = 0; n <= recur::sample_columns; ++n)
+                changed += std::memcmp(&was.nodes[recur::sample_line + n], &frame.nodes[recur::sample_line + n], sizeof(opxy::draw::Node)) != 0;
+            most = std::max(most, changed);
+            taken += changed != 0;
+        }
+        if (most > 12 || taken > 8) { std::printf("FAIL: a new gain redraws %u columns a frame\n", most); ++failures; }
+        std::printf("waveform: a new gain redraws over %u frames, at most %u a frame\n", taken, most);
+        overview.gain = 0;
+        overview.generation = 1;
+        for (u32 i = 0; i < 4; ++i) { overview.high[10 + i] = keep[i][0]; overview.low[10 + i] = keep[i][1]; }
     }
     {   // The tape: the grid's cuts stand where the engine cuts the trim, a long
         // tick at each row, between the trim's markers; and they don't move at rest.

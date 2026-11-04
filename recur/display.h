@@ -4,9 +4,10 @@
 
 namespace recur {
 // Matches resources.display: paths, points, nodes, texts, palette. The puzzle's
-// tiles are fixed outlines that move; the tape's waveform and the frame round
-// the stretch read are the four it reshapes.
-using Frame = opxy::draw::Frame<paths, 64, node_total, 16, 16>;
+// tiles are fixed outlines that move, as are the tape's waveform's columns;
+// the frame round the stretch read is the one it reshapes. Text slots 16 and
+// 17 are the swap hint's words.
+using Frame = opxy::draw::Frame<paths, 64, node_total, 18, 16>;
 
 // A tile sliding from one slot to another; ms since it began, at_rest when it's still.
 struct Slide { opxy::u8 from, to; opxy::u16 ms; };
@@ -25,7 +26,7 @@ struct DisplayState {
     opxy::u32 hiss_key;   // what the tiles' inks were worked out for
     opxy::i32 swing;      // the pendulum's angle, tenths of a degree
     opxy::u32 sweep;      // where in the tray this frame's changes begin
-    opxy::u32 wave_key;   // the sample the waveform was drawn from
+    opxy::u32 wave_key;   // the sample, trim and gain the waveform was last drawn from (0: none)
     Swell swell;          // the amp envelope's level: the puzzle and tape play on through the release
     Slide slides[64];     // the shown grid's tiles, by their home slot
     opxy::u8 inks[64];    // each tile's shade: in hiss, how much of it is back in place

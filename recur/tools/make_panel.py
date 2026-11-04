@@ -23,8 +23,77 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 ID = sys.argv[1] if len(sys.argv) > 1 else "recur"   # another prefix for a preview copy
 FONT = 'font-family="UniversNextPro-Light"'
 
+
+# --- sample view (to be shared) ---
+# The artwork display.cpp's sample view places (its own "sample view" block):
+# a centre line, 96 columns, the trim's two markers, and the swap hint's
+# icon and two texts. Every part is authored off screen, at (640, 320), so
+# nothing shows before the first frame places it, and every outline starts
+# where its closing edge is long: the device draws a short one as a sliver.
+SAMPLE_COLUMNS, SAMPLE_COLUMN_HALF, SAMPLE_COLUMN_WIDTH = 96, 32, 4.8
+SAMPLE_HINT_NODES = 3
+SAMPLE_PARKED = ' transform="matrix(1 0 0 1 640 320)"'
+
+
+def sample_view_number(v):
+    text = f"{round(v, 4):.4f}".rstrip("0").rstrip(".")
+    return "0" if text in ("", "-0") else text
+
+
+def sample_view_path(prefix, node, points, stroke, width, fill="none"):
+    d = "M" + " L".join(f"{sample_view_number(x)},{sample_view_number(y)}" for x, y in points) + " Z"
+    return (f'<path id="{prefix}_node_{node}"{SAMPLE_PARKED} d="{d}" fill="{fill}" stroke="{stroke}" '
+            f'stroke-width="{sample_view_number(width)}"/>')
+
+
+def sample_view_artwork(prefix, line, length, marks=None):
+    """The centre line (node line, a ribbon length px long and 0.3 px tall)
+    and the 96 columns after it (rectangles with a fill, 4.8 px wide and 64
+    tall, which display.cpp scales to each bin). marks, if given: the start
+    and end markers' nodes and outlines (each machine draws its own)."""
+    h = length / 2
+    out = [sample_view_path(prefix, line, [(h, 0.15), (-h, 0.15), (-h, -0.15), (h, -0.15)], "#333333", 0.5, "#333333")]
+    w, t = SAMPLE_COLUMN_WIDTH / 2, SAMPLE_COLUMN_HALF
+    column = [(-w, t), (-w, -t), (w, -t), (w, t)]
+    out += [sample_view_path(prefix, line + 1 + b, column, "#999999", 0.5, "#999999") for b in range(SAMPLE_COLUMNS)]
+    for node, points in marks or []:
+        out.append(sample_view_path(prefix, node, points, "#e6e6e6", 0.5, "#e6e6e6"))
+    return out
+
+
+def sample_view_hint(prefix, first, text_slot):
+    """The swap hint, about its top left corner: "swap" (10 px, #CBCBCB) over
+    "shift +" (10 px, #7D7D7D) in text slots text_slot and text_slot + 1, and
+    beside both, Grains' Sample key icon at 14 px in nodes first..first + 2,
+    in the empty state's grey, each with its own paint (display.cpp keeps it)."""
+    font = 'font-family="UniversNextPro-Light" font-size="10px"'
+    out = [f'<text id="{prefix}_text_{text_slot}"{SAMPLE_PARKED} fill="#CBCBCB" {font}>swap</text>',
+           f'<text id="{prefix}_text_{text_slot + 1}"{SAMPLE_PARKED} fill="#7D7D7D" {font}>shift +</text>']
+    k = 14 / 28
+    key = lambda x, y: (38 + (x - 256) * k, 4 + (y - 129) * k)
+    # The key: a rounded square, begun along its top so it closes over a long edge.
+    square = [(282.5763, 129), (284, 130.4237), (284, 155.5763), (282.5763, 157), (257.4237, 157), (256, 155.5763),
+              (256, 130.4237), (257.4237, 129)]
+    out.append(sample_view_path(prefix, first, [key(x, y) for x, y in square], "#7D7D7D", 0.8))
+    ring = [(270 + 9.0763 * math.cos(2 * math.pi * i / 20), 142.8814 + 9.0763 * math.sin(2 * math.pi * i / 20)) for i in range(20)]
+    out.append(sample_view_path(prefix, first + 1, [key(x, y) for x, y in ring], "#7D7D7D", 0.6))
+    # Its seven bars, a little waveform, as one filled outline: along their
+    # tops, then back along their bottoms, joined by a hairline at their middle.
+    bars = ((265.6254, 142.2881, 143.5932), (267.0492, 142.2881, 143.5932), (268.5322, 139.2627, 146.5593), (269.9559, 140.8644, 145.0763),
+            (271.439, 142.2881, 143.5932), (272.922, 142.2881, 143.5932), (274.3458, 142.2881, 143.5932))
+    middle, joint = 142.9407, 0.3
+    tops, bottoms = [], []
+    for x, top, bottom in bars:
+        tops += [(x, middle - joint), (x, top), (x + 0.8, top), (x + 0.8, middle - joint)]
+        bottoms += [(x, middle + joint), (x, bottom), (x + 0.8, bottom), (x + 0.8, middle + joint)]
+    wave = tops[1:-1] + bottoms[::-1][1:-1]
+    out.append(sample_view_path(prefix, first + 2, [key(x, y) for x, y in wave], "#7D7D7D", 0.5, "#7D7D7D"))
+    return out
+# --- end of sample view ---
+
+
 TRAY_X, TRAY_Y, TRAY = 172, 54, 136          # the print, 136 px square, centred
-TIN = (60, 46, 420, 216)
+TIN = (60, 46, 420, 219)
 BEZEL = 3                                    # the tray's bezel, px outside the print
 PENDULUM = (114, 188)                        # the escapement's pendulum pivot (slice)
 ROD = 112                                    # its rod
@@ -33,9 +102,9 @@ COMB_X, COMB_Y = 338, 58                     # the music-box comb
 TOOTH_NOTES = [0, 1, 3, 4, 7, 12, 19]        # its teeth: the semitones chrd's readers play
 TOOTH_PITCH = 9                              # px between teeth
 LEVER = (365, 188)                           # the rate lever's pivot
-RULE_X0, RULE_X1, RULE_Y = 84, 396, 205      # the tape's slot: the whole sample, 312 px
-WAVES, WAVE_COLUMNS = 3, 32                  # its waveform: three reshaping outlines, a column an overview bin
-PATHS = WAVES + 1                            # and the stretch the slot playing reads, the fourth
+RULE_X0, RULE_X1, RULE_Y = 84, 396, 206      # the tape's slot: the whole sample, 312 px, 20 tall
+PATHS = 1                                    # the one reshaping outline: the stretch the slot playing reads
+SWAP = (424, 198)                            # the swap hint's top left corner, outside the tin by the tape's right end
 MAIN, PART = ("#9a9a9a", 0.8), ("#6a6a6a", 0.6)   # the two inks of the fixed artwork: the tin and tray, the instruments' parts
 HALF = 0.5                                   # a stroke's half width, px
 GAP = 1.6                                    # a small tile's inset from its cell, px
@@ -348,7 +417,7 @@ out.append(circle(lx, ly, 3, *PART))
 # The tape: the whole sample's waveform in a slot along the tin's foot, the
 # trim's markers and the grid's cuts on it, and a frame round the stretch the
 # slot playing reads (all nodes).
-out.append(plain(rounded(RULE_X0 - 3, RULE_Y - 9, RULE_X1 + 3, RULE_Y + 9, 2.5), *PART))
+out.append(plain(rounded(RULE_X0 - 3, RULE_Y - 10, RULE_X1 + 3, RULE_Y + 10, 2.5), *PART))
 
 # With no sample: a cover over the stage (shown then), how to load one, and
 # a cover over that (shown once a sample is loaded). Drawn before every other
@@ -414,16 +483,22 @@ pin_first = n
 for i in range(PINS):
     tile_nodes.append(f'<circle id="{ID}_node_{n}" cx="0" cy="0" r="3.2" fill="none" stroke="#bdbdbd" stroke-width="0.8"/>')
     n += 1
+# The tape's waveform (display.cpp's sample view): a centre line and a
+# column for each of the overview's 96 bins, placed and sized by display.cpp,
+# under the grid's cuts.
+sample_line = n
+tile_nodes += sample_view_artwork(ID, n, RULE_X1 - RULE_X0)
+n += 1 + SAMPLE_COLUMNS
 # The grid's cuts on the tape, placed by display.cpp (so authored at the
 # origin): a long one where a row of the square begins, a short one at the
 # top of the slot for each other slice.
 row_first = n
 for i in range(ROWS):
-    tile_nodes.append(node(n, rect(-0.4, -7.5, 0.4, 7.5), "#cfcfcf", 0.5))
+    tile_nodes.append(node(n, rect(-0.4, -8.5, 0.4, 8.5), "#cfcfcf", 0.5))
     n += 1
 cut_first = n
 for i in range(CUTS):
-    tile_nodes.append(node(n, rect(-0.4, -7.5, 0.4, -3.5), "#cfcfcf", 0.5))
+    tile_nodes.append(node(n, rect(-0.4, -8.5, 0.4, -4.5), "#cfcfcf", 0.5))
     n += 1
 # The rate lever.
 lever = n
@@ -447,26 +522,24 @@ n += 1
 # each a bar the slot's height with a flag at its top pointing into the trim,
 # as Grains marks them. Each starts at its flag's corner, where both edges are long.
 mark_first = n
-tile_nodes.append(node(n, outline([(-0.6, -10), (4, -10), (0.6, -6.6), (0.6, 9), (-0.6, 9)]), "#e6e6e6", 0.5, "#e6e6e6",
+tile_nodes.append(node(n, outline([(-0.6, -11), (4, -11), (0.6, -7.6), (0.6, 10), (-0.6, 10)]), "#e6e6e6", 0.5, "#e6e6e6",
                        at=(RULE_X0, RULE_Y)))
 n += 1
-tile_nodes.append(node(n, outline([(0.6, -10), (0.6, 9), (-0.6, 9), (-0.6, -6.6), (-4, -10)]), "#e6e6e6", 0.5, "#e6e6e6",
+tile_nodes.append(node(n, outline([(0.6, -11), (0.6, 10), (-0.6, 10), (-0.6, -7.6), (-4, -11)]), "#e6e6e6", 0.5, "#e6e6e6",
                        at=(RULE_X1, RULE_Y)))
 n += 1
+# While Shift is held, the hint that Shift and the Sample key swap the sample.
+swap_first = n
+tile_nodes += sample_view_hint(ID, n, 16)
+n += SAMPLE_HINT_NODES
 cover_stage = n
 cover_hint = n + 1
 n += 2
-# The reshaping outlines, nodes 0 .. PATHS - 1, under the moving parts: the
-# waveform's three thirds (a closed ribbon each, out along the top and back
-# along the bottom, 64 distinct points), and the frame round the stretch
-# read, a rectangle of 64. display.cpp reshapes all four.
-for h in range(WAVES):
-    top = [(-52 + i * 104 / (WAVE_COLUMNS - 1), -0.6 - (i % 2) * 0.3) for i in range(WAVE_COLUMNS)]
-    out.append(node(h, outline(top + [(x, -y) for x, y in reversed(top)]), "#6a6a6a", 0.5,
-                    at=(RULE_X0 + 52 + 104 * h, RULE_Y)))
-frame_points = [(-5 + 10 * i / 16, -8) for i in range(16)] + [(5, -8 + 16 * i / 16) for i in range(16)] + \
-               [(5 - 10 * i / 16, 8) for i in range(16)] + [(-5, 8 - 16 * i / 16) for i in range(16)]
-out.append(node(WAVES, outline(frame_points), "#e6e6e6", 0.6, at=(RULE_X0 + 5, RULE_Y)))
+# The reshaping outline, node 0, under the moving parts: the frame round the
+# stretch read, a rectangle of 64, which display.cpp reshapes.
+frame_points = [(-5 + 10 * i / 16, -9) for i in range(16)] + [(5, -9 + 18 * i / 16) for i in range(16)] + \
+               [(5 - 10 * i / 16, 9) for i in range(16)] + [(-5, 9 - 18 * i / 16) for i in range(16)]
+out.append(node(0, outline(frame_points), "#e6e6e6", 0.6, at=(RULE_X0 + 5, RULE_Y)))
 out.append(node(cover_stage, rect(0, 39, 480, 220), "#000000", 0.5, "#000000", at=(0, 0)))
 out += hint
 out.append(node(cover_hint, rect(TRAY_X + 1, 88, TRAY_X + TRAY - 1, 160), "#000000", 0.5, "#000000", at=(0, 0)))
@@ -484,18 +557,19 @@ if ID == "recur":
         return ", ".join(map(str, values))
     lines = ["#pragma once", "// Generated by tools/make_panel.py; edit the generator, not this file.",
              "#include <opxy/types.hpp>", "", "namespace recur {",
-             "// The screen's nodes: the reshaping outlines (the tape's waveform in thirds, and",
-             "// the frame round the stretch read), the header's bar, the tiles' squares, each",
-             "// map's print in pieces, depth's pins, the tape's cuts, then the moving parts.",
-             f"const opxy::u32 paths = {PATHS}, waves = {WAVES}, wave_columns = {WAVE_COLUMNS}, reading = {WAVES}, header_first = {PATHS};",
+             "// The screen's nodes: the reshaping outline (the frame round the stretch read),",
+             "// the header's bar, the tiles' squares, each map's print in pieces, depth's pins,",
+             "// the tape's waveform (a centre line and 96 columns) and cuts, then the moving",
+             "// parts, the trim's markers and the swap hint's icon (with text slots 16 and 17).",
+             f"const opxy::u32 paths = {PATHS}, reading = 0, header_first = {PATHS};",
              f"const opxy::u32 small_first = {small_first}, large_first = {large_first};",
              "// The share of its size a tile's print pieces take, Q10, by grid (2, 4, 8): inside its square.",
              f"const opxy::i32 tile_fit[3] = {{{fit(1)}, {fit(2)}, {fit(3)}}};",
              f"const opxy::u32 print_first[6] = {{{row(print_first)}}}, print_count[6] = {{{row(print_count)}}};",
-             f"const opxy::u32 pin_first = {pin_first}, pin_count = {PINS}, row_first = {row_first}, row_count = {ROWS},",
+             f"const opxy::u32 pin_first = {pin_first}, pin_count = {PINS}, sample_line = {sample_line}, row_first = {row_first}, row_count = {ROWS},",
              f"                cut_first = {cut_first}, cut_count = {CUTS},",
              f"                lever_node = {lever}, teeth_first = {teeth_first}, teeth = {len(TOOTH_NOTES)},",
-             f"                rod_node = {rod}, weight_node = {weight}, mark_first = {mark_first},",
+             f"                rod_node = {rod}, weight_node = {weight}, mark_first = {mark_first}, swap_first = {swap_first}, swap_text = 16,",
              f"                cover_stage = {cover_stage}, cover_hint = {cover_hint}, node_total = {node_count};",
              "// The cell (of the 8 grid) each print piece sits in, from print_first[0] on.",
              "const opxy::u8 piece_cell[" + str(len(piece_cells)) + "] = {" + row(piece_cells) + "};",
@@ -509,6 +583,7 @@ if ID == "recur":
              "// The weight's distance up the rod for each slice, px.",
              "const opxy::i32 weight_heights[6] = {" + row(WEIGHTS) + "};",
              f"const opxy::i32 rule_x0 = {RULE_X0}, rule_x1 = {RULE_X1}, rule_y = {RULE_Y};",
+             f"const opxy::i32 swap_x = {SWAP[0]}, swap_y = {SWAP[1]};",
              "}", ""]
     ROOT.joinpath("layout.h").write_text("\n".join(lines))
 print("wrote", target, "nodes", node_count, "bytes", len("\n".join(out)), "pieces", print_count)

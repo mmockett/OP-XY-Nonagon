@@ -285,8 +285,13 @@ middle of the tin; beside it are only the instruments that carry a control.
 - **rate** sets the governor lever on the right, off to 1/16.
 - **chrd** plucks the music-box comb above it: its readers' teeth stand
   longer and lit solid, one for each note the chord plays.
-- **The tape** at the tin's foot is the whole sample: its waveform, the
-  trim's start and end markers as flags, and the grid's cuts over the trim,
+- **The tape** at the tin's foot is the whole sample, drawn as a sampler
+  draws one: its waveform, a column for each of the sample overview's 96
+  stretches from the stretch's lowest value to its highest, above and below
+  a faint centre line, as tall as the root of its value against the loudest
+  (a stretch too quiet for a column 2 px tall leaves the line), lit within
+  the trim and dim outside it; the trim's start and end markers as flags;
+  and the grid's cuts over the trim, bright over the waveform,
   a long tick where each row of the square begins and a short one at each
   other slice (only the rows when the slices are closer than 3 px, as on a
   bar of a long sample at 8 x 8). A bright frame round part of it is the
@@ -297,10 +302,12 @@ middle of the tin; beside it are only the instruments that carry a control.
   note's pitch (two slices, when 1/8 slots play a bar's sixteenths; half
   one, when 1/32s do), at 100 exactly its slice, between the next cuts.
   The display has no tempo, so it reckons at 120 BPM.
-- **Shift** lights the trim's markers and the waveform, and the header's
-  bright row reads start, window, gain and end, with the times the markers
-  mark and the gain in stock's steps. **gain** scales the waveform's height,
-  twice as tall each 10 steps up, within the slot.
+- **Shift** lights the trim's markers, and the header's bright row reads
+  start, window, gain and end, with the times the markers mark and the gain
+  in stock's steps. **gain** scales the waveform's height, twice as tall
+  each 10 steps up, within the slot. While Shift is held, a small hint
+  outside the tin by the tape's right end reads "swap" over "shift +" and
+  the Sample key's icon: Shift + the Sample key loads another sample.
 - In **hiss** the tiles stay home and dim by how much of each is out of
   place, so the print fades away and comes back.
 - With **no sample**, a cover over everything but the header reads
@@ -335,15 +342,18 @@ The screen is still at rest. Tiles slide in 0.16 s, easing out. A frame
 spends at most 20 changes on tiles and the pieces they carry, so a big
 reshuffle ripples across the tray, and what that leaves (at least 4) on the
 tape's cuts, which move only when the trim, the grid or the sample does; the
-waveform is redrawn only for a new sample or gain. The display cannot read
+waveform is redrawn only for a new sample, trim or gain, at most 12 columns
+a frame. The display cannot read
 the tempo, so it times slices at 120 BPM. Reduced motion and reset snap.
 Churn over a scripted run (`tools/screen.cpp`: notes on several settings,
 hiss, then Shift held with the trim stepped through the break's bars)
-averages 5.7 nodes a frame (7.9 while notes play) and peaks at 31, on the
-frame Shift is pressed after a change of grid. The screen uses 299 nodes
-(SDK 1.8 and later allow 512), four of them reshaping outlines (the
-waveform's three thirds and the frame round the stretch read, 64 points
-each), and 50.4 KB of artwork.
+averages 5.8 nodes a frame (7.9 while notes play) and peaks at 31, on the
+frame Shift is pressed after a change of grid (the swap hint appears with
+it). The screen uses 396 nodes (SDK 1.8 and later allow 512): one reshaping
+outline of 64 points (the frame round the stretch read), the waveform's
+centre line and 96 columns, the swap hint's 3, and the rest the tin's; 18
+text slots (the header's 16 and the swap hint's two words); and 63.5 KB of
+artwork.
 
 The tiles are 68 plain squares shared by every print (the 8 grid's 64, the
 first 16 of them doubled in size for the 4 grid, and 4 large ones). Each
@@ -415,11 +425,14 @@ every control in hundredths on each map, grid and slice, with samples from a
 tenth of a second to twenty minutes long, and Shift's row for those samples
 trimmed anywhere, and measures every caption the header shows in the OP-XY's
 face: a value must fit 53 px at 20 px, a title 56 px at 10 px. The tape's
-reshaped outlines are held to the same rules as drawn. With Shift held it
+reshaped outline is held to the same rules as drawn. With Shift held it
 checks the row's titles, times and gain on both pages, every gain from -30
-to +20, a blank cell with no gain known, and that the markers stand on the
-trim and light up. It checks that the waveform grows with the gain within
-the slot and ignores an unknown one; that the cuts stand on the slices the
+to +20, a blank cell with no gain known, that the markers stand on the
+trim and light up, and that the swap hint shows in its place and goes,
+alone, when Shift is let go. It checks that the waveform grows with the
+gain within the slot and ignores an unknown one; that its columns run
+from each bin's lowest value to its highest, above and below the line;
+that a new gain redraws at most 12 columns a frame; that the cuts stand on the slices the
 engine cuts (rows only when slices crowd); that the screen doesn't change at
 rest; that fit stretches the frame round the stretch read from two
 slices to one for 1/8 slots on a bar of sixteenths; and that the motion
