@@ -30,13 +30,47 @@ where it started. Recur's square of slices is such a picture.
 ![Recur's screen: the puzzle at rest; one iteration in; the baker's map on 8 x 8 with a chord; hiss](docs/screen.png)
 
 Recur is an OP-XY sample engine, id `recur`. It targets Open-XY
-SDK 1.8, which gives a sample engine its own screen and the sample's overview.
-With no sample loaded, its screen shows a cover reading "load a sample ·
-shift +" and the Sample key's icon.
+SDK 1.10, which gives a sample engine its own screen, the sample's overview
+and samples of its own. A new Recur track opens with **break** loaded, a
+four-bar drum break made for it, so it plays straight away; load your own
+over it with Shift + the Sample key. With no sample loaded, its screen shows
+a cover reading "load a sample · shift +" and the Sample key's icon.
 
 **Status: experimental.** Recur passes the SDK's tests and runs on an
 OP-XY, and its CPU is measured there
 (below).
+
+## The break
+
+`samples/break.wav` is a funk break in the pattern of the most sampled one
+of all, the four bars of the Winstons' "Amen, Brother" groove: ride on the
+eighths, the kick's pairs, ghost notes round the backbeat, the backbeat
+pushed late in bars 3 and 4, and the crash on the and of three in bar 4. It
+is played on [MD KIT](https://github.com/mmockett/OP-XY-MNMD), not sampled
+from any record: MD KIT's engine renders every hit on the host, the kick a
+damped P-I BD over a TRX-BD, the snare a P-I SD with its snares wide open
+over a TRX-SD's crack, ghosts on the same snare struck softly, a P-I RC ride
+and a P-I CC with a TRX-CY crash. The hits sit a little behind the grid as a
+drummer plays (1.2 ms on the off-sixteenths, the backbeat 3 ms late, a
+millisecond of spread), through a small dark room, gentle compression and a
+touch of saturation.
+
+It is four bars at 120 BPM, the tempo Recur falls back on and its screen
+times slices at: exactly 8 seconds, 352,800 frames, 16-bit mono at 44.1 kHz
+(689 KiB), peaking at −3 dBFS so the seams' crossfades stay under Recur's
+output ceiling. At 120 BPM every slice Recur cuts lands on the break's own
+grid: the default 4 x 4 of 1/16 is one bar of it, pos at 0, a third, two
+thirds and the end picks bars 1 to 4, and 8 x 8 of 1/16 is the whole break.
+Its tail wraps round, so the loop has no seam. At another tempo Recur still
+cuts on the project's grid, which then falls between the hits.
+
+The build installs it once as `/content/samples/recur/break.wav`, in the
+OP-XY's own storage rather than the module memory; the OP-XY loads it into
+its sample memory when a preset naming it is loaded, as it loads any sample.
+The init preset (`presets/default.json`) and every preset below name it, each
+keeping its own controls. `tools/make_regions.py` writes those regions and the
+init preset; `tools/break/make_break.py` renders the break from an MD KIT
+checkout.
 
 ## Controls
 
@@ -115,6 +149,11 @@ Each map's period, in iterations:
 | **Chorale** | Four beats swapped round under a minor chord of readers | hex, 2x2 of 1/4, a bar an iteration, chrd min | home every third bar |
 | **Frozen** | No motion: one fixed re-sequencing, a new beat to play from | cat, 8x8 of 1/32, rate off, step at the half period | 1.29, every pass the same |
 | **Shred** | The window shredded into hiss and back in six seconds | hiss on 64 x 64, cat, an iteration a 1/16 | flatness 0.26 to 0.38 against the source's 0.000 |
+
+Every preset opens on the break. They were measured on the test sources
+(`tools/make_sources.py`); Phrase and Chorale were made on a melody and play
+the break as beats instead. On the break the presets peak 0.4 to 2.5 dB
+under the output ceiling (Shred 10 dB), never clamped.
 
 Every preset clicks no more than its source (2.9 to 3.2 click-like events a
 second on the drums, against the source's own 3.2). A slice seam scores at
@@ -257,8 +296,12 @@ sample, depth 50). The estimate varies from run to run.
 - that rate off holds, and slices follow the tempo and don't drift;
 - that every change ramps (1.3% largest step on a constant), and slice seams
   on a sine stay within 1.47 of its own slope;
-- and for hiss: exactness, the return at the period, flatness mid-period, and
-  depth 0 playing the window plain.
+- for hiss: exactness, the return at the period, flatness mid-period, and
+  depth 0 playing the window plain;
+- and on the shipped break: that it is 16-bit mono at 44.1 kHz and four bars
+  at 120 BPM to the sample, that 8 x 8 of 1/16 plays it whole and loops bit
+  for bit, that pos's thirds play each of its bars, and that every preset
+  plays it under the ceiling, never clamped.
 
 `tests/screen.cpp`, also run by `sdk.py test`, checks that every point of
 every print piece lies inside the square of the tile carrying it, at rest
@@ -287,6 +330,9 @@ header shows in the OP-XY's face: a value must fit 53 px at 20 px, a title
   all three.
 - `definition.json`: the controls and presets. `tools/presets.py` writes its
   presets and `tools/presets.h`; run it after changing a preset.
+- `samples/break.wav`: the break every preset opens on.
+- `presets/`: the presets as the OP-XY saves them, each naming the break;
+  `tools/make_regions.py` writes their regions and `default.json`.
 - `tests/sound.cpp`, `tests/screen.cpp`: the sound and screen checks, run by
   `sdk.py test`.
 - `docs/`: the screen's picture, GIF and contact sheets.
@@ -294,6 +340,9 @@ header shows in the OP-XY's face: a value must fit 53 px at 20 px, a title
 The tools are not part of the machine. The C++ ones build against the SDK's
 headers; the compile command for each is at the top of its file.
 
+- `tools/break/make_break.py --mnmd <OP-XY-MNMD> --sdk <open-xy>` renders
+  `samples/break.wav` on MD KIT's engine, through `tools/break/hits.cpp`;
+  `--grid <file>` writes the pattern out as a grid.
 - `tools/make_sources.py <folder>` synthesises the test material, a drum
   loop and a melodic phrase over a bass line, two bars each at 120 BPM.
 - `tools/render.cpp` plays each preset on its source and writes WAVs into a

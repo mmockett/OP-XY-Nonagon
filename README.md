@@ -285,8 +285,9 @@ Ghost is made for headphones: its pitches exist only between the ears. As a
 sample engine it plays in stereo, which the SDK's synth voices can't.
 
 Ghost and Recur are sample engines, on the sampler page. With no sample
-loaded, both screens say so ("load a sample · shift + sample"). Recur needs
-one to play. Ghost plays without: its bed is then a gusty breath of its own,
+loaded, both screens say so ("load a sample · shift + sample"). Recur opens
+with a sample of its own, a four-bar break played on MD KIT at 120 BPM, and
+plays straight away. Ghost plays without: its bed is then a gusty breath of its own,
 and a loaded sample takes its place.
 
 ## CPU
@@ -322,7 +323,7 @@ sampler's own mixing, so they don't compare directly with the synths.
 The seven synths need SDK 1.4 (the two-page header), on the `staging` branch
 of [etcetc000/open-xy](https://github.com/etcetc000/open-xy). Ghost and Recur
 are sample engines with their own screens, which need SDK 1.8, also on
-`staging`.
+`staging`; Recur's own sample needs SDK 1.10.
 
 Check the SDK out beside this repository as `../open-xy`, fetch its
 toolchain (`python sdk.py toolchain fetch`), then:

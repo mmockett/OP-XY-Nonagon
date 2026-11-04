@@ -3,7 +3,10 @@
 #include "../sample.cpp"
 #include <cmath>
 #include <cstdio>
+#include <cstring>
+#include <string>
 #include <vector>
+#include "../tools/presets.h"
 
 namespace {
 using opxy::i32;
@@ -427,6 +430,71 @@ int main() {
         quiet.block.region.level = opxy::sample_unity_level / 2;
         const i32 a = loud.run(100), b = quiet.run(100);
         check(b > a / 2 - a / 50 && b < a / 2 + a / 50, "the sample's volume scales the output");
+    }
+    // --- The shipped sample ------------------------------------------------------
+    {   // samples/break.wav, every preset's region: four bars at 120 BPM, so the
+        // 8 x 8 window of 1/16s is the whole break and pos's thirds start its bars.
+        std::string path = __FILE__;
+        path = path.substr(0, path.find_last_of("/\\") + 1) + "../samples/break.wav";
+        std::vector<opxy::i16> brk;
+        if (FILE* f = std::fopen(path.c_str(), "rb")) {
+            std::vector<unsigned char> bytes;
+            unsigned char buffer[4096];
+            for (size_t n; (n = std::fread(buffer, 1, sizeof buffer, f)) > 0;) bytes.insert(bytes.end(), buffer, buffer + n);
+            std::fclose(f);
+            // RIFF chunks after the 12-byte header: 16-bit mono PCM at 44.1 kHz in "data".
+            for (size_t at = 12; at + 8 <= bytes.size();) {
+                const u32 size = bytes[at + 4] | bytes[at + 5] << 8 | bytes[at + 6] << 16 | u32(bytes[at + 7]) << 24;
+                if (!std::memcmp(&bytes[at], "fmt ", 4))
+                    check(bytes[at + 8] == 1 && bytes[at + 10] == 1 && bytes[at + 22] == 16 &&
+                          (bytes[at + 12] | bytes[at + 13] << 8 | bytes[at + 14] << 16) == 44100,
+                          "the shipped break is 16-bit mono PCM at 44.1 kHz");
+                if (!std::memcmp(&bytes[at], "data", 4) && at + 8 + size <= bytes.size())
+                    for (u32 i = 0; i < size / 2; ++i) brk.push_back(opxy::i16(bytes[at + 8 + 2 * i] | bytes[at + 9 + 2 * i] << 8));
+                at += 8 + size + (size & 1);
+            }
+        }
+        check(brk.size() == 4 * pass, "the shipped break is read: four bars at 120 BPM, to the sample");
+        if (brk.size() == 4 * pass) {
+            const u32 count = u32(brk.size());
+            {   // Unscrambled on 8 x 8, the window is the whole break, and it loops.
+                Rig* r = new Rig(brk.data(), count);
+                r->set(recur::kRate, off, recur::rate_count);
+                r->set(recur::kGrid, grid8, recur::grid_count);
+                r->run(8 * pass / opxy::block_frames + 2);
+                bool exact = true;
+                for (u32 i = 0; i < 8 * pass; ++i) exact = exact && r->heard[i] == played(brk[i % count]);
+                check(exact, "on 8 x 8 the break plays whole and loops, bit for bit");
+                delete r;
+            }
+            for (u32 bar = 0; bar < 4; ++bar) {
+                // pos at 0, 1/3, 2/3 and 1 plays the bar window on each bar of the break,
+                // to within pos's resolution (a few samples).
+                Rig* r = new Rig(brk.data(), count);
+                r->set(recur::kRate, off, recur::rate_count);
+                r->parameters[recur::kPos] = at(bar / 3.0);
+                r->run(pass / opxy::block_frames + 2);
+                bool found = false;
+                for (u32 d = 0; d <= 16 && !found; ++d) {
+                    const u32 start = bar * pass + d - (bar ? 8 : 0);
+                    bool exact = true;
+                    for (u32 i = 0; i < pass && exact; ++i) exact = r->heard[i] == played(brk[(start + i) % count]);
+                    found = exact;
+                }
+                if (!found) { std::printf("FAIL pos doesn't play bar %u of the break\n", bar + 1); ++failures; }
+                delete r;
+            }
+            for (const Preset& p : presets) {   // every preset plays it under the ceiling (never clamped) and well above silence
+                Rig* r = new Rig(brk.data(), count);
+                for (u32 i = 0; i < 8; ++i) r->parameters[i] = at(p.values[i]);
+                const i32 peak = r->run(4 * pass / opxy::block_frames);
+                double sum = 0;
+                for (u32 i = 0; i < r->heard.size(); ++i) sum += double(r->heard[i]) * r->heard[i];
+                const double rms = std::sqrt(sum / r->heard.size()) / 2147483648.0;
+                if (peak >= 0x40000000 || rms < 0.01) { std::printf("FAIL preset %s on the break: peak %d, rms %.4f\n", p.name, peak, rms); ++failures; }
+                delete r;
+            }
+        }
     }
     if (failures) std::printf("%d failures\n", failures);
     return failures ? 1 : 0;
