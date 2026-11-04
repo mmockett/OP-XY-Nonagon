@@ -24,12 +24,22 @@
 // humps, damping the felt pad's long lever, and the seed the starting shape
 // itself: the arch drawn with its nudge (three times over), and a flagged pin
 // on the bob it moves most, lifting off when the note lets the chain go.
+//
+// Where the OP-XY tells the screen its amp envelope (SDK 1.10, amp.h), the
+// strobe runs for as long as the sound lasts, as the voice's chain runs on
+// until the envelope ends it, and the chain is drawn as it is heard: the
+// arch, its ghost and the regulator's swing scaled by the envelope, swelling
+// with its attack, holding at its sustain while keys are held and fading
+// over its release, in 32 steps. The felt and the chain's own damping still
+// take the swing down sooner. Without it, the screen keeps its own timing:
+// the strobe runs while keys are held and two seconds after.
 namespace fermi {
 namespace screen {
 using namespace opxy::draw;
 const u32 budget = 20;            // nodes changed a frame, at most
 const i32 linger = 2048;          // Q10 s the strobe runs on after the last key is let go
 const u32 catch_up = 172;         // blocks a frame at most (0.25 s)
+const i32 steps = 32;             // the envelope's level as the chain is drawn
 
 inline i32 magnitude(i32 v) { return v < 0 ? -v : v; }
 // Places a node upright when it is not already so; returns 1 if it changed.
@@ -274,6 +284,7 @@ inline void display_reset(DisplayState& state) {
     state.initialized = 0;
     state.header.reset();
     state.notes.reset();
+    nonagon_amp::reset(state.amp);
 }
 
 inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& frame) {
@@ -306,7 +317,13 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
         st.ghost_shown = 0;
         st.initialized = 1;
         st.track = input.track;
+        nonagon_amp::reset(st.amp);
     }
+    // With the amp envelope known, the chain runs until the envelope ends
+    // the sound and is drawn at the envelope's level; without it, it runs
+    // while keys are held and lingers after.
+    const bool follows = nonagon_amp::follow(st.amp, input, input.note_serial != st.serial);
+    const i32 heard = follows ? nonagon_amp::level_steps(st.amp, steps) : steps;
     // A note releases the chain; a new number of masses or struck mode
     // restrings it, as it does each voice's.
     if (input.note_serial != st.serial) {
@@ -321,7 +338,7 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
     if (st.running) {
         if (held) st.linger = linger;
         else st.linger -= dt;
-        if (st.linger <= 0) st.running = 0;
+        if (follows ? !nonagon_amp::sounding(st.amp) || !heard : st.linger <= 0) st.running = 0;
     }
     if (st.running) {
         st.owed += static_cast<u32>(dt) * 44100u;   // Q16 blocks
@@ -385,6 +402,7 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
         const i32 target_strain = st.running ? st.shape[j] : strain(start[j + 1], d0);
         i32 target = (target_strain * st.reach) >> 12;   // px Q8
         target = clamp(target, -8704, 8704);
+        if (follows && st.running) target = target * heard / steps;
         st.drawn[j] = ease(st.drawn[j], target, left);
         if (st.running) {
             st.high[j] = target > st.high[j] ? target : ease(st.high[j], target, slow);
@@ -394,7 +412,7 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
 
     // The parts the other controls turn, eased.
     st.slide = ease(st.slide, (plate::fast << 8) + (((plate::slow - plate::fast) * chain::amount(input.slots[chain::TIME])) >> 7), left);
-    st.swing = ease(st.swing, st.running && !input.reduced_motion ? 30 << 8 : 0, left);
+    st.swing = ease(st.swing, st.running && !input.reduced_motion ? (30 << 8) * heard / steps : 0, left);
     st.damper = ease(st.damper, 70 - ((plate::lowered * chain::amount(input.slots[chain::DAMPING])) >> 15), left);
     st.lump = ease(st.lump, s.dispersion, left);
     st.lift = ease(st.lift, st.running ? 1024 : 0, left);
