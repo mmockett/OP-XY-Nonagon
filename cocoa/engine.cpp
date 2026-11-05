@@ -580,7 +580,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
 
     // The bubbles rise; the column's pitch at the block's end. The drink
     // sloshes at its first sloshing mode, swinging the pitch as it dies away.
-    drink::advance(voice.s, rate, 1);
+    drink::advance_one(voice.s, rate);
     const i32 void_now = drink::effective(voice.d, voice.s);
     const i32 drop = drink::wood_drop(void_now);
     voice.drop = drop;
