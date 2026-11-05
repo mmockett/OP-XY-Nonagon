@@ -313,12 +313,13 @@ using sample_view::SampleSlot;
 // gain changes; the trim's markers, lit while Shift edits them; and while
 // Shift is held, the stage dimmed under a cover and how to swap the sample
 // over it, the waveform, its markers and the header staying bright.
+const SampleSlot strip_slot = {strip_x0 * unit, (strip_x1 - strip_x0) * unit, strip_y * unit, 8 * unit, 9, 4, 3};
 void place_strip(DisplayState& state, Frame& frame, const SampleOverview& o, bool shift, bool snap) {
-    const SampleSlot slot = {strip_x0 * unit, (strip_x1 - strip_x0) * unit, strip_y * unit, 8 * unit, 9, 4, 3};
+    const SampleSlot& slot = strip_slot;
     sample_view::place_waveform(frame, sample_line, o, slot, state.wave_key, snap, 12);
     if (o.assigned) sample_view::place_trim_marks(frame, mark_first, o, slot, shift ? 15 : 8);
     else { hide(frame, mark_first); hide(frame, mark_first + 1); }
-    sample_view::place_shift_overlay(frame, overlay_cover, overlay_icon, overlay_text, shift && o.assigned);
+    sample_view::place_shift_overlay(frame, overlay_cover, overlay_icon, overlay_text, slot, shift && o.assigned);
 }
 
 inline void display_reset(DisplayState& state) {

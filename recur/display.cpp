@@ -494,6 +494,9 @@ void place_works(DisplayState& state, const Input& input, Frame& frame, bool hel
               lit ? tooth_lit : tooth_dark, lit ? fill_and_stroke : stroke);
     }
 }
+
+// The tape's slot: the whole sample along the tin's foot, 8 px a side.
+const SampleSlot tape_slot = {rule_x0 * unit, (rule_x1 - rule_x0) * unit, rule_y * unit, 8 * unit, 9, 4, 3};
 }
 
 inline void display_reset(DisplayState& state) {
@@ -558,7 +561,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         for (u32 n = 0; n < cover_stage; ++n)
             if (n < header_first || n >= header_first + 8) hide(frame, n);
         if (!frame.paths[reading].key) shape_reading(frame, 3 * unit);   // hidden, but shaped
-        sample_view::place_shift_overlay(frame, overlay_cover, overlay_icon, overlay_text, false);
+        sample_view::place_shift_overlay(frame, overlay_cover, overlay_icon, overlay_text, tape_slot, false);
         state.bits = 0;
         state.fresh = 1;
         state.wave_key = 0;
@@ -585,10 +588,10 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     // markers, lit while Shift edits them, and while Shift is held the tin
     // dimmed under a cover and how to swap the sample over it, the tape and
     // the header staying bright.
-    const SampleSlot tape = {rule_x0 * unit, (rule_x1 - rule_x0) * unit, rule_y * unit, 8 * unit, 9, 4, 3};
+    const SampleSlot& tape = tape_slot;
     sample_view::place_waveform(frame, sample_line, overview, tape, state.wave_key, snap, 12);
     sample_view::place_trim_marks(frame, mark_first, overview, tape, input.shift ? 15 : 9);
-    sample_view::place_shift_overlay(frame, overlay_cover, overlay_icon, overlay_text, input.shift != 0);
+    sample_view::place_shift_overlay(frame, overlay_cover, overlay_icon, overlay_text, tape, input.shift != 0);
     u32 left = budget > 4 ? budget : 4;   // what's left, and a little
     place_cuts(frame, sample, bits, hiss, snap, left);
     place_reading(frame, sample, input, bits, hiss, hiss_bits, source, bright);

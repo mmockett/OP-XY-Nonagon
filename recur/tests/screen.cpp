@@ -367,17 +367,22 @@ int main() {
         // goes, and nothing but it, the markers and the header changes, then
         // nothing. Its press is as cheap.
         namespace sv = recur::sample_view;
+        const i32 dy = sv::sample_overlay_shift(recur::tape_slot);
         const auto hint_shown = [&](bool want) {
             const opxy::draw::Node& cover = frame.nodes[recur::overlay_cover];
             bool ok = want ? cover.x == 0 && cover.y == 0 : !shown(cover);
             for (u32 k = 0; k < sv::sample_overlay_icon_nodes; ++k) {
                 const opxy::draw::Node& n = frame.nodes[recur::overlay_icon + k];
-                ok = ok && (want ? n.x == sv::sample_overlay_icon_x * 1024 && n.y == sv::sample_overlay_icon_y * 1024 : !shown(n));
+                ok = ok && (want ? n.x == sv::sample_overlay_icon_x * 1024 && n.y == sv::sample_overlay_icon_y * 1024 + dy : !shown(n));
             }
             const opxy::draw::Text& a = frame.texts[recur::overlay_text], &b = frame.texts[recur::overlay_text + 1];
             if (want) ok = ok && text(recur::overlay_text) == "swap sample" && text(recur::overlay_text + 1) == "with" &&
-                           a.x == sv::sample_overlay_title_x * 1024 && b.x == sv::sample_overlay_with_x * 1024;
+                           a.x == sv::sample_overlay_title_x * 1024 && b.x == sv::sample_overlay_with_x * 1024 &&
+                           a.y == sv::sample_overlay_title_y * 1024 + dy && b.y == sv::sample_overlay_with_y * 1024 + dy;
             else ok = ok && !a.chars[0] && !b.chars[0] && a.x == opxy::draw::hidden_x * 1024;
+            // Its words and key centred between the header (y 39) and the tape's waveform, and within that space.
+            const double top = (recur::tape_slot.y - recur::tape_slot.half) / 1024.0, middle = sv::sample_overlay_middle + dy / 1024.0;
+            if (want && (std::fabs(middle - (39 + top) / 2) > 0.5 || 89 + dy / 1024.0 < 39 || 157 + dy / 1024.0 > top)) ok = false;
             return ok;
         };
         if (!hint_shown(true)) { std::printf("FAIL: Shift doesn't show the overlay in its place\n"); ++failures; }

@@ -306,9 +306,10 @@ middle of the tin; beside it are only the instruments that carry a control.
   start, window, gain and end, with the times the markers mark and the gain
   in stock's steps. **gain** scales the waveform's height, twice as tall
   each 10 steps up, within the slot. While Shift is held the tin dims to
-  about 30%, under a black cover 70% opaque, the tape, its cuts and markers
-  and the header staying bright, and over it, where Grains' empty state says
-  how to load a sample and in its sizes and greys, the screen reads "swap
+  about 10%, under a black cover 90% opaque, the tape, its cuts and markers
+  and the header staying bright, and over it, centred between the header and
+  the tape, in the sizes and greys Grains' empty state says how to load a
+  sample in, the screen reads "swap
   sample with" and the Sample key's icon: with Shift down, the Sample key
   loads another sample. The cover is one node, so Shift's edges each change
   4 nodes besides the markers and the header.

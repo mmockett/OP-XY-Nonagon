@@ -64,7 +64,7 @@ most sustained part, or past a silence that would leave the bed gapped.
 | encoder 3 | **gain**: the sample's gain, in stock's steps from -30 to +20; it scales the bed | the waveform under the apron grows and shrinks; `+0`, `-12`, `+20` |
 | encoder 4 | **end**: where the stretch ends | the end's time in the sample |
 
-While Shift is held with a sample loaded, the stage dims to about 30% and
+While Shift is held with a sample loaded, the stage dims to about 10% and
 over it the screen reads "swap sample with" and the Sample key's icon: with
 Shift down, the Sample key loads another sample in its place. The header's
 row, the waveform and its markers, what Shift edits, stay bright. The track saves the markers
@@ -298,10 +298,11 @@ still show), scaled by the sample's gain (twice as tall each 10 steps up,
 within the slot); a stretch too quiet for a column 2 px tall leaves the
 line. Columns within the trim are lit and those outside it dim, between
 the trim's start and end markers, flags like Grains', lit while Shift
-edits them. While Shift is held the stage dims to about 30%, under a black
-cover 70% opaque drawn over the stage and under the waveform and its
-markers, and over it all, centred where Grains' empty state says how to load
-a sample and in its sizes and greys, "swap sample" over "with" and the
+edits them. While Shift is held the stage dims to about 10%, under a black
+cover 90% opaque drawn over the stage and under the waveform and its
+markers, and over it all, centred between the header and the waveform, in
+the sizes and greys Grains' empty state says how to load a sample in,
+"swap sample" over "with" and the
 Sample key's icon: with Shift down, the Sample key swaps the sample. The
 cover is one node, so Shift's press and release each change 4 nodes (the
 cover and the icon's 3) besides the markers and the header. The waveform

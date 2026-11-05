@@ -96,17 +96,21 @@ void play(const double* c, u32 notes, int frames, const char* when) {
 // all of it off screen with no words.
 void check_hint(bool shown, const char* when) {
     namespace sv = ghost::sample_view;
+    const i32 dy = sv::sample_overlay_shift(ghost::strip_slot);
     const Node& cover = frame.nodes[ghost::overlay_cover];
     bool ok = shown ? cover.x == 0 && cover.y == 0 && cover.scale == unit : cover.x == hidden_x * unit && cover.y == hidden_y * unit;
     for (u32 k = 0; k < sv::sample_overlay_icon_nodes; ++k) {
         const Node& n = frame.nodes[ghost::overlay_icon + k];
-        ok = ok && (shown ? n.x == sv::sample_overlay_icon_x * unit && n.y == sv::sample_overlay_icon_y * unit : n.x == hidden_x * unit && n.y == hidden_y * unit);
+        ok = ok && (shown ? n.x == sv::sample_overlay_icon_x * unit && n.y == sv::sample_overlay_icon_y * unit + dy : n.x == hidden_x * unit && n.y == hidden_y * unit);
     }
     const Text& a = frame.texts[ghost::overlay_text], &b = frame.texts[ghost::overlay_text + 1];
     if (shown)
         ok = ok && !std::strcmp(a.chars, "swap sample") && !std::strcmp(b.chars, "with") && a.x == sv::sample_overlay_title_x * unit &&
-             a.y == sv::sample_overlay_title_y * unit && b.x == sv::sample_overlay_with_x * unit && b.y == sv::sample_overlay_with_y * unit;
+             a.y == sv::sample_overlay_title_y * unit + dy && b.x == sv::sample_overlay_with_x * unit && b.y == sv::sample_overlay_with_y * unit + dy;
     else ok = ok && !a.chars[0] && !b.chars[0] && a.x == hidden_x * unit && b.x == hidden_x * unit;
+    // Its words and key centred between the header (y 39) and the waveform's top, and within that space.
+    const double top = (ghost::strip_slot.y - ghost::strip_slot.half) / 1024.0, middle = sv::sample_overlay_middle + dy / 1024.0;
+    if (shown && (std::fabs(middle - (39 + top) / 2) > 0.5 || 89 + dy / 1024.0 < 39 || 157 + dy / 1024.0 > top)) ok = false;
     if (!ok) fail(shown ? "the Shift overlay isn't shown in its place" : "the Shift overlay shows", when, 0, 0);
 }
 u32 seed = 0x2545f491u;
