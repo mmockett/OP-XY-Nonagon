@@ -271,6 +271,27 @@ void hear(const i32* from, const i32* to, i32& lp, const i32* in, i32* out) {
     lp = low;
 }
 
+// A new note's lines are cleared as they are needed, not 4,096 samples in its
+// first block. Reads in the upper copy are always of this note's own
+// writes; the lower copy is read from a period back, line_length + write -
+// whole - 1 up, before this pass's mirror write reaches it. Until the write
+// position has gone once round, the lower copies from zero_from up are
+// silent and the stretch from write to zero_from may hold an old note's
+// sound: what this block reads of it is cleared before the block, and
+// another 128 samples each block, until all of it is written or silent.
+// Every read sees what lines cleared at once hold.
+const u32 clear_step = 128;
+void clean(Lines& own, u32 write, u32 whole) {
+    const u32 top = own.zero_from;
+    if (!top) return;   // written or silent throughout
+    u32 to = top > clear_step ? top - clear_step : 0;
+    if (line_length + write < to + whole + 1) to = line_length + write - whole - 1;   // read this block
+    if (to < write + opxy::block_frames) to = write;   // the rest is mirrored before it is read
+    for (u32 c = 0; c < 2; ++c)
+        for (u32 i = to; i < top; ++i) own.comb[c][i] = 0;
+    own.zero_from = to > write ? to : 0;
+}
+
 // Holds this voice's pool slot for the cycle, taking a free one if it has
 // none; null while every slot is sounding.
 Lines* hold_lines(Voice& voice) {
@@ -367,10 +388,9 @@ void render_sample(Voice& voice, const opxy::SampleBlock& block) {
         return;
     }
     if (voice.fresh) {
-        for (u32 c = 0; c < 2; ++c) {
-            for (u32 i = 0; i < 2 * line_length; ++i) own->comb[c][i] = 0;
+        for (u32 c = 0; c < 2; ++c)
             for (u32 i = 0; i < ear_tail; ++i) own->tail[c][i] = 0;
-        }
+        own->zero_from = line_length;   // the lines cleared as they are needed (clean)
         voice.write = 0;
     }
     const i32* p = block.parameters;
@@ -498,6 +518,11 @@ void render_sample(Voice& voice, const opxy::SampleBlock& block) {
         const i32 wl = wn << 1, wr = (mul(i32(right_increment), pi_q29) << 2) << 1;   // radians a half-rate sample
         notch[0] = flip(wl, mul(wl, 644245094));
         notch[1] = flip(wr, mul(wr, 644245094));
+    }
+
+    {   // the furthest back either resonator reads
+        const u32 left_whole = u32(delays[0]) >> 16, right_whole = u32(delays[1]) >> 16;
+        clean(*own, voice.write, left_whole > right_whole ? left_whole : right_whole);
     }
 
     // The block, a stage at a time.
