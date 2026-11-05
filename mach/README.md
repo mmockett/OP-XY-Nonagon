@@ -242,14 +242,17 @@ The figures below are host estimates made during development.
   run, and with the machine's load).
 - **Counted from the compiled code** (the pinned `bfin-elf-g++ -O2`), every
   sample loop is a zero-overhead hardware loop without stack traffic, a
-  function of its own: the bell 52 instructions a sample, its reflection 26;
-  a wavetable 50; the pad, or a reflection, 46; the voice 61 and its
-  reflection 37 (each counting a branch taken once a period). One Newton step
-  is about 190, and a root's sub-step about 600 with it. The bell's echo
-  corner (every source with echo at Mach 1.67 or Mach 3 and four roots
-  sounding) therefore comes to about (52 + 52 + 26 + 26) × 64 = 10,000 for
-  the loops, 2,400 for the four roots' solves and 1,000 for the output,
-  about 13,400.
+  function of its own, which makes the source's wave; one more loop then
+  applies the root's gain ramp and its air, 10 instructions a sample. With
+  it, the bell is 42 instructions a sample and its reflection 25, a
+  wavetable 37, the pad, or a reflection, 42, and the voice 47 (each
+  counting a branch taken once a period); swept, the bell is 68 and a
+  wavetable 45. One Newton step is about 190, and a root's sub-step about
+  600 with it. The bell's echo corner (every source with echo at Mach 1.67
+  or Mach 3 and four roots sounding) therefore comes to about
+  (42 + 42 + 25 + 25) × 64 = 8,600 for the loops, 2,400 for the four roots'
+  solves and 1,000 for the output, about 12,000. A boom's two low-passes run in a loop of their own, 10
+  instructions a sample, for the 40 to 50 blocks a boom and its tail last.
 - **No float or 64-bit helper** runs in the audio path: the firmware links
   none (`sdk.py test --firmware` compiles it), so products, quotients and
   roots are made of 32-bit words. Division by reciprocal is per sub-step or

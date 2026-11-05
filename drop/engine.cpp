@@ -137,6 +137,26 @@ inline void figure(Voice& voice, i32 vapour) {
 }
 }
 
+// The pipe is cleared as it is needed, not all at once: 2,048 stores in one
+// block, at a note's start or a drop's end, cost more than the block's own
+// sound. Until the write position has gone once round, the pipe from
+// zero_from up is silent and the stretch from the write position to
+// zero_from may hold an old note's sound. A block reads that stretch only
+// where its delay reaches back past the start (2,048 + write - whole up), so
+// that much is cleared before the block, and another 128 each block, until it
+// is all written or silent. Every read sees what a pipe cleared at once holds.
+const u32 clear_step = 128;
+inline void clean(Voice& voice, u32 step, bool reading) {
+    const u32 w = voice.write, top = voice.zero_from;
+    if (!top) return;   // written or silent throughout
+    const u32 whole = static_cast<u32>(voice.whole);
+    u32 to = top > step ? top - step : 0;
+    if (reading && whole > w && pipe_length + w - whole < to) to = pipe_length + w - whole;   // read this block
+    if (to < w + opxy::block_frames) to = w;   // the rest is written before it is read
+    for (u32 i = to; i < top; ++i) voice.pipe[i] = 0;
+    voice.zero_from = to > w ? to : 0;
+}
+
 inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     voice.counted = 0;
     voice.share = sound::full_share;
@@ -151,12 +171,12 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     voice.noise = 0x2545f491u + owner * 0x9e3779b9u;
     voice.dice = 0x6c8e9cf5u ^ owner * 0x85ebca6bu;
     voice.write = 0;
+    voice.zero_from = pipe_length;   // all of it to clear, as it is needed
     voice.ap_in = voice.ap_out = voice.f1 = voice.f2 = voice.e1 = voice.e2 = voice.e3 = 0;
     voice.tuned = 0;
     voice.figured = -1;
     voice.crack_last = voice.hiss_last = 0;
     voice.dc_in = voice.dc_out = 0;
-    for (u32 i = 0; i < pipe_length; ++i) voice.pipe[i] = 0;
 }
 
 // Each note drops a new drop, which lands on the next block. A pipe still
@@ -178,6 +198,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     using opxy::block_frames;
     if (voice.quiet) {
         for (unsigned i = 0; i < block_frames; ++i) output[i] = 0;
+        clean(voice, 2 * clear_step, false);   // a silent voice clears its pipe twice as fast
         return;
     }
     const physics::Plate p = physics::plate(parameters);
@@ -276,6 +297,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     voice.share = fair < voice.share ? fair : voice.share + (fair - voice.share) / 8;   // down at once, up gently
     const i32 share = voice.share;
     const u32 mask = pipe_length - 1, whole = static_cast<u32>(voice.whole);
+    clean(voice, clear_step, true);
 
     u32 phase = voice.phase, vent = voice.vent, vents = voice.vents, beats = voice.beats;
     u32 noise = voice.noise, dice = voice.dice, w = voice.write;
@@ -429,11 +451,14 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     voice.e3 = e3;
     // Gone and rung out (under -66 dBFS as heard): clear the pipe and stop.
     // (The pipe may hold an offset of a unit or two, which the DC blocker hides.)
+    // A silent pipe sounds the same read from anywhere, so it starts again
+    // from the top, cleared as it is needed (clean).
     if (!alive && loudest < 32 && spark < (32 << 15)) {
         voice.quiet = 1;
         if (voice.counted && shared.sounding) --shared.sounding;
         voice.counted = 0;
-        for (u32 i = 0; i < pipe_length; ++i) voice.pipe[i] = 0;
+        voice.write = 0;
+        voice.zero_from = pipe_length;
         voice.ap_in = voice.ap_out = voice.f1 = voice.f2 = voice.e1 = voice.e2 = voice.e3 = 0;
         voice.jet = voice.spark = voice.pulse = voice.soft_crack = voice.softer_crack = voice.settled = voice.hold = voice.held = voice.lowest = voice.jet_lp = 0;
         voice.dc_in = voice.dc_out = voice.crack_last = voice.hiss_last = 0;

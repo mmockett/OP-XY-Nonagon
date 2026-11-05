@@ -92,6 +92,16 @@ inline i32 root30(u32 x) {
     return (a + (((b - a) * static_cast<i32>(frac)) >> 16)) >> (even >> 1);
 }
 
+// Two tables' lookups at one phase, t1 `gap` entries after t0: lookup()'s
+// arithmetic, with the index worked out once.
+inline void lookup2(const opxy::i16* t0, i32 gap, u32 phase, i32& a, i32& b) {
+    const opxy::i16* q = t0 + (phase >> 23);
+    const i32 frac = static_cast<i32>((phase >> 8) & 0x7fff);
+    const i32 a0 = q[0], b0 = q[1], a1 = q[gap], b1 = q[gap + 1];
+    a = a0 + (((b0 - a0) * frac) >> 15);
+    b = a1 + (((b1 - a1) * frac) >> 15);
+}
+
 // Table lookup with linear interpolation (512 samples a cycle, a guard sample).
 inline i32 lookup(const opxy::i16* t, u32 phase) {
     const u32 at = phase >> 23;
@@ -639,12 +649,27 @@ inline i32 held(i32 from, i32 to, u32 c, u32 bits, bool mean) {
 // and 4x (prime and nominal) and the tierce. The ground's reflection keeps the
 // low ring (hum and prime): the ground takes the highs, and the voice half the
 // cost.
+// The root's gain ramp and its air over a loop's wave, out into the block:
+// every sample loop below makes its wave first, then this, so each pass keeps
+// its own state in the Blackfin's registers.
+template <int n>
+MACH_LOOP void air(Root& root, i32* out, const i32* x) {
+    i32 g = root.gain, low = root.low;
+    const i32 slope = root.slope, k = root.coef;
+    for (i32 i = 0; i < n; ++i) {
+        g += slope;
+        low += opxy::q31::multiply(opxy::q31::multiply(x[i] << 15, g) - low, k);
+        out[i] += low;
+    }
+    root.gain = g;
+    root.low = low;
+}
+
 template <int n, bool image>
 MACH_LOOP void rung(Root& root, i32* out, i32 step0, i32 step2, const i32* amp) {
     u32 hum = root.part[0], tierce = root.part[2];
     const opxy::i16 a0 = static_cast<opxy::i16>(amp[0]), a1 = static_cast<opxy::i16>(amp[1]), a2 = static_cast<opxy::i16>(amp[2]), a3 = static_cast<opxy::i16>(amp[3]);
-    i32 g = root.gain, low = root.low;
-    const i32 slope = root.slope, k = root.coef;
+    i32 wave[n];
     for (i32 i = 0; i < n; ++i) {
         hum += static_cast<u32>(step0);
         i32 x = tables::sine[hum >> 20] * a0 + tables::sine[(hum << 1) >> 20] * a1;
@@ -653,14 +678,11 @@ MACH_LOOP void rung(Root& root, i32* out, i32 step0, i32 step2, const i32* amp) 
             x += tables::sine[tierce >> 20] * a2 + tables::sine[(hum << 2) >> 20] * a3;
         }
         x >>= 14;
-        g += slope;
-        low += opxy::q31::multiply(opxy::q31::multiply(x << 15, g) - low, k);
-        out[i] += low;
+        wave[i] = x;
     }
     root.part[0] = hum;
     root.part[2] = tierce;
-    root.gain = g;
-    root.low = low;
+    air<n>(root, out, wave);
 }
 
 // The voice over n samples: formant bursts under the pulse's window. The
@@ -674,8 +696,7 @@ MACH_LOOP void sung(Root& root, i32* out, u32 rise, const i32* inc, const i32* a
     const opxy::i16 a0 = static_cast<opxy::i16>(amp[0]), a1 = static_cast<opxy::i16>(amp[1]), a2 = static_cast<opxy::i16>(amp[2]);
     const u32 i0 = static_cast<u32>(inc[0]), i1 = static_cast<u32>(inc[1]), i2 = static_cast<u32>(inc[2]);
     u32 ph = root.phase, f0 = f[0], f1 = f[1], f2 = f[2];
-    i32 g = root.gain, low = root.low;
-    const i32 slope = root.slope, k = root.coef;
+    i32 wave[n];
     for (i32 i = 0; i < n; ++i) {
         const u32 before = ph;
         ph += rise;
@@ -693,33 +714,28 @@ MACH_LOOP void sung(Root& root, i32* out, u32 rise, const i32* inc, const i32* a
         if (formants > 1) sum += tables::sine[f1 >> 20] * a1;
         if (formants > 2) sum += tables::sine[f2 >> 20] * a2;
         const i32 x = ((sum >> 15) * w) >> 15;
-        g += slope;
-        low += opxy::q31::multiply(opxy::q31::multiply(x << 15, g) - low, k);
-        out[i] += low;
+        wave[i] = x;
     }
     root.phase = ph;
     f[0] = f0; f[1] = f1; f[2] = f2;
-    root.gain = g;
-    root.low = low;
+    air<n>(root, out, wave);
 }
 
 // A wavetable source: two levels crossfading.
 template <int n>
 MACH_LOOP void played(Root& root, i32* out, const opxy::i16* t0, const opxy::i16* t1, i32 inc, i32 mix) {
     u32 ph = root.phase;
-    i32 g = root.gain, low = root.low;
-    const i32 slope = root.slope, k = root.coef, fade = mix >> 5;
+    i32 wave[n];
+    const i32 fade = mix >> 5, gap = static_cast<i32>(t1 - t0);
     for (i32 i = 0; i < n; ++i) {
         ph += static_cast<u32>(inc);
-        const i32 a = lookup(t0, ph), b = lookup(t1, ph);
+        i32 a, b;
+        lookup2(t0, gap, ph, a, b);
         const i32 x = a + (((b - a) * fade) >> 15);
-        g += slope;
-        low += opxy::q31::multiply(opxy::q31::multiply(x << 15, g) - low, k);
-        out[i] += low;
+        wave[i] = x;
     }
     root.phase = ph;
-    root.gain = g;
-    root.low = low;
+    air<n>(root, out, wave);
 }
 
 // The pad: two oscillators on one level, 0.3% apart. The ground's reflection
@@ -727,8 +743,7 @@ MACH_LOOP void played(Root& root, i32* out, const opxy::i16* t0, const opxy::i16
 template <int n>
 MACH_LOOP void bowed(Root& root, i32* out, const opxy::i16* t0, i32 inc, i32 sharp) {
     u32 ph = root.phase, ph2 = root.part[0];
-    i32 g = root.gain, low = root.low;
-    const i32 slope = root.slope, k = root.coef;
+    i32 wave[n];
     for (i32 i = 0; i < n; ++i) {
         ph += static_cast<u32>(inc);
         i32 x = lookup(t0, ph);
@@ -736,14 +751,11 @@ MACH_LOOP void bowed(Root& root, i32* out, const opxy::i16* t0, i32 inc, i32 sha
             ph2 += static_cast<u32>(sharp);
             x = (x + lookup(t0, ph2)) >> 1;
         }
-        g += slope;
-        low += opxy::q31::multiply(opxy::q31::multiply(x << 15, g) - low, k);
-        out[i] += low;
+        wave[i] = x;
     }
     root.phase = ph;
     root.part[0] = ph2;
-    root.gain = g;
-    root.low = low;
+    air<n>(root, out, wave);
 }
 
 // While a root sweeps, its steps and amplitudes move sample by sample: the
@@ -755,8 +767,7 @@ MACH_LOOP void rung_swept(Root& root, i32* out, i32 s0, i32 d0, i32 s2, i32 d2, 
     i32 v0 = from[0] + 2 * step[0], v1 = from[1] + 2 * step[1], v2 = from[2] + 2 * step[2], v3 = from[3] + 2 * step[3];
     const i32 e0 = 2 * step[0], e1 = 2 * step[1], e2 = 2 * step[2], e3 = 2 * step[3];
     i32 st0 = s0 + d0, st2 = s2 + d2;
-    i32 g = root.gain, low = root.low;
-    const i32 slope = root.slope, k = root.coef;
+    i32 wave[substep];
     for (i32 i = 0; i < substep; ++i) {
         hum += static_cast<u32>(st0);
         i32 x = tables::sine[hum >> 20] * (v0 >> 1) + tables::sine[(hum << 1) >> 20] * (v1 >> 1);
@@ -765,16 +776,13 @@ MACH_LOOP void rung_swept(Root& root, i32* out, i32 s0, i32 d0, i32 s2, i32 d2, 
             x += tables::sine[tierce >> 20] * (v2 >> 1) + tables::sine[(hum << 2) >> 20] * (v3 >> 1);
         }
         x >>= 14;
-        g += slope;
-        low += opxy::q31::multiply(opxy::q31::multiply(x << 15, g) - low, k);
-        out[i] += low;
+        wave[i] = x;
         st0 += 2 * d0; st2 += 2 * d2;
         v0 += e0; v1 += e1; v2 += e2; v3 += e3;
     }
     root.part[0] = hum;
     root.part[2] = tierce;
-    root.gain = g;
-    root.low = low;
+    air<substep>(root, out, wave);
 }
 template <int formants, bool forward>
 MACH_LOOP void sung_swept(Root& root, i32* out, u32 rise, const i32* inc, const i32* from, const i32* step, u32* f) {
@@ -783,8 +791,7 @@ MACH_LOOP void sung_swept(Root& root, i32* out, u32 rise, const i32* inc, const 
     const i32 e0 = 2 * step[0], e1 = 2 * step[1], e2 = 2 * step[2];
     const u32 i0 = static_cast<u32>(inc[0]), i1 = static_cast<u32>(inc[1]), i2 = static_cast<u32>(inc[2]);
     u32 ph = root.phase, f0 = f[0], f1 = f[1], f2 = f[2];
-    i32 g = root.gain, low = root.low;
-    const i32 slope = root.slope, k = root.coef;
+    i32 wave[substep];
     for (i32 i = 0; i < substep; ++i) {
         const u32 before = ph;
         ph += rise;
@@ -802,39 +809,33 @@ MACH_LOOP void sung_swept(Root& root, i32* out, u32 rise, const i32* inc, const 
         if (formants > 1) sum += tables::sine[f1 >> 20] * a1;
         if (formants > 2) sum += tables::sine[f2 >> 20] * a2;
         const i32 x = ((sum >> 15) * w) >> 15;
-        g += slope;
-        low += opxy::q31::multiply(opxy::q31::multiply(x << 15, g) - low, k);
-        out[i] += low;
+        wave[i] = x;
         a0 += e0; a1 += e1; a2 += e2;
     }
     root.phase = ph;
     f[0] = f0; f[1] = f1; f[2] = f2;
-    root.gain = g;
-    root.low = low;
+    air<substep>(root, out, wave);
 }
 MACH_LOOP void played_swept(Root& root, i32* out, const opxy::i16* t0, const opxy::i16* t1, i32 inc, i32 dinc, i32 mix, i32 dmix) {
     u32 ph = root.phase;
-    i32 g = root.gain, low = root.low;
-    const i32 slope = root.slope, k = root.coef;
+    i32 wave[substep];
     i32 in = inc + dinc, mx = mix + dmix;
+    const i32 gap = static_cast<i32>(t1 - t0);
     for (i32 i = 0; i < substep; ++i) {
         ph += static_cast<u32>(in);
         const i32 fade = mx >> 5;
-        const i32 a = lookup(t0, ph), b = lookup(t1, ph);
+        i32 a, b;
+        lookup2(t0, gap, ph, a, b);
         const i32 x = a + (((b - a) * fade) >> 15);
-        g += slope;
-        low += opxy::q31::multiply(opxy::q31::multiply(x << 15, g) - low, k);
-        out[i] += low;
+        wave[i] = x;
         in += 2 * dinc; mx += 2 * dmix;
     }
     root.phase = ph;
-    root.gain = g;
-    root.low = low;
+    air<substep>(root, out, wave);
 }
 MACH_LOOP void bowed_swept(Root& root, i32* out, const opxy::i16* t0, i32 inc, i32 dinc, i32 sharp, i32 dsharp, bool pad) {
     u32 ph = root.phase, ph2 = root.part[0];
-    i32 g = root.gain, low = root.low;
-    const i32 slope = root.slope, k = root.coef;
+    i32 wave[substep];
     i32 in = inc + dinc, sh = sharp + dsharp;
     for (i32 i = 0; i < substep; ++i) {
         ph += static_cast<u32>(in);
@@ -843,15 +844,12 @@ MACH_LOOP void bowed_swept(Root& root, i32* out, const opxy::i16* t0, i32 inc, i
             ph2 += static_cast<u32>(sh);
             x = (x + lookup(t0, ph2)) >> 1;
         }
-        g += slope;
-        low += opxy::q31::multiply(opxy::q31::multiply(x << 15, g) - low, k);
-        out[i] += low;
+        wave[i] = x;
         in += 2 * dinc; sh += 2 * dsharp;
     }
     root.phase = ph;
     root.part[0] = ph2;
-    root.gain = g;
-    root.low = low;
+    air<substep>(root, out, wave);
 }
 // held()'s step: the change over a piece of 2^bits.
 inline i32 piece(i32 from, i32 to, u32 bits) { return ((to >> 1) - (from >> 1)) >> bits; }
@@ -930,6 +928,18 @@ inline void sound(Voice& v, Root& root, i32* out) {
     root.mix = root.mix_to;
 }
 
+// The booms' shock rise and air over a block, from the summed N-waves.
+MACH_LOOP void rumble(Voice& v, const i32* x, opxy::Output out, i32 rise, i32 k) {
+    i32 low = v.boom_low, lower = v.boom_lower;
+    for (u32 i = 0; i < opxy::block_frames; ++i) {
+        low += opxy::q31::multiply(x[i] - low, rise);
+        lower += opxy::q31::multiply(low - lower, k);
+        out[i] += lower;
+    }
+    v.boom_low = low;
+    v.boom_lower = lower;
+}
+
 // The booms: each image's N-wave, through a shock's rise and the air (its
 // corner at the closest pass as w, Q16; -1 open).
 inline void booms(Voice& v, Shared& shared, opxy::Output out, i32 air) {
@@ -946,33 +956,44 @@ inline void booms(Voice& v, Shared& shared, opxy::Output out, i32 air) {
     }
     const i32 rise = v.boom_rise;
     const i32 k = air < 0 ? max31 : absorb(mul30(air, v.boom_near));
-    for (u32 i = 0; i < opxy::block_frames; ++i) {
-        const i32 n = static_cast<i32>(v.samples + i);
-        i32 x = 0;
-        for (u32 m = 0; m < 2; ++m) {
-            Image& im = v.image[m];
-            if (im.boom_at < 0) continue;
-            const i32 at = n - im.boom_at;
-            if (at == 0) {
-                if (!v.boom_held) {
-                    v.boom_held = 1;
-                    ++shared.booming;
-                    v.boom_share = 32768 / static_cast<i32>(shared.booming);
-                }
-                // The bow shock: up at once, then a straight fall through zero
-                // to the tail shock, which returns to rest.
-                im.boom_value = (mul30(mul30(im.boom_scale, v.boom_gain), 343597384) >> 15) * v.boom_share;   // Q31: 0.16 of full scale at a full crack
-                im.boom_drop = im.boom_length > 0 ? 2 * (im.boom_value / im.boom_length) : 0;
-            }
-            if (at >= 0 && at < im.boom_length) {
-                x += im.boom_value >> 1;
-                im.boom_value -= im.boom_drop;
-            }
+    // Each image's N-wave over this block: it starts (at its first sample,
+    // the share of booms in progress is taken) and plays its straight fall
+    // over its length. Images take their starts in the order a sample loop
+    // over both would meet them; then the two waves are summed, and the
+    // low-passes run with their state in locals.
+    const i32 first = static_cast<i32>(v.samples), frames = static_cast<i32>(opxy::block_frames);
+    i32 x[opxy::block_frames];
+    for (u32 i = 0; i < opxy::block_frames; ++i) x[i] = 0;
+    const i32 e0 = v.image[0].boom_at - first, e1 = v.image[1].boom_at - first;
+    const bool second_first = v.image[1].boom_at >= 0 && e1 >= 0 && e1 < frames && !(v.image[0].boom_at >= 0 && e0 >= 0 && e0 <= e1);
+    for (u32 j = 0; j < 2; ++j) {
+        Image& im = v.image[second_first ? 1 - j : j];
+        if (im.boom_at < 0) continue;
+        const i32 e = im.boom_at - first;
+        if (e < 0 || e >= frames) continue;
+        if (!v.boom_held) {
+            v.boom_held = 1;
+            ++shared.booming;
+            v.boom_share = 32768 / static_cast<i32>(shared.booming);
         }
-        v.boom_low += opxy::q31::multiply(x - v.boom_low, rise);
-        v.boom_lower += opxy::q31::multiply(v.boom_low - v.boom_lower, k);
-        out[i] += v.boom_lower;
+        // The bow shock: up at once, then a straight fall through zero
+        // to the tail shock, which returns to rest.
+        im.boom_value = (mul30(mul30(im.boom_scale, v.boom_gain), 343597384) >> 15) * v.boom_share;   // Q31: 0.16 of full scale at a full crack
+        im.boom_drop = im.boom_length > 0 ? 2 * (im.boom_value / im.boom_length) : 0;
     }
+    for (u32 m = 0; m < 2; ++m) {
+        Image& im = v.image[m];
+        if (im.boom_at < 0) continue;
+        const i32 from = clamp(im.boom_at - first, 0, frames), to = clamp(im.boom_at + im.boom_length - first, 0, frames);
+        i32 value = im.boom_value;
+        const i32 drop = im.boom_drop;
+        for (i32 i = from; i < to; ++i) {
+            x[i] += value >> 1;
+            value -= drop;
+        }
+        im.boom_value = value;
+    }
+    rumble(v, x, out, rise, k);
 }
 
 // A DC blocker (a pole at 6 Hz), then twice, within half scale; its state in

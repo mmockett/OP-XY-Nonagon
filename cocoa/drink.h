@@ -136,6 +136,16 @@ inline void advance(i32* s, const i32* rate, u32 blocks) {
         s[i] = blocks && r && (blocks >= left / r + 1 || r * blocks >= left) ? clear : s[i] + static_cast<i32>(r * blocks);
     }
 }
+// The same for one block, without advance's divide (Blackfin has none in
+// hardware): with blocks 1, left / r + 1 <= 1 says exactly r >= left.
+inline void advance_one(i32* s, const i32* rate) {
+    for (u32 i = 0; i < classes; ++i) {
+        if (s[i] >= clear) continue;
+        const u32 left = static_cast<u32>(clear - s[i]);
+        const u32 r = static_cast<u32>(rate[i]);
+        s[i] = r && r >= left ? clear : s[i] + static_cast<i32>(r);
+    }
+}
 // W(s), Q30: the pressure-weighted share of the column a class still fills.
 inline i32 weighted(i32 s) {
     if (s >= clear) return 0;

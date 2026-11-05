@@ -35,6 +35,7 @@ struct Voice {
     // The pipe: a delay of one period, its fractional part an allpass, and a
     // three-tap loop filter of exactly one sample's delay.
     u32 write;
+    u32 zero_from;      // the pipe from here up is silent; between write and here it is stale (see clean())
     i32 ap_in, ap_out, f1, f2;
     i32 e1, e2, e3;     // the jet's low-passes into the pipe, and its low end taken out
     i32 whole;          // the delay's whole samples
