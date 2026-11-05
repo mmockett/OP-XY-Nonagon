@@ -930,6 +930,18 @@ inline void sound(Voice& v, Root& root, i32* out) {
     root.mix = root.mix_to;
 }
 
+// The booms' shock rise and air over a block, from the summed N-waves.
+MACH_LOOP void rumble(Voice& v, const i32* x, opxy::Output out, i32 rise, i32 k) {
+    i32 low = v.boom_low, lower = v.boom_lower;
+    for (u32 i = 0; i < opxy::block_frames; ++i) {
+        low += opxy::q31::multiply(x[i] - low, rise);
+        lower += opxy::q31::multiply(low - lower, k);
+        out[i] += lower;
+    }
+    v.boom_low = low;
+    v.boom_lower = lower;
+}
+
 // The booms: each image's N-wave, through a shock's rise and the air (its
 // corner at the closest pass as w, Q16; -1 open).
 inline void booms(Voice& v, Shared& shared, opxy::Output out, i32 air) {
@@ -946,33 +958,44 @@ inline void booms(Voice& v, Shared& shared, opxy::Output out, i32 air) {
     }
     const i32 rise = v.boom_rise;
     const i32 k = air < 0 ? max31 : absorb(mul30(air, v.boom_near));
-    for (u32 i = 0; i < opxy::block_frames; ++i) {
-        const i32 n = static_cast<i32>(v.samples + i);
-        i32 x = 0;
-        for (u32 m = 0; m < 2; ++m) {
-            Image& im = v.image[m];
-            if (im.boom_at < 0) continue;
-            const i32 at = n - im.boom_at;
-            if (at == 0) {
-                if (!v.boom_held) {
-                    v.boom_held = 1;
-                    ++shared.booming;
-                    v.boom_share = 32768 / static_cast<i32>(shared.booming);
-                }
-                // The bow shock: up at once, then a straight fall through zero
-                // to the tail shock, which returns to rest.
-                im.boom_value = (mul30(mul30(im.boom_scale, v.boom_gain), 343597384) >> 15) * v.boom_share;   // Q31: 0.16 of full scale at a full crack
-                im.boom_drop = im.boom_length > 0 ? 2 * (im.boom_value / im.boom_length) : 0;
-            }
-            if (at >= 0 && at < im.boom_length) {
-                x += im.boom_value >> 1;
-                im.boom_value -= im.boom_drop;
-            }
+    // Each image's N-wave over this block: it starts (at its first sample,
+    // the share of booms in progress is taken) and plays its straight fall
+    // over its length. Images take their starts in the order a sample loop
+    // over both would meet them; then the two waves are summed, and the
+    // low-passes run with their state in locals.
+    const i32 first = static_cast<i32>(v.samples), frames = static_cast<i32>(opxy::block_frames);
+    i32 x[opxy::block_frames];
+    for (u32 i = 0; i < opxy::block_frames; ++i) x[i] = 0;
+    const i32 e0 = v.image[0].boom_at - first, e1 = v.image[1].boom_at - first;
+    const bool second_first = v.image[1].boom_at >= 0 && e1 >= 0 && e1 < frames && !(v.image[0].boom_at >= 0 && e0 >= 0 && e0 <= e1);
+    for (u32 j = 0; j < 2; ++j) {
+        Image& im = v.image[second_first ? 1 - j : j];
+        if (im.boom_at < 0) continue;
+        const i32 e = im.boom_at - first;
+        if (e < 0 || e >= frames) continue;
+        if (!v.boom_held) {
+            v.boom_held = 1;
+            ++shared.booming;
+            v.boom_share = 32768 / static_cast<i32>(shared.booming);
         }
-        v.boom_low += opxy::q31::multiply(x - v.boom_low, rise);
-        v.boom_lower += opxy::q31::multiply(v.boom_low - v.boom_lower, k);
-        out[i] += v.boom_lower;
+        // The bow shock: up at once, then a straight fall through zero
+        // to the tail shock, which returns to rest.
+        im.boom_value = (mul30(mul30(im.boom_scale, v.boom_gain), 343597384) >> 15) * v.boom_share;   // Q31: 0.16 of full scale at a full crack
+        im.boom_drop = im.boom_length > 0 ? 2 * (im.boom_value / im.boom_length) : 0;
     }
+    for (u32 m = 0; m < 2; ++m) {
+        Image& im = v.image[m];
+        if (im.boom_at < 0) continue;
+        const i32 from = clamp(im.boom_at - first, 0, frames), to = clamp(im.boom_at + im.boom_length - first, 0, frames);
+        i32 value = im.boom_value;
+        const i32 drop = im.boom_drop;
+        for (i32 i = from; i < to; ++i) {
+            x[i] += value >> 1;
+            value -= drop;
+        }
+        im.boom_value = value;
+    }
+    rumble(v, x, out, rise, k);
 }
 
 // A DC blocker (a pole at 6 Hz), then twice, within half scale; its state in
