@@ -81,31 +81,42 @@ inline u32 next(u32& seed) {
 // plain loops, so neither tests the split each sample.
 __attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split) {
     u32 p = m.phase;
+    // Each sample reads the sine the sample before addressed, so the Blackfin
+    // moves the index to an address register well ahead of its load.
+    const opxy::i16* at = tables::sine + (p >> 20);
     i32 a = amp;
     if (!glide) {   // a steady pitch: the same sums without the glide's add
         for (u32 i = 0; i < split; ++i) {
-            sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
+            const i32 s = *at;
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * s) >> 3;   // a >> 16 always fits 16 bits: a one-cycle product
             a += slope;
             p += inc;
+            at = tables::sine + (p >> 20);
         }
         for (u32 i = split; i < opxy::block_frames; ++i) {
-            sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
+            const i32 s = *at;
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * s) >> 3;   // a >> 16 always fits 16 bits: a one-cycle product
             a += after;
             p += inc;
+            at = tables::sine + (p >> 20);
         }
         m.phase = p;
         return;
     }
     for (u32 i = 0; i < split; ++i) {
-        sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
+        const i32 s = *at;
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * s) >> 3;   // a >> 16 always fits 16 bits: a one-cycle product
         a += slope;
         p += inc;
+        at = tables::sine + (p >> 20);
         inc += static_cast<u32>(glide);
     }
     for (u32 i = split; i < opxy::block_frames; ++i) {
-        sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
+        const i32 s = *at;
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * s) >> 3;   // a >> 16 always fits 16 bits: a one-cycle product
         a += after;
         p += inc;
+        at = tables::sine + (p >> 20);
         inc += static_cast<u32>(glide);
     }
     m.phase = p;
@@ -119,28 +130,37 @@ template <u32 R>
 __attribute__((noinline)) void sing_at(i32* sum, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split) {
     const u32 steps = 1u << R;
     u32 p = m.phase;
+    // Each sample reads the sine the sample before addressed, so the Blackfin
+    // moves the index to an address register well ahead of its load.
+    const opxy::i16* at = tables::sine + (p >> 20);
     i32 a = amp;
     const u32 ramped = (split + steps - 1) >> R;   // samples before the split
     const i32 ramp = slope << R;
     if (!glide) {
         const u32 advance = inc << R;
         for (u32 i = 0; i < ramped; ++i) {
-            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+            const i32 s = *at;
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * s) >> 3;
             a += ramp;
             p += advance;
+            at = tables::sine + (p >> 20);
         }
         a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << R) - split);
         if (!after) {
             const opxy::i16 held = static_cast<opxy::i16>(static_cast<u32>(a) >> 16);
             for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
-                sum[i] += (held * tables::sine[p >> 20]) >> 3;
+                const i32 s = *at;
+                sum[i] += (held * s) >> 3;
                 p += advance;
+                at = tables::sine + (p >> 20);
             }
         } else {
             for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
-                sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+                const i32 s = *at;
+                sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * s) >> 3;
                 a += after << R;
                 p += advance;
+                at = tables::sine + (p >> 20);
             }
         }
         m.phase = p;
@@ -149,16 +169,20 @@ __attribute__((noinline)) void sing_at(i32* sum, Mode& m, u32 inc, i32 glide, i3
     const u32 bend = static_cast<u32>(glide) << R, curve = static_cast<u32>(glide) * ((steps * (steps - 1)) >> 1);
     u32 advance = (inc << R) + curve;
     for (u32 i = 0; i < ramped; ++i) {
-        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+        const i32 s = *at;
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * s) >> 3;
         a += ramp;
         p += advance;
+        at = tables::sine + (p >> 20);
         advance += bend << R;
     }
     a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << R) - split);
     for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
-        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+        const i32 s = *at;
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * s) >> 3;
         a += after << R;
         p += advance;
+        at = tables::sine + (p >> 20);
         advance += bend << R;
     }
     m.phase = p;
@@ -757,7 +781,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         i32 a = p.amp;
         const u32 shift = p.shift, chirp = inc >> 13;
         for (unsigned i = 0; i < block_frames; ++i) {
-            sum[i] += ((a >> 16) * tables::sine[ph >> 20]) >> 3;
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[ph >> 20]) >> 3;
             a -= a >> shift;
             ph += inc;
             inc += chirp;
