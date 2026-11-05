@@ -87,7 +87,7 @@ inline void single(i32* out, const i16* w, u32& p, u32 inc, const i32* g) {
 }
 // The same pair with levels ramped every sample, for a note's first block,
 // where a level rises from silence and quartered steps would click.
-inline void pair_ramped(i32* out, const i16* w1, u32& p1, u32 i1, i32 from1, i32 to1,
+__attribute__((noinline)) void pair_ramped(i32* out, const i16* w1, u32& p1, u32 i1, i32 from1, i32 to1,
                         const i16* w2, u32& p2, u32 i2, i32 from2, i32 to2) {
     u32 q1 = p1, q2 = p2;
     i32 a1 = from1 << 15, a2 = from2 << 15;
@@ -104,7 +104,7 @@ inline void pair_ramped(i32* out, const i16* w1, u32& p1, u32 i1, i32 from1, i32
 }
 
 // One ramped partial alone, the last of an odd number in a note's first block.
-inline void single_ramped(i32* out, const i16* w, u32& p, u32 inc, i32 from, i32 to) {
+__attribute__((noinline)) void single_ramped(i32* out, const i16* w, u32& p, u32 inc, i32 from, i32 to) {
     u32 q = p;
     i32 a = from << 15;
     const i32 d = ((to - from) << 15) >> 6;
