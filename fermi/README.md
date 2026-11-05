@@ -337,10 +337,11 @@ a voice block runs about:
 - up to 480 in damping;
 - and up to 1,200 of straight-line code, counted as if it all ran.
 
-That is about 14,300, and 14,900 at most. A note's first block costs about
-2,000 more for its per-sample ramps; the seed's starting shape is made once
-for every note that shares it (about 1,400 instructions, when the seed,
-masses or mode change). Ten voiced partials are what fit this budget.
+That is about 14,300, and 14,900 at most. A note's first block ramps its
+sounding partials sample by sample (a fresh chain sounds only a few; the rest
+only keep time); the seed's starting shape and the controls' setup are made
+once for every note that shares them (the shape about 1,400 instructions,
+when the seed, masses or mode change). Ten voiced partials are what fit this budget.
 
 - `sdk.py test --firmware` compiles for the Blackfin: Fermi is 89.6 KiB of
   the 2040 KiB module region.

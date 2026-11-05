@@ -382,7 +382,9 @@ as the SDK estimates synths) reads 20k and 21.6k, because the portable
 host. With a plain multiply in its place it reads 8.7k and 9.7k.
 
 Memory is 228 KiB, mostly the pool's lines (16 notes × 8 KiB). A note's
-first block clears its lines, a one-off of about 4k stores.
+lines are cleared as they are read, not all at once in its first block:
+that block clears only what its period reaches back over, then 128 samples
+a block until the note's first pass round the lines is done.
 
 ## On the OP-XY
 

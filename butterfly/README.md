@@ -326,10 +326,11 @@ midpoint.
 
 The figures below are host estimates made during development.
 
-- By count of the Blackfin build: the bank's inner loop is 11 instructions
-  a partial a half-rate sample, about 6,000 a block for 17 partials, and
-  about 11,400 a block with the table reads, the gate and the held hum's
-  fade, each partial's tilt, the increments and the half-band.
+- By count of the Blackfin build: the bank is a hardware loop of 10
+  instructions a partial a half-rate sample, about 5,400 a block for 17
+  partials, and the half-band one of 75 instructions an output pair, about
+  2,400; with the table reads, the gate and the held hum's fade, each
+  partial's tilt and the increments, about 10,500 a block.
 - The SDK's host estimate (`sdk.py test`) reads 11,500 Blackfin instructions
   per voice block at the heaviest setting, on a heavily loaded host.
 - Both are within 15,000; Moth reads 10,300 by the same count. Nothing is
