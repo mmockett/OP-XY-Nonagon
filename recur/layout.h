@@ -6,7 +6,7 @@ namespace recur {
 // The screen's nodes: the reshaping outline (the frame round the stretch read),
 // the header's bar, the tiles' squares, each map's print in pieces, depth's pins,
 // the tape's waveform (a centre line and 96 columns) and cuts, then the moving
-// parts, the trim's markers and the swap hint's icon (with text slots 16 and 17).
+// parts, the trim's markers and the Shift overlay's icon and cover (with text slots 16 and 17).
 const opxy::u32 paths = 1, reading = 0, header_first = 1;
 const opxy::u32 small_first = 9, large_first = 73;
 // The share of its size a tile's print pieces take, Q10, by grid (2, 4, 8): inside its square.
@@ -15,8 +15,8 @@ const opxy::u32 print_first[6] = {77, 103, 123, 142, 161, 181}, print_count[6] =
 const opxy::u32 pin_first = 203, pin_count = 16, sample_line = 219, row_first = 316, row_count = 7,
                 cut_first = 323, cut_count = 56,
                 lever_node = 379, teeth_first = 380, teeth = 7,
-                rod_node = 387, weight_node = 388, mark_first = 389, swap_first = 391, swap_text = 16,
-                cover_stage = 394, cover_hint = 395, node_total = 396;
+                rod_node = 387, weight_node = 388, mark_first = 389, overlay_icon = 391, overlay_cover = 394, overlay_text = 16,
+                cover_stage = 395, cover_hint = 396, node_total = 397;
 // The cell (of the 8 grid) each print piece sits in, from print_first[0] on.
 const opxy::u8 piece_cell[126] = {10, 13, 18, 18, 19, 20, 21, 21, 26, 26, 27, 28, 29, 29, 34, 34, 35, 35, 36, 36, 37, 37, 42, 43, 44, 45, 18, 19, 20, 21, 25, 26, 27, 28, 29, 30, 33, 34, 37, 38, 42, 45, 50, 51, 52, 53, 22, 23, 23, 27, 28, 28, 29, 30, 31, 34, 35, 36, 38, 39, 43, 45, 46, 52, 53, 17, 18, 19, 19, 19, 25, 26, 29, 29, 33, 34, 35, 41, 42, 43, 43, 43, 44, 44, 10, 13, 18, 21, 27, 28, 35, 35, 36, 36, 42, 43, 43, 44, 44, 45, 50, 51, 52, 53, 11, 11, 12, 13, 13, 18, 19, 21, 22, 26, 26, 30, 30, 34, 35, 37, 38, 43, 43, 44, 45, 45};
 // The semitone each comb tooth stands for.
@@ -29,5 +29,4 @@ const opxy::i32 pendulum_x = 114, pendulum_y = 188;
 // The weight's distance up the rod for each slice, px.
 const opxy::i32 weight_heights[6] = {16, 34, 52, 70, 88, 106};
 const opxy::i32 rule_x0 = 84, rule_x1 = 396, rule_y = 206;
-const opxy::i32 swap_x = 424, swap_y = 198;
 }

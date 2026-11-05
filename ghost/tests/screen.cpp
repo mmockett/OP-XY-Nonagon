@@ -91,22 +91,23 @@ void play(const double* c, u32 notes, int frames, const char* when) {
         check_frame(when);
     }
 }
-// The swap hint, shown (Shift held, with a sample) or not: its nodes and
-// text slots on screen beside the slot's right end, clear of the columns and
-// markers and inside the pilaster, or all off screen with no words.
+// The Shift overlay, shown (Shift held, with a sample) or not: the cover at
+// the origin, the key's icon and "swap sample" / "with" in their places, or
+// all of it off screen with no words.
 void check_hint(bool shown, const char* when) {
-    bool ok = true;
-    for (u32 k = 0; k < ghost::sample_view::sample_hint_nodes; ++k) {
-        const Node& n = frame.nodes[ghost::swap_first + k];
-        ok = ok && (shown ? n.x == ghost::swap_x * unit && n.y == ghost::swap_y * unit : n.x == hidden_x * unit && n.y == hidden_y * unit);
+    namespace sv = ghost::sample_view;
+    const Node& cover = frame.nodes[ghost::overlay_cover];
+    bool ok = shown ? cover.x == 0 && cover.y == 0 && cover.scale == unit : cover.x == hidden_x * unit && cover.y == hidden_y * unit;
+    for (u32 k = 0; k < sv::sample_overlay_icon_nodes; ++k) {
+        const Node& n = frame.nodes[ghost::overlay_icon + k];
+        ok = ok && (shown ? n.x == sv::sample_overlay_icon_x * unit && n.y == sv::sample_overlay_icon_y * unit : n.x == hidden_x * unit && n.y == hidden_y * unit);
     }
-    const Text& a = frame.texts[ghost::swap_text], &b = frame.texts[ghost::swap_text + 1];
-    if (shown) {
-        ok = ok && !std::strcmp(a.chars, "swap") && !std::strcmp(b.chars, "shift +") && a.x == ghost::swap_x * unit && b.x == ghost::swap_x * unit;
-        ok = ok && ghost::swap_x >= ghost::strip_x1 + 6 && ghost::swap_x + ghost::sample_view::sample_hint_width <= 420 &&
-             ghost::swap_y >= 200 && ghost::swap_y + ghost::sample_view::sample_hint_height <= 220;
-    } else ok = ok && !a.chars[0] && !b.chars[0] && a.x == hidden_x * unit && b.x == hidden_x * unit;
-    if (!ok) fail(shown ? "the swap hint isn't shown in its place" : "the swap hint shows", when, 0, 0);
+    const Text& a = frame.texts[ghost::overlay_text], &b = frame.texts[ghost::overlay_text + 1];
+    if (shown)
+        ok = ok && !std::strcmp(a.chars, "swap sample") && !std::strcmp(b.chars, "with") && a.x == sv::sample_overlay_title_x * unit &&
+             a.y == sv::sample_overlay_title_y * unit && b.x == sv::sample_overlay_with_x * unit && b.y == sv::sample_overlay_with_y * unit;
+    else ok = ok && !a.chars[0] && !b.chars[0] && a.x == hidden_x * unit && b.x == hidden_x * unit;
+    if (!ok) fail(shown ? "the Shift overlay isn't shown in its place" : "the Shift overlay shows", when, 0, 0);
 }
 u32 seed = 0x2545f491u;
 u32 next() { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; return seed; }
@@ -190,8 +191,8 @@ int main() {
             std::fabs(x1 - (ghost::strip_x0 + width * 158760 / overview.frames)) > 0.5 || frame.nodes[ghost::mark_first].shade != 15)
             fail("the trim's markers", "Shift", 0, 0);
         // Columns within the trim lit, those outside dim; and with Shift held,
-        // the swap hint: "swap" over "shift +" and the Sample key's icon, by the
-        // slot's right end, clear of the columns, the markers and the pilaster.
+        // the overlay: the stage dimmed under its cover, "swap sample" and
+        // "with" and the Sample key's icon over it.
         u32 lit = 0, dark = 0;
         for (u32 b = 0; b < ghost::sample_view::sample_columns; ++b) {
             const Node& n = frame.nodes[ghost::sample_line + 1 + b];
@@ -231,11 +232,12 @@ int main() {
         // With no sample, the strip goes and the hint shows.
         overview.assigned = 0;
         for (int t = 0; t < 2; ++t) ghost::display(state, input, frame);
-        for (u32 n = ghost::sample_line; n < ghost::swap_first + ghost::sample_view::sample_hint_nodes; ++n)
+        for (u32 n = ghost::sample_line; n <= ghost::overlay_cover; ++n)
             if (frame.nodes[n].x != opxy::draw::hidden_x * 1024) fail("the strip without a sample", "shown", 0, 0);
         check_hint(false, "no sample, Shift held");
         overview.assigned = 1;
-        // Shift let go: the hint goes, and only it, the markers' shade and the header change.
+        // Shift let go: the overlay goes, and only it, the markers' shade and
+        // the header change; then nothing does. Its press is as cheap.
         for (int t = 0; t < 20; ++t) ghost::display(state, input, frame);
         static ghost::Frame held;
         held = frame;
@@ -243,8 +245,12 @@ int main() {
         ghost::display(state, input, frame);
         check_hint(false, "Shift let go");
         for (u32 n = ghost::header_first + 8; n < ghost::Frame::node_count; ++n)
-            if (std::memcmp(&held.nodes[n], &frame.nodes[n], sizeof(Node)) && !(n >= ghost::mark_first && n < ghost::swap_first + ghost::sample_view::sample_hint_nodes))
-                fail("letting go of Shift moves more than the hint and markers", "Shift", 0, n);
+            if (std::memcmp(&held.nodes[n], &frame.nodes[n], sizeof(Node)) && !(n >= ghost::mark_first && n <= ghost::overlay_cover))
+                fail("letting go of Shift moves more than the overlay and markers", "Shift", 0, n);
+        u32 edge = 0;
+        for (u32 n = 0; n < ghost::Frame::node_count; ++n) edge += std::memcmp(&held.nodes[n], &frame.nodes[n], sizeof(Node)) != 0;
+        if (edge > 14) fail("Shift's edge changes more than 14 nodes", "Shift", 0, edge);
+        std::printf("Shift's edge: %u nodes change (the overlay's 4, the markers' 2, the header)\n", edge);
         held = frame;
         ghost::display(state, input, frame);
         if (std::memcmp(&held, &frame, sizeof frame)) fail("the screen changes at rest after Shift", "Shift", 0, 0);

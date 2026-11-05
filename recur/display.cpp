@@ -372,7 +372,7 @@ i32 tape_x(const Sample& sample, u32 frame) {
 }
 
 // The sample's view, shared byte for byte with the other sample engines
-// (sample_view.h): the waveform, the trim's markers and the swap hint.
+// (sample_view.h): the waveform, the trim's markers and the Shift overlay.
 namespace sample_view {
 #include "sample_view.h"
 }
@@ -558,7 +558,7 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
         for (u32 n = 0; n < cover_stage; ++n)
             if (n < header_first || n >= header_first + 8) hide(frame, n);
         if (!frame.paths[reading].key) shape_reading(frame, 3 * unit);   // hidden, but shaped
-        sample_view::place_swap_hint(frame, swap_first, swap_text, swap_x * unit, swap_y * unit, false, sample_view::sample_hint_stacked);
+        sample_view::place_shift_overlay(frame, overlay_cover, overlay_icon, overlay_text, false);
         state.bits = 0;
         state.fresh = 1;
         state.wave_key = 0;
@@ -582,12 +582,13 @@ inline void display(DisplayState& state, const Input& input, Frame& frame) {
     }
     // The tape's waveform (the sample view's columns, at most 12 changing a
     // frame while the sample, its trim or its gain changes), the trim's
-    // markers, lit while Shift edits them, and while Shift is held the swap
-    // hint by the tape's right end.
+    // markers, lit while Shift edits them, and while Shift is held the tin
+    // dimmed under a cover and how to swap the sample over it, the tape and
+    // the header staying bright.
     const SampleSlot tape = {rule_x0 * unit, (rule_x1 - rule_x0) * unit, rule_y * unit, 8 * unit, 9, 4, 3};
     sample_view::place_waveform(frame, sample_line, overview, tape, state.wave_key, snap, 12);
     sample_view::place_trim_marks(frame, mark_first, overview, tape, input.shift ? 15 : 9);
-    sample_view::place_swap_hint(frame, swap_first, swap_text, swap_x * unit, swap_y * unit, input.shift != 0, sample_view::sample_hint_stacked);
+    sample_view::place_shift_overlay(frame, overlay_cover, overlay_icon, overlay_text, input.shift != 0);
     u32 left = budget > 4 ? budget : 4;   // what's left, and a little
     place_cuts(frame, sample, bits, hiss, snap, left);
     place_reading(frame, sample, input, bits, hiss, hiss_bits, source, bright);

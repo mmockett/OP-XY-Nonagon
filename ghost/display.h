@@ -3,24 +3,24 @@
 
 namespace ghost {
 // Matches resources.display: paths, points, nodes, texts, palette (README, "Screen").
-using Frame = opxy::draw::Frame<4, 64, 126, 18, 16>;
+using Frame = opxy::draw::Frame<4, 64, 127, 18, 16>;
 
 // Nodes: the apparition, its twin in the glass, its mouth and the chalk path
 // it walks (the paths), the header's bar, its halos, two more apparitions for
 // more held notes, the twin's own halos and mouth, the cover over the hint
 // under the apron, a black silhouette under each of the two figures, and with
 // a sample, the sample view in the slot under the apron (display.cpp): its
-// centre line and 96 columns, the trim's two markers, and the swap hint's
-// icon (with text slots 16 and 17). tools/make_panel.py draws them.
+// centre line and 96 columns, the trim's two markers, and the Shift overlay's
+// icon and cover (with text slots 16 and 17). tools/make_panel.py draws them.
 const opxy::u32 apparition = 0, twin = 1, mouth = 2, floor_path = 3, header_first = 4, halo_first = 12,
                 halo_count = 3, extra_first = 15, twin_halo_first = 17, twin_mouth = 20, hint_cover = 21,
-                mask = 22, twin_mask = 23, sample_line = 24, mark_first = 121, swap_first = 123, swap_text = 16;
+                mask = 22, twin_mask = 23, sample_line = 24, mark_first = 121, overlay_icon = 123,
+                overlay_cover = 126, overlay_text = 16;
 // Where make_panel.py puts the stage, in pixels.
 const opxy::i32 stage_front = 198, stage_back = 150, half_front = 170, half_back = 108;
 const opxy::i32 front_feet = 187;   // the nearest feet: clear of the footlights' hoods (194) on the apron
 const opxy::i32 path_x = 240, path_y = 174;   // the chalk path's origin, drawn at twice its points
-const opxy::i32 strip_x0 = 66, strip_x1 = 358, strip_y = 209;   // the sample's slot under the apron
-const opxy::i32 swap_x = 366, swap_y = 200;                    // the swap hint's top left corner, by its right end
+const opxy::i32 strip_x0 = 90, strip_x1 = 390, strip_y = 209;   // the sample's slot under the apron
 
 // The amp envelope's level as the screen follows it (display.cpp, follow()).
 struct Swell { opxy::u32 level, from, stage; };   // level Q16; from spare (0); stage 0 idle, 1 attack, 2 decay, 3 release, 4 sustain

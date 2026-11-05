@@ -362,29 +362,36 @@ int main() {
             ++failures;
         }
         if (frame.nodes[recur::mark_first].shade <= unlit) { std::printf("FAIL: Shift doesn't light the trim's markers\n"); ++failures; }
-        // While Shift is held, the swap hint: "swap" over "shift +" and the Sample
-        // key's icon, outside the tin by the tape's right end; let go, it goes,
-        // and nothing but it, the markers and the header changes, then nothing.
+        // While Shift is held, the overlay: the tin dimmed under its cover and
+        // over it "swap sample", "with" and the Sample key's icon; let go, it
+        // goes, and nothing but it, the markers and the header changes, then
+        // nothing. Its press is as cheap.
+        namespace sv = recur::sample_view;
         const auto hint_shown = [&](bool want) {
-            bool ok = true;
-            for (u32 k = 0; k < recur::sample_view::sample_hint_nodes; ++k) {
-                const opxy::draw::Node& n = frame.nodes[recur::swap_first + k];
-                ok = ok && (want ? n.x == recur::swap_x * 1024 && n.y == recur::swap_y * 1024 : !shown(n));
+            const opxy::draw::Node& cover = frame.nodes[recur::overlay_cover];
+            bool ok = want ? cover.x == 0 && cover.y == 0 : !shown(cover);
+            for (u32 k = 0; k < sv::sample_overlay_icon_nodes; ++k) {
+                const opxy::draw::Node& n = frame.nodes[recur::overlay_icon + k];
+                ok = ok && (want ? n.x == sv::sample_overlay_icon_x * 1024 && n.y == sv::sample_overlay_icon_y * 1024 : !shown(n));
             }
-            const opxy::draw::Text& a = frame.texts[recur::swap_text], &b = frame.texts[recur::swap_text + 1];
-            if (want) ok = ok && text(recur::swap_text) == "swap" && text(recur::swap_text + 1) == "shift +" && a.x == recur::swap_x * 1024 && b.x == a.x;
+            const opxy::draw::Text& a = frame.texts[recur::overlay_text], &b = frame.texts[recur::overlay_text + 1];
+            if (want) ok = ok && text(recur::overlay_text) == "swap sample" && text(recur::overlay_text + 1) == "with" &&
+                           a.x == sv::sample_overlay_title_x * 1024 && b.x == sv::sample_overlay_with_x * 1024;
             else ok = ok && !a.chars[0] && !b.chars[0] && a.x == opxy::draw::hidden_x * 1024;
             return ok;
         };
-        if (!hint_shown(true) || recur::swap_x < recur::rule_x1 + 24 || recur::swap_x + recur::sample_view::sample_hint_width > 480 ||
-            recur::swap_y + recur::sample_view::sample_hint_height > 220) { std::printf("FAIL: Shift doesn't show the swap hint in its place\n"); ++failures; }
+        if (!hint_shown(true)) { std::printf("FAIL: Shift doesn't show the overlay in its place\n"); ++failures; }
         {
             const recur::Frame held = frame;
             input.shift = 0;
             recur::display(state, input, frame);
-            if (!hint_shown(false)) { std::printf("FAIL: the swap hint stays after Shift\n"); ++failures; }
+            if (!hint_shown(false)) { std::printf("FAIL: the overlay stays after Shift\n"); ++failures; }
+            u32 edge = 0;
+            for (u32 n = 0; n < recur::node_total; ++n) edge += std::memcmp(&held.nodes[n], &frame.nodes[n], sizeof(opxy::draw::Node)) != 0;
+            if (edge > 14) { std::printf("FAIL: Shift's edge changes %u nodes\n", edge); ++failures; }
+            std::printf("Shift's edge: %u nodes change (the overlay's 4, the markers' 2, the header)\n", edge);
             for (u32 n = recur::header_first + 8; n < recur::node_total; ++n)
-                if (std::memcmp(&held.nodes[n], &frame.nodes[n], sizeof(opxy::draw::Node)) && !(n >= recur::mark_first && n < recur::swap_first + recur::sample_view::sample_hint_nodes)) {
+                if (std::memcmp(&held.nodes[n], &frame.nodes[n], sizeof(opxy::draw::Node)) && !(n >= recur::mark_first && n <= recur::overlay_cover)) {
                     std::printf("FAIL: letting go of Shift moves node %u\n", n); ++failures; break;
                 }
             const recur::Frame after = frame;

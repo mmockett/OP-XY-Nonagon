@@ -25,7 +25,7 @@ FONT = 'font-family="UniversNextPro-Light"'
 
 
 # The sample's view (sample_view.h's artwork), shared with the other sample engines.
-from sample_view import COLUMNS as SAMPLE_COLUMNS, HINT_NODES as SAMPLE_HINT_NODES, artwork as sample_view_artwork, hint as sample_view_hint
+from sample_view import COLUMNS as SAMPLE_COLUMNS, OVERLAY_ICON_NODES, artwork as sample_view_artwork, shift_cover, shift_overlay
 
 
 TRAY_X, TRAY_Y, TRAY = 172, 54, 136          # the print, 136 px square, centred
@@ -40,7 +40,6 @@ TOOTH_PITCH = 9                              # px between teeth
 LEVER = (365, 188)                           # the rate lever's pivot
 RULE_X0, RULE_X1, RULE_Y = 84, 396, 206      # the tape's slot: the whole sample, 312 px, 20 tall
 PATHS = 1                                    # the one reshaping outline: the stretch the slot playing reads
-SWAP = (424, 198)                            # the swap hint's top left corner, outside the tin by the tape's right end
 MAIN, PART = ("#9a9a9a", 0.8), ("#6a6a6a", 0.6)   # the two inks of the fixed artwork: the tin and tray, the instruments' parts
 HALF = 0.5                                   # a stroke's half width, px
 GAP = 1.6                                    # a small tile's inset from its cell, px
@@ -421,20 +420,22 @@ for i in range(PINS):
     n += 1
 # The tape's waveform (display.cpp's sample view): a centre line and a
 # column for each of the overview's 96 bins, placed and sized by display.cpp,
-# under the grid's cuts.
+# under the grid's cuts. It, the cuts and the trim's markers are what Shift
+# edits, so they draw over the cover that dims the rest while it is held.
+bright_nodes = []
 sample_line = n
-tile_nodes += sample_view_artwork(ID, n, RULE_X1 - RULE_X0, 8)
+bright_nodes += sample_view_artwork(ID, n, RULE_X1 - RULE_X0, 8)
 n += 1 + SAMPLE_COLUMNS
 # The grid's cuts on the tape, placed by display.cpp (so authored at the
 # origin): a long one where a row of the square begins, a short one at the
 # top of the slot for each other slice.
 row_first = n
 for i in range(ROWS):
-    tile_nodes.append(node(n, rect(-0.4, -8.5, 0.4, 8.5), "#cfcfcf", 0.5))
+    bright_nodes.append(node(n, rect(-0.4, -8.5, 0.4, 8.5), "#cfcfcf", 0.5))
     n += 1
 cut_first = n
 for i in range(CUTS):
-    tile_nodes.append(node(n, rect(-0.4, -8.5, 0.4, -4.5), "#cfcfcf", 0.5))
+    bright_nodes.append(node(n, rect(-0.4, -8.5, 0.4, -4.5), "#cfcfcf", 0.5))
     n += 1
 # The rate lever.
 lever = n
@@ -458,16 +459,19 @@ n += 1
 # each a bar the slot's height with a flag at its top pointing into the trim,
 # as Grains marks them. Each starts at its flag's corner, where both edges are long.
 mark_first = n
-tile_nodes.append(node(n, outline([(-0.6, -11), (4, -11), (0.6, -7.6), (0.6, 10), (-0.6, 10)]), "#e6e6e6", 0.5, "#e6e6e6",
+bright_nodes.append(node(n, outline([(-0.6, -11), (4, -11), (0.6, -7.6), (0.6, 10), (-0.6, 10)]), "#e6e6e6", 0.5, "#e6e6e6",
                        at=(RULE_X0, RULE_Y)))
 n += 1
-tile_nodes.append(node(n, outline([(0.6, -11), (0.6, 10), (-0.6, 10), (-0.6, -7.6), (-4, -11)]), "#e6e6e6", 0.5, "#e6e6e6",
+bright_nodes.append(node(n, outline([(0.6, -11), (0.6, 10), (-0.6, 10), (-0.6, -7.6), (-4, -11)]), "#e6e6e6", 0.5, "#e6e6e6",
                        at=(RULE_X1, RULE_Y)))
 n += 1
-# While Shift is held, the hint that Shift and the Sample key swap the sample.
-swap_first = n
-tile_nodes += sample_view_hint(ID, n, 16)
-n += SAMPLE_HINT_NODES
+# While Shift is held: a cover dimming the tin, under the tape (drawn between
+# them), and over it all how to swap the sample, the key's icon and two words.
+overlay_icon = n
+overlay = shift_overlay(ID, n, 16)
+n += OVERLAY_ICON_NODES
+overlay_cover = n
+n += 1
 cover_stage = n
 cover_hint = n + 1
 n += 2
@@ -479,7 +483,7 @@ out.append(node(0, outline(frame_points), "#e6e6e6", 0.6, at=(RULE_X0 + 5, RULE_
 out.append(node(cover_stage, rect(0, 39, 480, 220), "#000000", 0.5, "#000000", at=(0, 0)))
 out += hint
 out.append(node(cover_hint, rect(TRAY_X + 1, 88, TRAY_X + TRAY - 1, 160), "#000000", 0.5, "#000000", at=(0, 0)))
-out += tile_nodes
+out += tile_nodes + [shift_cover(ID, overlay_cover)] + bright_nodes + overlay
 node_count = n
 for i in range(16):
     grey = f"#{i * 17:02x}{i * 17:02x}{i * 17:02x}"
@@ -496,7 +500,7 @@ if ID == "recur":
              "// The screen's nodes: the reshaping outline (the frame round the stretch read),",
              "// the header's bar, the tiles' squares, each map's print in pieces, depth's pins,",
              "// the tape's waveform (a centre line and 96 columns) and cuts, then the moving",
-             "// parts, the trim's markers and the swap hint's icon (with text slots 16 and 17).",
+             "// parts, the trim's markers and the Shift overlay's icon and cover (with text slots 16 and 17).",
              f"const opxy::u32 paths = {PATHS}, reading = 0, header_first = {PATHS};",
              f"const opxy::u32 small_first = {small_first}, large_first = {large_first};",
              "// The share of its size a tile's print pieces take, Q10, by grid (2, 4, 8): inside its square.",
@@ -505,7 +509,7 @@ if ID == "recur":
              f"const opxy::u32 pin_first = {pin_first}, pin_count = {PINS}, sample_line = {sample_line}, row_first = {row_first}, row_count = {ROWS},",
              f"                cut_first = {cut_first}, cut_count = {CUTS},",
              f"                lever_node = {lever}, teeth_first = {teeth_first}, teeth = {len(TOOTH_NOTES)},",
-             f"                rod_node = {rod}, weight_node = {weight}, mark_first = {mark_first}, swap_first = {swap_first}, swap_text = 16,",
+             f"                rod_node = {rod}, weight_node = {weight}, mark_first = {mark_first}, overlay_icon = {overlay_icon}, overlay_cover = {overlay_cover}, overlay_text = 16,",
              f"                cover_stage = {cover_stage}, cover_hint = {cover_hint}, node_total = {node_count};",
              "// The cell (of the 8 grid) each print piece sits in, from print_first[0] on.",
              "const opxy::u8 piece_cell[" + str(len(piece_cells)) + "] = {" + row(piece_cells) + "};",
@@ -519,7 +523,6 @@ if ID == "recur":
              "// The weight's distance up the rod for each slice, px.",
              "const opxy::i32 weight_heights[6] = {" + row(WEIGHTS) + "};",
              f"const opxy::i32 rule_x0 = {RULE_X0}, rule_x1 = {RULE_X1}, rule_y = {RULE_Y};",
-             f"const opxy::i32 swap_x = {SWAP[0]}, swap_y = {SWAP[1]};",
              "}", ""]
     ROOT.joinpath("layout.h").write_text("\n".join(lines))
 print("wrote", target, "nodes", node_count, "bytes", len("\n".join(out)), "pieces", print_count)

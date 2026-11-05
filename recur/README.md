@@ -305,9 +305,13 @@ middle of the tin; beside it are only the instruments that carry a control.
 - **Shift** lights the trim's markers, and the header's bright row reads
   start, window, gain and end, with the times the markers mark and the gain
   in stock's steps. **gain** scales the waveform's height, twice as tall
-  each 10 steps up, within the slot. While Shift is held, a small hint
-  outside the tin by the tape's right end reads "swap" over "shift +" and
-  the Sample key's icon: Shift + the Sample key loads another sample.
+  each 10 steps up, within the slot. While Shift is held the tin dims to
+  about 30%, under a black cover 70% opaque, the tape, its cuts and markers
+  and the header staying bright, and over it, where Grains' empty state says
+  how to load a sample and in its sizes and greys, the screen reads "swap
+  sample with" and the Sample key's icon: with Shift down, the Sample key
+  loads another sample. The cover is one node, so Shift's edges each change
+  4 nodes besides the markers and the header.
 - In **hiss** the tiles stay home and dim by how much of each is out of
   place, so the print fades away and comes back.
 - With **no sample**, a cover over everything but the header reads
@@ -347,12 +351,13 @@ a frame. The display cannot read
 the tempo, so it times slices at 120 BPM. Reduced motion and reset snap.
 Churn over a scripted run (`tools/screen.cpp`: notes on several settings,
 hiss, then Shift held with the trim stepped through the break's bars)
-averages 5.8 nodes a frame (7.9 while notes play) and peaks at 31, on the
-frame Shift is pressed after a change of grid (the swap hint appears with
-it). The screen uses 396 nodes (SDK 1.8 and later allow 512): one reshaping
+averages 5.8 nodes a frame (7.9 while notes play) and peaks at 32, on the
+frame Shift is pressed after a change of grid (the Shift overlay appears with
+it). The screen uses 397 nodes (SDK 1.8 and later allow 512): one reshaping
 outline of 64 points (the frame round the stretch read), the waveform's
-centre line and 96 columns, the swap hint's 3, and the rest the tin's; 18
-text slots (the header's 16 and the swap hint's two words); and 63.5 KB of
+centre line and 96 columns, the Shift overlay's cover and icon, 4, and the
+rest the tin's; 18 text slots (the header's 16 and the Shift overlay's two
+words); and 63.5 KB of
 artwork.
 
 The tiles are 68 plain squares shared by every print (the 8 grid's 64, the
@@ -428,8 +433,8 @@ face: a value must fit 53 px at 20 px, a title 56 px at 10 px. The tape's
 reshaped outline is held to the same rules as drawn. With Shift held it
 checks the row's titles, times and gain on both pages, every gain from -30
 to +20, a blank cell with no gain known, that the markers stand on the
-trim and light up, and that the swap hint shows in its place and goes,
-alone, when Shift is let go. It checks that the waveform grows with the
+trim and light up, and that the Shift overlay shows in its place and goes,
+alone, when Shift is let go, its edge changing at most 14 nodes. It checks that the waveform grows with the
 gain within the slot and ignores an unknown one; that its columns run
 from each bin's lowest value to its highest, above and below the line;
 that a new gain redraws at most 12 columns a frame; that the cuts stand on the slices the
@@ -449,7 +454,7 @@ release word, and swelling in slower for a larger attack word.
   `tools/make_tables.py`.
 - `display.cpp`, `display.h`, `layout.h`: the screen.
 - `sample_view.h`, with its artwork in `tools/sample_view.py`: the sample's
-  waveform, the trim's markers and the swap hint, shared byte for byte with
+  waveform, the trim's markers and the Shift overlay, shared byte for byte with
   Ghost and Grains (`tools/check_shared.py` at the repository's root checks
   the copies). Change every copy together.
 - `panel.svg.fragment`: the screen's artwork, written with `layout.h` by

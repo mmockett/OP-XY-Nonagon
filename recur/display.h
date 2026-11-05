@@ -6,7 +6,7 @@ namespace recur {
 // Matches resources.display: paths, points, nodes, texts, palette. The puzzle's
 // tiles are fixed outlines that move, as are the tape's waveform's columns;
 // the frame round the stretch read is the one it reshapes. Text slots 16 and
-// 17 are the swap hint's words.
+// 17 are the Shift overlay's words.
 using Frame = opxy::draw::Frame<paths, 64, node_total, 18, 16>;
 
 // A tile sliding from one slot to another; ms since it began, at_rest when it's still.

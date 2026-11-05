@@ -312,7 +312,7 @@ move the stock sampler's start marker, both markers together and its end
 marker, the stretch of the sample they play (for Recur, the loop it slices),
 and Shift + encoder 3 its gain; a waveform along the foot of each screen
 shows the sample as a sampler draws it, with its trim and its gain, and
-while Shift is held a hint there says Shift + the Sample key swaps it. Both screens follow the track's amp envelope, so their
+while Shift is held the rest of the screen dims and says the Sample key swaps the sample. Both screens follow the track's amp envelope, so their
 motion lasts as long as the sound: as on stock, a larger attack or decay is
 longer, but a larger release is shorter.
 

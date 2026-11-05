@@ -64,9 +64,10 @@ most sustained part, or past a silence that would leave the bed gapped.
 | encoder 3 | **gain**: the sample's gain, in stock's steps from -30 to +20; it scales the bed | the waveform under the apron grows and shrinks; `+0`, `-12`, `+20` |
 | encoder 4 | **end**: where the stretch ends | the end's time in the sample |
 
-While Shift is held with a sample loaded, a small hint beside the waveform's
-right end reads "swap" over "shift +" and the Sample key's icon: Shift + the
-Sample key loads another sample in its place. The track saves the markers
+While Shift is held with a sample loaded, the stage dims to about 30% and
+over it the screen reads "swap sample with" and the Sample key's icon: with
+Shift down, the Sample key loads another sample in its place. The header's
+row, the waveform and its markers, what Shift edits, stay bright. The track saves the markers
 and gain, as the sampler does. Without a sample, Shift's times read `-` and
 the gain's cell is blank.
 
@@ -297,9 +298,14 @@ still show), scaled by the sample's gain (twice as tall each 10 steps up,
 within the slot); a stretch too quiet for a column 2 px tall leaves the
 line. Columns within the trim are lit and those outside it dim, between
 the trim's start and end markers, flags like Grains', lit while Shift
-edits them. While Shift is held, "swap", "shift +" and the Sample key's
-icon sit beside the waveform's right end, in the empty hint's greys: Shift +
-the Sample key swaps the sample. The waveform changes only with the sample,
+edits them. While Shift is held the stage dims to about 30%, under a black
+cover 70% opaque drawn over the stage and under the waveform and its
+markers, and over it all, centred where Grains' empty state says how to load
+a sample and in its sizes and greys, "swap sample" over "with" and the
+Sample key's icon: with Shift down, the Sample key swaps the sample. The
+cover is one node, so Shift's press and release each change 4 nodes (the
+cover and the icon's 3) besides the markers and the header. The waveform
+sits centred under the stage (x 90 to 390). It changes only with the sample,
 its trim or its gain, at most 12 columns a frame. The contact sheets' last
 rows show it with Shift held at gain -30, 0 and +20, and the empty hint.
 
@@ -319,9 +325,9 @@ engine uses. Each apparition's place is seeded from the note's serial, so it
 matches the sound in kind, not note for note.
 
 The screen uses 4 reshaping outlines of 64 points (the apparition, its twin,
-its mouth and the chalk path), 126 nodes (8 of them the header bar, 99 the
-sample's waveform and markers, 3 the swap hint's icon), 18 text slots (the
-header's 16 and the swap hint's two words), 46 static outlines (37 of the
+its mouth and the chalk path), 127 nodes (8 of them the header bar, 99 the
+sample's waveform and markers, 4 the Shift overlay's cover and icon), 18 text
+slots (the header's 16 and the Shift overlay's two words), 46 static outlines (37 of the
 stage, 9 of the hint's icon) and 104 bytes of state. Churn over a scripted
 run (`tools/frames.cpp`: every control, a page switch, three notes circling,
 the bed, Shift held with the trim slid and the gain stepped, reduced motion)
@@ -382,6 +388,12 @@ first block clears its lines, a one-off of about 4k stores.
 
 Not yet checked on the device:
 
+- **The Shift overlay's dimming** is a cover authored with `fill-opacity`,
+  which the SDK's artwork rules and the browser accept but no machine has
+  yet shown on the OP-XY. Should the OP-XY draw it opaque, the stage hides
+  rather than dims while Shift is held; the waveform, its markers, the
+  header and the overlay's words still show.
+
 - **Anything that narrows the stereo image weakens the effect,** though it
   never breaks the sound, since mono is a full note: a track filter or
   envelope that does not act alike on both channels, pan, the mixer, the
@@ -401,7 +413,7 @@ Not yet checked on the device:
   `tools/gen_tables.py`.
 - `display.cpp`, `display.h`, `captions.h`, `figure.h`: the screen.
 - `sample_view.h`, with its artwork in `tools/sample_view.py`: the sample's
-  waveform, the trim's markers and the swap hint, shared byte for byte with
+  waveform, the trim's markers and the Shift overlay, shared byte for byte with
   Recur and Grains (`tools/check_shared.py` at the repository's root checks
   the copies). Change every copy together.
 - `panel.svg.fragment`: the screen's artwork, written with `figure.h` (the
@@ -453,8 +465,9 @@ the top of its file.
   back. It also checks that a trim changes the fray and that Shift's row reads
   start, window, gain and end with their times and steps on both pages; that
   the trim's markers stand on the trim and light up, the columns within it
-  lit; that the swap hint shows in its place while Shift is held and goes,
-  alone, when it is let go; that the columns grow with the gain, within the
+  lit; that the Shift overlay (its cover, words and icon) shows in its place
+  while Shift is held and goes, alone, when it is let go, Shift's edge
+  changing at most 14 nodes; that the columns grow with the gain, within the
   slot; that they run from each bin's lowest value to its highest, above and
   below the centre line, and a new gain redraws at most 12 a frame; that an
   unknown gain (`gain_unavailable`) leaves its cell blank; that with no

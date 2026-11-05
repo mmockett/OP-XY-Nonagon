@@ -23,7 +23,7 @@ LINE = "#9a9a9a"   # the default stroke
 
 
 # The sample's view (sample_view.h's artwork), shared with the other sample engines.
-from sample_view import COLUMNS as SAMPLE_COLUMNS, HINT_NODES as SAMPLE_HINT_NODES, artwork as sample_view_artwork, hint as sample_view_hint
+from sample_view import artwork as sample_view_artwork, shift_cover, shift_overlay
 
 
 
@@ -371,13 +371,15 @@ dynamic += [f'<path id="{ID}_node_{n}" d="{small}" fill="#000000" stroke="#55555
 # bin each (25..120), placed and sized by display.cpp; the trim's start and
 # end markers (121, 122), each a bar with a flag at its top pointing into
 # the trim, as Grains marks them, starting at the flag's corner where both
-# its edges are long; and, beside the slot's right end, the hint that Shift
-# and the Sample key swap the sample (nodes 123..125, text slots 16 and 17).
-STRIP_X0, STRIP_X1, STRIP_Y = 66, 358, 209
+# its edges are long. Under them, over everything else, the cover that dims
+# the stage while Shift is held (node 126); over it all, what it says, how to
+# swap the sample (nodes 123..125, text slots 16 and 17).
+STRIP_X0, STRIP_X1, STRIP_Y = 90, 390, 209
+dynamic.append(shift_cover(ID, 126))
 dynamic += sample_view_artwork(ID, 24, STRIP_X1 - STRIP_X0, 8, [
     (121, [(-0.6, -9), (4, -9), (0.6, -5.6), (0.6, 9), (-0.6, 9)]),
     (122, [(0.6, -9), (0.6, 9), (-0.6, 9), (-0.6, -5.6), (-4, -9)])])
-dynamic += sample_view_hint(ID, 123, 16)
+dynamic += shift_overlay(ID, 123, 16)
 
 palette = []
 for i in range(16):
