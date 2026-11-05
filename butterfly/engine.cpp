@@ -21,13 +21,19 @@ const i32 halfband[halfband_taps] = {20556, -6082, 2851, -1374, 597, -205, 38};
 // The bank's and the half-band's sample loops, functions of their own so the
 // Blackfin compiler makes each a zero-overhead hardware loop (inlined into
 // render's partial loop, the bank branched every sample).
+// Each sample reads the sine the sample before addressed, so the Blackfin
+// moves the index to an address register well ahead of its load.
 __attribute__((noinline)) u32 bank(i32* acc, u32 ph, u32 step_phase, i32 g, i32 slide) {
+    ph += step_phase;
+    const opxy::i16* at = tables::sine + (ph >> (32 - tables::sine_bits));
     for (u32 i = 0; i < half_frames; ++i) {
+        const i32 s = *at;
         ph += step_phase;
-        acc[i] += tables::sine[ph >> (32 - tables::sine_bits)] * static_cast<opxy::i16>(static_cast<u32>(g) >> 10);
+        at = tables::sine + (ph >> (32 - tables::sine_bits));
+        acc[i] += s * static_cast<opxy::i16>(static_cast<u32>(g) >> 10);
         g += slide;
     }
-    return ph;
+    return ph - step_phase;   // the phase after the block's last sample
 }
 inline i32 tap(const i32* x, i32 t) {
     const i32 pair = (x[-t] >> 1) + (x[t + 1] >> 1);   // Q29
