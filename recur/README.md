@@ -50,9 +50,8 @@ Sample key's icon.
 
 **Status: experimental.** Recur passes the SDK's tests and plays on an
 OP-XY (OS 1.2.1), with its break, the trim as the loop, fit, Shift's markers
-and gain, and the screen following the amp envelope. Its CPU for this
-version is still to be captured on the device; the figure below is from
-v0.7.0.
+and gain, and the screen following the amp envelope. Its CPU is measured there
+(below).
 
 ## The break
 
@@ -376,12 +375,11 @@ contact sheets come from `tools/screen.cpp` on the host.
 
 ## CPU
 
-Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, as one capture, at
-`v0.7.0`: Recur's sample callback at its default settings, playing the SDK's
-generated two-second test sample, costs **1.16%** of the 580,352-cycle audio
-block. This test plays one setting; heavier settings cost more. Since then the
-engine slices the whole trim and fit scales each reader's rate, so this
-version's capture is still to come.
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`
+(`opxy-sample-callback-v1`), in three runs at `v0.8.0`: Recur's sample callback
+at its default settings, playing the SDK's generated two-second test sample,
+costs **1.23%** of the 580,352-cycle audio block (1.224–1.234% across the
+runs). This test plays one setting; heavier settings cost more.
 
 The figures below are host estimates made during development.
 

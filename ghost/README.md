@@ -38,8 +38,7 @@ Ghost's own.
 
 **Status: experimental.** Ghost passes the SDK's tests and plays on an
 OP-XY (OS 1.2.1), with Shift's markers and gain, the sample's strip and the
-screen following the amp envelope. Its CPU was measured on the device at
-v0.7.0 (below); this version's capture is still to come.
+screen following the amp envelope. Its CPU is measured there (below).
 
 ## Controls
 
@@ -346,11 +345,11 @@ and contact sheets come from `tools/frames.cpp` on the host.
 
 ## CPU
 
-Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, as one capture, at
-`v0.7.0`: Ghost's sample callback at its default settings, playing the SDK's
-generated two-second test sample, costs **3.07%** of the 580,352-cycle audio
-block. This test plays one setting; heavier settings cost more. Ghost's sound
-code hasn't changed since; the screen has.
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`
+(`opxy-sample-callback-v1`), in three runs at `v0.8.0`: Ghost's sample callback
+at its default settings, playing the SDK's generated two-second test sample,
+costs **3.03%** of the 580,352-cycle audio block. This test plays one setting;
+heavier settings cost more.
 
 The figures below are host estimates made during development.
 

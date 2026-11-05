@@ -21,8 +21,7 @@ than nine sounds you won't have heard from a synth before.
 OP-XY, their screens are checked against how it draws, and their CPU is
 measured on it (below). v0.8.0's Ghost and Recur, with Shift on the sampler's
 markers and gain, Recur's own break and its trim as the loop, have been played
-on the OP-XY; their CPU capture for this version is still to come. Expect
-rough edges.
+and measured on the OP-XY. Expect rough edges.
 
 All nine are live in the [open-xy.com](https://open-xy.com) builder:
 [Sand](https://open-xy.com/#preview/machines/sand),
@@ -36,8 +35,12 @@ All nine are live in the [open-xy.com](https://open-xy.com) builder:
 [Drop](https://open-xy.com/#preview/machines/drop). The builder installs the
 version the Open-XY catalog pins for each, which can be older than this
 repository's latest tag (`v0.8.0`): Sand `v0.5.0`; Cocoa, Coin, Fermi,
-Butterfly and Drop `v0.6.0`; Ghost and Recur `v0.7.0`; Mach `v0.7.2`. Until
-the catalog pins v0.8.0, build Ghost and Recur from source (below).
+Butterfly and Drop `v0.6.0`; Ghost and Recur `v0.7.0`; Mach `v0.7.2`. Ghost's
+and Recur's entries are moving to v0.8.0
+([etcetc000/open-xy#419](https://github.com/etcetc000/open-xy/pull/419)); until
+then, build them from source (below). The builder plays Recur's presets with
+no sample loaded, as it doesn't install a machine's own samples; a build from
+source opens them on its break.
 
 ## The machines
 
@@ -319,7 +322,7 @@ longer, but a larger release is shorter.
 ## CPU
 
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`: Mach from
-one capture at `v0.4.0`, Sand from one at `v0.5.0`, Cocoa, Coin, Fermi, Butterfly and Drop from one at `v0.6.0`, and Ghost and Recur from one at `v0.7.0` (v0.8.0's capture is still to come). For a synth, one voice plays middle C with the first
+one capture at `v0.4.0`, Sand from one at `v0.5.0`, Cocoa, Coin, Fermi, Butterfly and Drop from one at `v0.6.0`, and Ghost and Recur from three at `v0.8.0` (their median). For a synth, one voice plays middle C with the first
 four controls at their midpoint; for a sample engine, its sample callback
 plays the SDK's generated two-second test sample at its default settings. Each
 figure is a share of the OP-XY's 580,352-cycle audio block.
@@ -333,8 +336,8 @@ figure is a share of the OP-XY's 580,352-cycle audio block.
 | Mach | 3.8% | ~30% |
 | Butterfly | 5.0% | ~40% |
 | Drop | 2.7% | ~22% |
-| Ghost (sample callback) | 3.1% | n/a |
-| Recur (sample callback) | 1.2% | n/a |
+| Ghost (sample callback) | 3.03% | n/a |
+| Recur (sample callback) | 1.23% | n/a |
 
 The OP-XY's own engines measure 1.6–2.7% a voice in the same test, and
 Hexagon's synths 2.4–4.1%. A full chord on one track is fine; several tracks
@@ -350,14 +353,12 @@ The seven synths need SDK 1.4 (the two-page header), on the `staging` branch
 of [etcetc000/open-xy](https://github.com/etcetc000/open-xy). Ghost and Recur
 are sample engines with their own screens, Shift on the stock sampler's
 markers and gain, and screens that follow the amp envelope, which need SDK
-1.10, also on `staging`. Recur's own sample needs one more SDK change, still
-in review: `samples`, which lets a sample engine ship samples its presets
-load. Until it merges, build all nine from the branch that adds it, `staging`
-with that change on top, checked out beside this repository as `../open-xy`
-(one firmware comes from one SDK checkout):
+1.10, also on `staging`, as is `samples`, which lets Recur ship its own break.
+Build all nine from `staging`, checked out beside this repository as
+`../open-xy` (one firmware comes from one SDK checkout):
 
 ```sh
-git clone -b sdk/machine-samples-v2 https://github.com/mmockett/open-xy ../open-xy
+git clone -b staging https://github.com/etcetc000/open-xy ../open-xy
 python ../open-xy/sdk.py toolchain fetch
 python ../open-xy/sdk.py test --machine sand --machine cocoa --machine coin --machine fermi --machine mach --machine butterfly --machine drop --machine ghost --machine recur
 python ../open-xy/sdk.py build --machine sand --machine cocoa --machine coin --machine fermi --machine mach --machine butterfly --machine drop --machine ghost --machine recur \
