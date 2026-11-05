@@ -1,5 +1,6 @@
 #pragma once
 #include <opxy/page_header.hpp>
+#include "amp.h"
 #include "spin.h"
 
 namespace coin {
@@ -46,6 +47,7 @@ struct ScreenDisk {
 struct DisplayState {
     opxy::draw::PageHeader header;
     opxy::draw::NoteTracker notes;
+    nonagon_amp::Follower amp;  // the track's amp envelope, as the screen follows it (amp.h)
     u32 initialized, track, serial;
     ScreenDisk disk[spin::most];
     u32 count;        // the latest note's disks

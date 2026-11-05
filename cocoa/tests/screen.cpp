@@ -12,7 +12,8 @@
 //     a sliver, and an outline with no area or turning straight back on
 //     itself draws streaks; and that a reshaping outline is never turned or
 //     scaled other than by 2, as the device draws one only so. Over every
-//     control at five settings, each through a note;
+//     control at five settings, each through a note, and again under a long
+//     amp envelope through its slow attack and release;
 //   - checks every header caption fits its column in the OP-XY's font: each
 //     control swept across its range (fizz with fill, whose caption follows
 //     both), and every title.
@@ -186,6 +187,8 @@ struct Run {
         std::memset(&state, 0, sizeof state);
         std::memset(&frame, 0, sizeof frame);
         std::memset(&in, 0, sizeof in);
+        // The envelope unknown, as before SDK 1.10 (tests/envelope.cpp follows one).
+        in.amp.attack = in.amp.decay = in.amp.sustain = in.amp.release = opxy::draw::envelope_unavailable;
         const double standard[8] = {0.87, 0.55, 0.2, 0.1667, 0.65, 0.6, 0.3, 1.0};   // the long climb, tapping
         for (int k = 0; k < 8; ++k) c[k] = standard[k];
         for (int k = 0; k < 4; ++k) in.shown[k] = static_cast<opxy::u8>(k);
@@ -287,19 +290,28 @@ int main(int argc, char** argv) {
     captions_fit();
     // Every control at five settings, the others at the default, through a
     // note's first second and a half: every outline as the device draws it.
+    // Then again under a long amp envelope (a 1.25 s attack, a 3.4 s
+    // release), the note let go after a second: the motion at low levels.
     {
         const double defaults[8] = {0.32, 0.0, 0.7, 0.1667, 0.65, 0.6, 0.15, 0.6};
         unsigned frames = 0;
+        for (int e = 0; e < 2; ++e)
         for (int k = 0; k < 8; ++k)
             for (int v = 0; v <= 4; ++v) {
                 Run r;
                 for (int q = 0; q < 8; ++q) r.c[q] = defaults[q];
                 r.c[k] = v / 4.0;
+                if (e) {
+                    r.in.amp.attack = r.in.amp.decay = 1073741823;   // 0.5
+                    r.in.amp.sustain = 1610612735;                    // 0.75
+                    r.in.amp.release = 1503238553;                    // 0.7
+                }
                 char when[64];
-                for (int f = 0; f < 100; ++f) {
+                for (int f = 0; f < (e ? 300 : 100); ++f) {
                     if (f == 10) { r.in.note_serial = 1; r.in.held_notes = 1; }
+                    if (e && f == 70) { r.in.held_notes = 0; r.in.note_off_serial = 1; }
                     r.tick();
-                    std::snprintf(when, sizeof when, "control %d at %d%%, frame %d", k, v * 25, f);
+                    std::snprintf(when, sizeof when, "control %d at %d%%, %s, frame %d", k, v * 25, e ? "long envelope" : "no envelope", f);
                     device_check(r.frame, when);
                     ++frames;
                 }

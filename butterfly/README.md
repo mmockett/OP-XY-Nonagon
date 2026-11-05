@@ -32,7 +32,9 @@ the bright partials trade places.
 
 **Status: experimental.** Butterfly passes the SDK's tests. It runs on an
 OP-XY, and its CPU is measured there
-(below).
+(below). Its screen now follows the track's amp envelope, which needs
+version 1.10 of the Open-XY SDK: this version can't ship until SDK 1.10 is
+released.
 
 ## Controls
 
@@ -289,6 +291,18 @@ sweep, the tails and the lit band's grey ease to the controls in about
 held light at once, with no flick or breathing. A reset solves nothing: the
 first frame reads the tables.
 
+Where the OP-XY tells the screen the track's amp envelope (SDK 1.10), the
+wings show what is heard. The voice rings and beats until the envelope ends
+it, and so does the screen: the lit band's light, the wingbeat's breathing
+and drift and the antennae's flick are scaled by the envelope, swelling with
+its attack, holding at its sustain while keys are held and fading over its
+release. A short release stills the wings at once; a long one keeps them
+beating, more and more gently, until the sound ends. A pluck's light still
+dies with its ring. Without the envelope (an older OS, the builder's
+preview) the screen keeps its own timing: the wings beat while keys are
+held, and the light fades in about 0.2 s after. The shared `amp.h` follows
+the envelope; its note gives stock's envelope times and shapes.
+
 ### Redrawing little
 
 - **The wings are solved at most eight times a second**, and only when what
@@ -341,7 +355,7 @@ The figures below are host estimates made during development.
 
 ## Tests
 
-`sdk.py test` runs five host tests, and `--firmware` compiles Butterfly for
+`sdk.py test` runs six host tests, and `--firmware` compiles Butterfly for
 the Blackfin. The sound, screen and outline tests are clean under UBSan, and
 the screen and outline tests under ASan too.
 
@@ -377,8 +391,17 @@ the screen and outline tests under ASan too.
   closing edge of at least a quarter. It runs every reshaping outline on
   every frame of a note's animation, at each control alone in twentieths,
   every control at 0, 1/2 and 1 together, each preset, and the settings of a
-  device photo that showed a root's spike. It also runs every static outline
-  of the artwork at the scale its node is drawn at: 6,738 settings.
+  device photo that showed a root's spike, and each control alone and each
+  preset again under a slow amp envelope, through its attack and release.
+  It also runs every static outline of the artwork at the scale its node is
+  drawn at: 6,738 settings.
+- **`tests/envelope.cpp`:** the screen under the amp envelope. With it
+  unknown, every frame is as before the screen read it. A short envelope's
+  motion ends within 0.4 s of the note-off and a long one's lasts 3.6 s; a
+  slow attack lights the band less at first; a long release keeps the wings
+  breathing and a pad lit a second on, where a short one has gone still and
+  dark. Churn under a held note and its release stays under 4 nodes a frame
+  on average, 7 at most, and none at rest.
 - **`tests/captions.cpp`:** every caption each control can show, over 2^16
   steps of its travel, and every title, measured by advance widths in the
   OP-XY's font (Univers Next Pro Light, at the header's 20 and 10 px): each
@@ -396,8 +419,10 @@ the screen and outline tests under ASan too.
 | `core.h`, `engine.cpp` | The voice: the half-rate bank behind its gate, and the half-band |
 | `tables.h`, `tables_data.h` | The tables' declarations, and their one definition (from `tools/make_tables.py`) |
 | `display.h`, `display.cpp` | The screen |
+| `amp.h` | The amp envelope as the screen follows it, a copy of the suite's `tools/amp.h` |
+| `amp_curve.h` | Stock's amp envelope times and shapes, which `amp.h` follows, a copy of the suite's `tools/amp_curve.h` |
 | `panel.svg.fragment`, `plate.h` | Artwork and the wing's geometry, from `tools/make_panel.py` |
-| `tests/sound.cpp`, `tests/screen.cpp`, `tests/outlines.cpp`, `tests/captions.cpp`, `tests/scenes.cpp` | The checks above |
+| `tests/sound.cpp`, `tests/screen.cpp`, `tests/outlines.cpp`, `tests/captions.cpp`, `tests/envelope.cpp`, `tests/scenes.cpp` | The checks above |
 | `tests/presets.h` | The presets for the tests, from `tools/make_presets.py` |
 | `tools/make_gif.py`, `tools/make_controls.py`, `tools/render.py`, `tools/frame2svg.py` | `docs/butterfly.gif`, `docs/controls-1x.png`, `docs/controls.png` and single frames, from the real display code |
 

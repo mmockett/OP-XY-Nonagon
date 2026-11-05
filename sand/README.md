@@ -24,7 +24,9 @@ in 1680; Chladni made the figures a method and published them.
 
 **Status: experimental.** Sand passes the SDK's tests and runs on an
 OP-XY, where its CPU is
-measured (below).
+measured (below). Its screen now follows the track's amp envelope, which
+needs version 1.10 of the Open-XY SDK: this version can't ship until SDK 1.10
+is released.
 
 ## Controls
 
@@ -216,6 +218,15 @@ same functions (`sand.h`), with the bowed mode swelling at the bow's pace
 while notes are held and a strike ringing down. Its grains are not the
 sound's grains, but they move as they do.
 
+Where the OP-XY tells the screen the track's amp envelope (SDK 1.10), the
+plate is bowed for as long as the sound lasts, and the sand is thrown by
+what is heard: the swing scaled by the envelope, swelling with its attack,
+holding at its sustain while keys are held and fading over its release. A
+short release lets the sand settle at once; a long one keeps it dancing and
+the bow drawing until the sound ends. Without the envelope (an older OS, the
+builder's preview) the screen keeps its own timing. The shared `amp.h`
+follows the envelope; its note gives stock's envelope times and shapes.
+
 A settled plate redraws nothing. Only part of the sand is redrawn each
 frame, moving grains every third frame and settled ones every sixth, so
 the sand follows a tipping plate within a fifth of a second and never
@@ -249,6 +260,15 @@ the plate.
   that a legato note keeps the settled sand and a struck one throws it, that
   settle, shake and sand do what they say, the pitch, level and headroom
   above, and that every corner of the controls stays bounded.
+- `amp.h`: the amp envelope as the screen follows it, a copy of the
+  suite's `tools/amp.h`.
+- `amp_curve.h`: stock's amp envelope times and shapes, which `amp.h`
+  follows, a copy of the suite's `tools/amp_curve.h`.
+- `tests/envelope.cpp`: the screen under the amp envelope, run by
+  `sdk.py test`: unchanged frames with the envelope unknown, a short
+  envelope's motion ending soon after the note-off and a long one's lasting
+  through its release, a slow attack moving less at first, and churn under
+  a held note and its release.
 - `tests/screen.cpp`: the screen checks, also run by `sdk.py test`: the
   screen over every figure, each control at five settings and a note's
   animation, failing on any shown outline the OP-XY would draw as a streak

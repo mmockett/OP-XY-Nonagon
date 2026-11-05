@@ -1,5 +1,6 @@
 #pragma once
 #include <opxy/page_header.hpp>
+#include "amp.h"
 #include "drink.h"
 
 namespace cocoa {
@@ -36,6 +37,7 @@ const i32 water_step = 6;                         // px between the drink's line
 struct DisplayState {
     opxy::draw::PageHeader header;
     opxy::draw::NoteTracker notes;
+    nonagon_amp::Follower amp;   // the track's amp envelope, as the screen follows it (amp.h)
     u32 initialized, track, serial;
     i32 d[drink::classes], s[drink::classes];   // the drink, as the voices keep it (drink.h)
     i32 s0[drink::classes];                    // where each class's bubbles began at the last stir

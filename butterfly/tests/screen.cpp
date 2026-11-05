@@ -87,6 +87,8 @@ Result run(const char* scenario, double fps, int every, bool quiet) {
     static Frame frame, last;
     display_reset(state);
     opxy::draw::Input input = {};
+    // The envelope unknown, as before SDK 1.10 (tests/envelope.cpp follows one).
+    input.amp.attack = input.amp.decay = input.amp.sustain = input.amp.release = opxy::draw::envelope_unavailable;
     input.track = 1;
     input.reduced_motion = still ? 1 : 0;
     for (unsigned i = 0; i < 4; ++i) input.shown[i] = static_cast<opxy::u8>(i);
@@ -161,6 +163,7 @@ void controls_sheet() {
             controls[c] = v / 4.0;
             display_reset(state);
             opxy::draw::Input input = {};
+            input.amp.attack = input.amp.decay = input.amp.sustain = input.amp.release = opxy::draw::envelope_unavailable;
             input.track = 1;
             for (unsigned i = 0; i < 4; ++i) input.shown[i] = static_cast<opxy::u8>(i);
             const int frames = static_cast<int>(length * fps);

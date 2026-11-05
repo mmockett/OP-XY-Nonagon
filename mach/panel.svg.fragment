@@ -81,6 +81,8 @@
 <path id="mach_node_40" transform="matrix(1 0 0 1 640 320)" d="M-0.8,-4.5 L0.8,-4.5 L0.8,4.5 L-0.8,4.5 Z" fill="none" stroke="#6e6e6e" stroke-width="0.5"/>
 <path id="mach_node_41" transform="matrix(1 0 0 1 640 320)" d="M-0.8,-4.5 L0.8,-4.5 L0.8,4.5 L-0.8,4.5 Z" fill="none" stroke="#6e6e6e" stroke-width="0.5"/>
 <path id="mach_node_42" transform="matrix(1 0 0 1 640 320)" d="M-0.8,-4.5 L0.8,-4.5 L0.8,4.5 L-0.8,4.5 Z" fill="none" stroke="#6e6e6e" stroke-width="0.5"/>
+<path d="M466.8,40 L480,40 L480,220 L466.8,220 Z" fill="#000000" stroke="#000000" stroke-width="0.3"/>
+<path d="M466.8,44 L468,44 L468,216 L466.8,216 Z" fill="#6e6e6e" stroke="#6e6e6e" stroke-width="0.3"/>
 <circle id="mach_palette_0" cx="640" cy="0" r="1" fill="#000000" stroke="#000000" stroke-width="0.5"/>
 <circle id="mach_palette_1" cx="640" cy="0" r="1" fill="#0d0d0d" stroke="#0d0d0d" stroke-width="0.5"/>
 <circle id="mach_palette_2" cx="640" cy="0" r="1" fill="#141414" stroke="#141414" stroke-width="0.5"/>

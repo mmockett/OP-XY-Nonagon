@@ -19,6 +19,14 @@
 // band and stands the antennae up, short and folded back at none, long and
 // upright at full, and a strike flicks them.
 //
+// Where the OP-XY tells the screen its amp envelope (SDK 1.10, amp.h), the
+// wings beat and the lit band rings for as long as the sound lasts, as the
+// voice does until the envelope ends it, and what is seen is what is heard:
+// the light, the wingbeat's depth and the antennae's flick scaled by the
+// envelope, swelling with its attack, holding at its sustain and fading over
+// its release. Without it, the screen keeps its own timing: the wings beat
+// while keys are held, and let go, the light fades in about 0.2 s.
+//
 // Three weights: the margin, white and 2 px; the lit band, 1 to 1.6 px; the
 // veins, rings and antennae a step down (the palette's brighter greys draw
 // heavier lines).
@@ -407,6 +415,7 @@ inline void place_wing(Frame& frame, DisplayState& state, u32 side, i32 scale, i
 inline void display_reset(DisplayState& state) {
     state.header.reset();
     state.notes.reset();
+    nonagon_amp::reset(state.amp);
     state.initialized = 0;
 }
 
@@ -436,22 +445,30 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         state.turn = 0;
     }
 
+    // The amp envelope, where it is known: the voice beats and rings until
+    // the envelope ends the sound, heard at the envelope's level (Q15; all of
+    // it without one). Without it, the voice is taken to sound while held.
+    const bool started = input.note_serial != state.serial;
+    const bool follows = nonagon_amp::follow(state.amp, input, started);
+    const i32 heard = follows ? nonagon_amp::level(state.amp) : 32768;
+    const bool sounds = follows ? nonagon_amp::sounding(state.amp) && heard > 0 : held;
+
     // A new note: the strike.
-    if (input.note_serial != state.serial) {
+    if (started) {
         state.serial = input.note_serial;
         state.gate = 0;
         state.blocks = 0;
         state.beat = state.beat_site = 0;
         state.flick = still ? flick_time : 0;
     }
-    // The latest strike's gate and wingbeat, a block at a time, while held;
-    // let go, the light fades in about 0.2 s, as the amp envelope takes it.
+    // The latest strike's gate and wingbeat, a block at a time, while it
+    // sounds; let go without the envelope, the light fades in about 0.2 s.
     // The strike as the gate takes it, and the knob as the picture does, so
     // the antennae and the lit band move evenly over its travel.
     const i32 struck = strike(p[STRIKE]), knob = q15(p[STRIKE]), glow = glow_log2(p[GLOW]);
     const u32 rate = wingbeat_rate(p[WINGBEAT]);
     for (i32 t = dt * 64; t > 0; t -= block_q16) {
-        if (held || state.blocks < pulse_blocks) {
+        if (sounds || state.blocks < pulse_blocks) {
             state.gate = gate_step(state.gate, state.blocks, struck, glow);
             if (state.blocks < 0xffffu) ++state.blocks;
             if (!still) {
@@ -462,18 +479,25 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             state.gate -= state.gate >> 6;
         }
     }
-    if (still && held) state.gate = held_level(0, struck, glow);   // reduced motion: the held light at once
+    if (still && sounds) state.gate = held_level(0, struck, glow);   // reduced motion: the held light at once
 
     // The chain the wings show: as the engine's, easing to the controls in about 0.15 s.
-    const u32 beat = held ? state.beat : 0, beat_site = held ? state.beat_site : 0;
-    const u32 alpha = warp(flux(p[FLUX]), snap_pull) + static_cast<u32>(wingbeat_flux(p[WINGBEAT], beat));
+    // The wingbeat's depth follows the envelope, where it is known.
+    const u32 beat = sounds ? state.beat : 0, beat_site = sounds ? state.beat_site : 0;
+    i32 beat_flux = wingbeat_flux(p[WINGBEAT], beat), beat_at = wingbeat_site(p[WINGBEAT], beat_site);
+    if (follows) {
+        beat_flux = (beat_flux >> 15) * heard;
+        beat_at = (beat_at * (heard >> 5)) >> 10;
+    }
+    const u32 alpha = warp(flux(p[FLUX]), snap_pull) + static_cast<u32>(beat_flux);
     const i32 lambda = coupling(p[COUPLING]);
-    const i32 at = clamp(site(p[SITE]) + wingbeat_site(p[WINGBEAT], beat_site), 0, 8 << 16);
+    const i32 at = clamp(site(p[SITE]) + beat_at, 0, 8 << 16);
     // The wings' scale: spread's wingspan, 0.1 an octave of span, 0.94 of
     // Moth's at 24 semitones (0.64 at 3, 1.04 at 48, clear of the header),
     // breathing in by up to 28% with the wingbeat.
     const i32 span = clamp(30802 + (((spread_log2(p[SPREAD]) - 65536) * 3277) >> 16), 0, 34079);
-    const i32 breath = (((q15(p[WINGBEAT]) * 9175) >> 15) * ((32768 - cosine(beat)) >> 1)) >> 15;   // 0.28 x amount x (1 - cos) / 2
+    i32 breath = (((q15(p[WINGBEAT]) * 9175) >> 15) * ((32768 - cosine(beat)) >> 1)) >> 15;   // 0.28 x amount x (1 - cos) / 2
+    if (follows) breath = (breath * heard) >> 15;
     const i32 scale = (span * (32768 - breath)) >> 15;
     // Tilt's sweep, glow's tail, strike's lit band.
     const i32 sweep = (((tilt(p[TILT]) >> 4) * sweep_per_tilt) + 2048) >> 12;
@@ -533,8 +557,10 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         }
     }
 
-    // The light: the gate's, in sixteen steps, on the lit band and the eyespots.
-    const i32 light = state.gate >> 15;   // Q15
+    // The light: the gate's, heard through the envelope, in sixteen steps,
+    // on the lit band and the eyespots.
+    i32 light = state.gate >> 15;   // Q15
+    if (follows) light = (light * heard) >> 15;
     const u32 step = static_cast<u32>(light >> 11);
     if (step != state.drawn_light) {
         state.drawn_light = step;
@@ -562,7 +588,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     // long at full (13 degrees in, 1.05), turned and drawn out from their
     // bases; a strike flicks them out and back within 0.2 s.
     if (state.flick < flick_time) state.flick += dt;
-    const i32 flicked = state.flick < flick_time / 2 ? 40 : state.flick < flick_time ? 20 : 0;   // tenths of a degree
+    i32 flicked = state.flick < flick_time / 2 ? 40 : state.flick < flick_time ? 20 : 0;   // tenths of a degree
+    if (follows) flicked = (flicked * nonagon_amp::level_steps(state.amp, 4)) >> 2;   // as loud as the strike is heard
     const i32 out = 350 - ((knob * 480) >> 15) + ((flicked * knob) >> 15);
     const i32 length = 717 + ((knob * 358) >> 15);   // Q10
     for (u32 side = 0; side < 2; ++side) {

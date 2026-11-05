@@ -71,6 +71,8 @@ int main(int argc, char** argv) {
         std::memset(&frame, 0, sizeof frame);
         drop::display_reset(state);
         opxy::draw::Input input = {};
+        // The envelope unknown, as before SDK 1.10 (tests/envelope.cpp follows one).
+        input.amp.attack = input.amp.decay = input.amp.sustain = input.amp.release = opxy::draw::envelope_unavailable;
         input.track = 1;
         input.elapsed = 17;
         for (unsigned i = 0; i < 4; ++i) input.shown[i] = static_cast<opxy::u8>(i);
@@ -157,6 +159,10 @@ static Churn run(const char* scenario, double fps, const std::vector<double>& sn
     drop::initialize(voice, shared, 1);
     bool voice_on = false, matched = true;
     opxy::draw::Input input = {};
+    // The amp envelope unknown, as the builder's preview has it: the screen's
+    // own timing, for these checks and the docs' frames (tools/amp_sheet.py
+    // draws it under an envelope).
+    input.amp.attack = input.amp.decay = input.amp.sustain = input.amp.release = opxy::draw::envelope_unavailable;
     input.track = 1;
     for (unsigned i = 0; i < 4; ++i) input.shown[i] = static_cast<opxy::u8>(i);
     const int frames = static_cast<int>(length * fps);

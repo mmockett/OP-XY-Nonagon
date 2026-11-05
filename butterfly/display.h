@@ -1,5 +1,6 @@
 #pragma once
 #include <opxy/page_header.hpp>
+#include "amp.h"
 #include "harper.h"
 #include "plate.h"
 
@@ -13,6 +14,7 @@ using Frame = opxy::draw::Frame<4, 64, plate::nodes, 16, 16>;
 struct DisplayState {
     opxy::draw::PageHeader header;
     opxy::draw::NoteTracker notes;
+    nonagon_amp::Follower amp;  // the track's amp envelope, as the screen follows it (amp.h)
     u32 initialized, track, serial;
     u32 eased_alpha;          // the flux as drawn, easing to the controls' (Q32 turns)
     i32 eased_lambda, eased_site;   // Q12, Q16
