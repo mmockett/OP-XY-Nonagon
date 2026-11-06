@@ -273,11 +273,12 @@ inline void nudge(i32* r, const Setup& s) {
         if (k == s.m) continue;
         const i32 a = ((static_cast<i32>(scramble(s.seed * 0x9e3779b1u + k) >> 17) - 16384) * inverse_k[k - 1]) >> 15;   // Q14
         const i16* row = &tables::shape[tables::shape_at[s.size] + (k - 1) * half];
-        // The near half from the row, the far half mirrored (negated for even
-        // modes): two plain loops rather than a test each mass.
-        for (u32 j = 1; j <= half; ++j) r[j] += (row[j - 1] * a) >> 15;
-        const i32 b = (k & 1) ? a : -a;
-        for (u32 j = half + 1; j <= s.n; ++j) r[j] += (row[s.n - j] * b) >> 15;
+        for (u32 j = 1; j <= s.n; ++j) {
+            const bool far = j > half;
+            i32 sv = row[(far ? s.n + 1 - j : j) - 1];
+            if (far && !(k & 1)) sv = -sv;
+            r[j] += (sv * a) >> 15;
+        }
     }
 }
 // The nudge's share of the note's energy, Q16: 0.66 x (1.5 - x / 2) for x
@@ -294,9 +295,12 @@ inline void shape(i32* x, const Setup& s) {
     const i16* row = &tables::shape[tables::shape_at[s.size] + (s.m - 1) * half];
     const i32 f = static_cast<i32>(tables::start[s.size * 4 + s.m - 1]);
     x[0] = x[s.n + 1] = 0;
-    for (u32 j = 1; j <= half; ++j) x[j] = (row[j - 1] * f) >> 6;   // Q15 x Q11 = Q26, to Q20
-    const i32 g = (s.m & 1) ? f : -f;                                  // the far half mirrored, negated for even modes
-    for (u32 j = half + 1; j <= s.n; ++j) x[j] = (row[s.n - j] * g) >> 6;
+    for (u32 j = 1; j <= s.n; ++j) {
+        const bool far = j > half;
+        i32 sv = row[(far ? s.n + 1 - j : j) - 1];
+        if (far && !(s.m & 1)) sv = -sv;
+        x[j] = (sv * f) >> 6;   // Q15 x Q11 = Q26, to Q20
+    }
     if (!s.seed) return;
     i32 r[most + 2];
     nudge(r, s);
