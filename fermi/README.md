@@ -225,8 +225,11 @@ eases back to its drawn rest. Motion eases out in 0.15 s, and
 reduced motion snaps. A bob moves with both its coils, three nodes at a time,
 so the chain never tears, however the budget falls. The idle screen is still.
 
-**Churn** (host, the GIF's 31 s scene): a mean of 8.9 nodes a frame at
-60 fps and 10.4 at 30 fps, peaking at 20 at a note-on or a change of masses.
+**Churn** (host, `tests/envelope.cpp`, a note held 3 s and released): a mean
+of 5.9 to 6.5 nodes a frame at the defaults and 14.0 to 14.2 at the heaviest
+settings, peaking at 19. `tests/screen.cpp` holds the GIF's 31 s scene, a
+change of masses included (it moves the stands, the plank's halves, the
+pendulum and the damper), to a mean of 20 and a peak of 30.
 The swinging pendulum is 2 of those a frame. Idle: 0. The artwork is 118
 nodes and no static paths, and is 39 KB (the preview's limit is 64 KiB).
 
@@ -420,9 +423,9 @@ captions.
 - a short envelope (instant attack, a release of about 40 ms) stops the
   chain 0.05 s after the note-off, and a long one (a 1.25 s attack, a 3.4 s
   release) keeps it running 3.5 s; a quarter second in, the slow attack has
-  drawn the chain out 3.7 px against the instant one's 18.8;
+  drawn the chain out 4.5 px against the instant one's 18.8;
 - churn under a held note and its release, at the defaults and the heaviest
-  settings, under each: at most 15.3 nodes a frame on average, a peak of 19,
+  settings, under each: at most 14.2 nodes a frame on average, a peak of 19,
   none at rest.
 
 ## Prior art
