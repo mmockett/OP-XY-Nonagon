@@ -19,10 +19,10 @@ than nine sounds you won't have heard from a synth before.
 
 **Status: experimental.** All nine pass the SDK's tests and run on the
 OP-XY, their screens are checked against how it draws, and their CPU is
-measured on it (below). v0.8.0's Ghost and Recur, with Shift on the sampler's
-markers and gain, Recur's own break and its trim as the loop, have been played
-and measured on the OP-XY. The seven synths' screens now follow the track's
-amp envelope, which needs version 1.10 of the Open-XY SDK. Expect rough edges.
+measured on it (below). In v0.9.0 the seven synths' screens follow the
+track's amp envelope, which needs version 1.10 of the Open-XY SDK; Mach's
+flyby leaves the glass plate whole; and Mach, Butterfly and Ghost cost less
+at their peaks, with the same sound. Expect rough edges.
 
 All nine are live in the [open-xy.com](https://open-xy.com) builder:
 [Sand](https://open-xy.com/#preview/machines/sand),
@@ -35,11 +35,10 @@ All nine are live in the [open-xy.com](https://open-xy.com) builder:
 [Butterfly](https://open-xy.com/#preview/machines/butterfly) and
 [Drop](https://open-xy.com/#preview/machines/drop). The builder installs the
 version the Open-XY catalog pins for each, which can be older than this
-repository's latest tag (`v0.8.0`): Sand `v0.5.0`; Cocoa, Coin, Fermi,
-Butterfly and Drop `v0.6.0`; Ghost and Recur `v0.7.0`; Mach `v0.7.2`. Ghost's
-and Recur's entries are moving to v0.8.0
-([etcetc000/open-xy#419](https://github.com/etcetc000/open-xy/pull/419)); until
-then, build them from source (below). The builder plays Recur's presets with
+repository's latest tag (`v0.9.0`): Sand `v0.5.0`; Cocoa, Coin, Fermi,
+Butterfly and Drop `v0.6.0`; Ghost and Recur `v0.7.0`; Mach `v0.7.2`. Sand,
+Cocoa, Coin, Fermi, Drop, Ghost and Recur are moving to v0.9.0, which needs
+SDK 1.10; until the builder has it, build v0.9.0 from source (below). The builder plays Recur's presets with
 no sample loaded, as it doesn't install a machine's own samples; a build from
 source opens them on its break.
 
@@ -322,23 +321,31 @@ longer, but a larger release is shorter.
 
 ## CPU
 
-Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`: Mach from
-one capture at `v0.4.0`, Sand from one at `v0.5.0`, Cocoa, Coin, Fermi, Butterfly and Drop from one at `v0.6.0`, and Ghost and Recur from three at `v0.8.0` (their median). For a synth, one voice plays middle C with the first
-four controls at their midpoint; for a sample engine, its sample callback
-plays the SDK's generated two-second test sample at its default settings. Each
-figure is a share of the OP-XY's 580,352-cycle audio block.
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`. Sand,
+Cocoa, Fermi, Mach, Butterfly, Drop and Ghost are from two captures of one
+firmware holding v0.9.0's sound code, Coin from one capture at `v0.6.0` and
+Recur from three at `v0.8.0`. For a synth, one voice plays middle C with the
+first four controls at their midpoint; for a sample engine, its sample
+callback plays the SDK's generated two-second test sample at its default
+settings. Each figure is a share of the OP-XY's 580,352-cycle audio block: the
+mean over the test, and its worst single block.
 
-| Machine | One voice | Eight voices |
-| --- | ---: | ---: |
-| Sand | 4.8% | ~39% |
-| Cocoa | 3.5% | ~28% |
-| Coin | 1.3% | ~10% |
-| Fermi | 3.0% | ~24% |
-| Mach | 3.8% | ~30% |
-| Butterfly | 5.0% | ~40% |
-| Drop | 2.7% | ~22% |
-| Ghost (sample callback) | 3.03% | n/a |
-| Recur (sample callback) | 1.23% | n/a |
+| Machine | One voice | Worst block | Eight voices |
+| --- | ---: | ---: | ---: |
+| Sand | 5.08% | 6.89% | ~41% |
+| Cocoa | 3.73% | 7.69% | ~30% |
+| Coin | 1.30% | – | ~10% |
+| Fermi | 3.27% | 7.37% | ~26% |
+| Mach | 4.14% | 6.02% | ~33% |
+| Butterfly | 5.23% | 6.76% | ~42% |
+| Drop | 2.95% | 7.02% | ~24% |
+| Ghost (sample callback) | 3.02% | 5.69% | n/a |
+| Recur (sample callback) | 1.23% | – | n/a |
+
+In the same firmware, v0.8.0's sound code put Mach's worst block at 6.88%
+(13.15% at the worst setting of its sweep, now 11.64%), Butterfly's voice at
+5.46% and Ghost's worst block at 6.39%. The screens run outside the audio
+block, so they aren't in these figures.
 
 The OP-XY's own engines measure 1.6–2.7% a voice in the same test, and
 Hexagon's synths 2.4–4.1%. A full chord on one track is fine; several tracks

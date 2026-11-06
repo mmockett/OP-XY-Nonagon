@@ -23,9 +23,8 @@ the bubbles rise out, the note climbs back to the key.
 
 **Status: experimental.** Cocoa passes the SDK's tests and runs on an
 OP-XY, where its CPU is
-measured (below). Its screen now follows the track's amp envelope, which
-needs version 1.10 of the Open-XY SDK: this version can't ship until SDK 1.10
-is released.
+measured (below). Its screen follows the track's amp envelope, which needs
+version 1.10 of the Open-XY SDK, on its `staging` branch.
 
 ## Controls
 
@@ -364,6 +363,10 @@ controls at their midpoint costs **3.45%** of the 580,352-cycle audio block, so
 eight voices take about 28%. The heaviest setting in the sweep costs **4.71%**,
 about 38% for eight. The OP-XY's own engines measure 1.6–2.7% a voice at the
 midpoint. Its modes run at a lower rate, which delays the sound by about 1.1 ms.
+
+In a later capture of the same sound code, on a firmware holding v0.9.0, one
+voice at the midpoint measured **3.73%** on average and **7.69%** in its
+worst single block.
 
 At the heaviest setting:
 

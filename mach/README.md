@@ -28,9 +28,8 @@ gone. Releasing fades it, as sound already in the air cannot be called back.
 
 **Status: experimental.** Mach passes the SDK's tests and runs on an
 OP-XY, where its CPU is
-measured (below). Its screen now follows the track's amp envelope, which
-needs version 1.10 of the Open-XY SDK: this version can't ship until SDK 1.10
-is released.
+measured (below). Its screen follows the track's amp envelope, which needs
+version 1.10 of the Open-XY SDK, on its `staging` branch.
 
 ## Controls
 
@@ -245,11 +244,15 @@ so nothing steps audibly.
 
 ## CPU
 
-Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, at `v0.4.0`,
-as one capture of its sweep: one voice playing middle C with the first four
-controls at their midpoint costs **3.80%** of the 580,352-cycle audio block, so
-eight voices take about 30%. The heaviest setting in the sweep, Echo at 87.5%,
-costs **5.91%**, so eight voices there take about 47%. The OP-XY's own engines
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, as two
+captures of its sweep on a firmware holding v0.9.0's sound code (the screen
+runs outside the audio block and isn't measured): one voice playing middle C
+with the first four controls at their midpoint costs **4.14%** of the
+580,352-cycle audio block, so eight voices take about 33%, and its worst
+single block is **6.02%**. The heaviest setting in the sweep, Echo at 62.5%,
+costs **6.64%**, about 53% for eight, and the worst block over the whole
+sweep is **11.64%**, at Echo 12.5%. In the same firmware v0.8.0's sound code
+measured 6.88% and 13.15% for those worst blocks. The OP-XY's own engines
 measure 1.6–2.7% a voice at the midpoint.
 
 The figures below are host estimates made during development.

@@ -32,9 +32,8 @@ the bright partials trade places.
 
 **Status: experimental.** Butterfly passes the SDK's tests. It runs on an
 OP-XY, and its CPU is measured there
-(below). Its screen now follows the track's amp envelope, which needs
-version 1.10 of the Open-XY SDK: this version can't ship until SDK 1.10 is
-released.
+(below). Its screen follows the track's amp envelope, which needs
+version 1.10 of the Open-XY SDK, on its `staging` branch.
 
 ## Controls
 
@@ -331,12 +330,16 @@ peaks at 0.93.
 
 ## CPU
 
-Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, at `v0.6.0`,
-as one capture of its sweep: one voice playing middle C with the first four
-controls at their midpoint costs **4.99%** of the 580,352-cycle audio block, so
-eight voices take about 40%. The heaviest setting in the sweep costs **7.98%**,
-about 64% for eight. The OP-XY's own engines measure 1.6–2.7% a voice at the
-midpoint.
+Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, as two
+captures of its sweep on a firmware holding v0.9.0's sound code (the screen
+runs outside the audio block and isn't measured): one voice playing middle C
+with the first four controls at their midpoint costs **5.23%** of the
+580,352-cycle audio block, so eight voices take about 42%, and its worst
+single block is **6.76%**. The heaviest setting in the sweep, Coupling at
+12.5%, costs **7.99%**, about 64% for eight, with a worst block of **8.22%**.
+In the same firmware v0.8.0's sound code measured 5.46% at the midpoint and
+8.72% at Coupling 12.5%. The OP-XY's own engines measure 1.6–2.7% a voice at
+the midpoint.
 
 The figures below are host estimates made during development.
 
