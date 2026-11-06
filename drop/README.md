@@ -293,7 +293,7 @@ The figures below are host estimates made during development.
   division comes only when the key or the vapour moves, and two small ones
   remain a block.
 - **Memory.** Compiled for the Blackfin (`--firmware`), Drop takes about 81 KiB
-  of module memory, eight voices of 4,352 bytes.
+  of module memory, eight voices of 4,348 bytes.
 
 ## Tests
 
