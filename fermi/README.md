@@ -143,44 +143,49 @@ in the same roles, on the same phrases, through each engine's own `render()`:
 
 ## Screen
 
-One object, drawn boldly in two weights of line and three greys
-(`tools/make_panel.py`): **the chain as a laboratory apparatus.** The chain
-is brightest, the apparatus around it a step down, and the swing's ghost
-faint.
+One object (`tools/make_panel.py`): **the chain as a laboratory apparatus**,
+drawn in the stock look's grey code. Each part takes the grey of the encoder
+that moves it, and the four run left to right in encoder order: the bobs
+hollow in a light line (encoder 1), the stands dark solids (2), the coils and
+the felt mid grey (3), the pendulum and the seed's flag light (4). The plank
+and the swing's ghost belong to no encoder.
 
 ![Fermi's screen: energy drawing the chain back, a breathing note, the crossing into chaos, then eight bobs on cubic coils](docs/fermi.gif)
 
 - **The apparatus:**
-  - Brass bobs strung on coil springs between the clamps of two retort
-    stands, on a plank.
-  - A **stroboscope** on the plank, clocked by a **regulator pendulum** hung
-    from the left stand, lights the bobs once a period of the struck mode,
-    at the peak of that mode's own swing. It locks to the mode itself, since
-    loading the springs shifts its period. So the struck mode stands still
-    and only the energy's flow moves the shape. While the chain breathes,
-    the arch ripples into higher modes and comes back clean at each return.
-    In chaos it shivers.
+  - Bobs strung on coil springs between the clamps of two retort stands, on
+    a plank.
+  - The chain is drawn as a stroboscope would light it, once a period of the
+    struck mode, at the peak of that mode's own swing. It locks to the mode
+    itself, since loading the springs shifts its period. So the struck mode
+    stands still and only the energy's flow moves the shape. While the chain
+    breathes, the arch ripples into higher modes and comes back clean at each
+    return. In chaos it shivers.
   - A faint ghost around the chain holds the swing's recent extremes, like a
     long exposure.
-  - A felt damper on a long lever from the right stand.
+  - A **regulator pendulum** in a bracket on the right stand, and a felt
+    damper on a lever from the left stand.
 - **Every control moves a part of it.** `docs/controls.png` shows each
   control at 0, 50 and 100 with the others at their defaults, and
   `docs/controls-1x.png` the same at the screen's own size:
   - **Energy** draws the chain back before the note, from a 4 px arch to a
     34 px one.
-  - **Masses** sets the number of bobs (8 to 32), which shrink as they crowd.
+  - **Masses** sets the number of bobs (8 to 32). They hang at a near-even
+    spacing, so more bobs make a longer chain and the stands move apart, from
+    226 px between them to 376.
   - **Springs** swaps the coils. Quadratic coils are open, conical and grey
-    (they stiffen one way). Cubic coils are straight, tall and white (alike
-    both ways).
+    (they stiffen one way). Cubic coils are straight and tall (alike both
+    ways).
   - **Time** slides the regulator's bob down its rod, from fast near the
     knife edge to slow at the rod's foot: the longer the pendulum, the slower
     the clock. While a note runs, the pendulum swings once a breath, out at
-    each flash of the lamp.
+    each return.
   - **Dispersion** sizes the bobs. At 0 they are beads on what is nearly a
     continuous spring, and a continuous string is harmonic. At 100 they are
     lumped into heavy bobs: a lattice, which disperses.
   - **Mode** sets the arch's humps.
-  - **Damping** lowers the felt pad from above the chain onto it.
+  - **Damping** lowers the felt pad from 34 px above the drawn-back chain to
+    4 px above it.
   - **Seed** reshapes the arch itself: between notes the chain is drawn in
     the next note's starting shape, its nudge drawn three times over so it
     reads, and a flagged pin marks the bob the nudge moves most. The pin
@@ -208,13 +213,13 @@ controls still it is the same chain, step for step, even in chaos:
 bit-identical after 9,600 blocks at energy 0.9.
 
 Where the OP-XY tells the screen the track's amp envelope (SDK 1.10), the
-strobe runs for as long as the sound lasts, and the chain is drawn as it is
+chain runs for as long as the sound lasts, and it is drawn as it is
 heard: the arch, its ghost and the regulator's swing scaled by the envelope,
 swelling with its attack, holding at its sustain while keys are held and
-fading over its release. A short release stops the strobe at once; a long
+fading over its release. A short release stops the chain at once; a long
 one keeps the chain swinging, ever smaller, until the sound ends. Damping
 still takes the swing down sooner. Without the envelope (an older OS, the
-builder's preview) the screen keeps its own timing: the strobe runs while a
+builder's preview) the screen keeps its own timing: the chain runs while a
 key is held and for 2 s after the last release. Either way the chain then
 eases back to its drawn rest. Motion eases out in 0.15 s, and
 reduced motion snaps. A bob moves with both its coils, three nodes at a time,
@@ -222,8 +227,8 @@ so the chain never tears, however the budget falls. The idle screen is still.
 
 **Churn** (host, the GIF's 31 s scene): a mean of 8.9 nodes a frame at
 60 fps and 10.4 at 30 fps, peaking at 20 at a note-on or a change of masses.
-The swinging pendulum is 2 of those a frame. Idle: 0. The artwork has 15
-static paths and 115 nodes, and is 41 KB (the preview's limit is 64 KiB).
+The swinging pendulum is 2 of those a frame. Idle: 0. The artwork is 118
+nodes and no static paths, and is 39 KB (the preview's limit is 64 KiB).
 
 ## How it works
 
@@ -257,7 +262,7 @@ integers only.
   thermalizes. The energy knob runs through those three on log scales, the
   first 0.22 of the way to the second in its first twentieth. The same runs
   measure the breathing period for the time caption and the
-  strobe's flashes.
+  pendulum's swing.
 - **Voicing.**
   - A third of the modes are projected each block, in turn. Each one's energy
     is the leapfrog's own invariant, exact for the linear chain.
@@ -359,7 +364,7 @@ masses or mode change). Ten voiced partials are what fit this budget.
   the 2040 KiB module region.
 - There is no division per sample, and one per block (the tilt's gain).
 - **Memory:** a voice is 556 bytes, the voices' shared starting shape and setup 288
-  and the screen state 1,060.
+  and the screen state 1,068.
 
 ## Tests
 
@@ -413,7 +418,7 @@ captions.
 - with the envelope unknown, every frame of a scene is as the screen drew it
   before it read the envelope;
 - a short envelope (instant attack, a release of about 40 ms) stops the
-  strobe 0.05 s after the note-off, and a long one (a 1.25 s attack, a 3.4 s
+  chain 0.05 s after the note-off, and a long one (a 1.25 s attack, a 3.4 s
   release) keeps it running 3.5 s; a quarter second in, the slow attack has
   drawn the chain out 3.7 px against the instant one's 18.8;
 - churn under a held note and its release, at the defaults and the heaviest

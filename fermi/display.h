@@ -5,7 +5,7 @@
 
 namespace fermi {
 // Matches resources.display in definition.json: paths, points, nodes, texts, palette.
-using Frame = opxy::draw::Frame<4, 64, 115, 16, 16>;
+using Frame = opxy::draw::Frame<4, 64, 118, 16, 16>;
 
 // Nodes, as tools/make_panel.py writes them into panel.svg.fragment.
 namespace node {
@@ -14,27 +14,32 @@ const u32 ghost = 0,                    // the swing's ghost: four reshaping out
           mass = 12,                    // 32 bobs
           cone = 44, straight = 77,     // 33 coils of each kind: conical (quadratic) and straight (cubic)
           rod = 110,                    // the regulator pendulum's rod, on its knife edge
-          flash = 111,                  // the stroboscope's flash
+          stand_left = 111,             // the left stand, with the damper's pivot boss
           damper = 112,                 // the felt damper's lever
           pin = 113,                    // the seed's pin, pressing the bob it nudges hardest
-          regulator = 114;              // the pendulum's sliding bob
+          regulator = 114,              // the pendulum's sliding bob
+          stand_right = 115,            // the right stand, with the pendulum's bracket
+          plank_left = 116, plank_right = 117;   // the plank, in two halves that slide apart with the stands
 }
-// Palette entries (make_panel.py: PALETTE).
+// Palette entries (make_panel.py: PALETTE): the grey code, each part in the
+// grey of its encoder.
 namespace shade {
-const u32 black = 0, ghost = 1, hard = 2, mass = 3, coil = 4, rod = 5, dark = 6, fading = 7, lit = 8, damper = 9,
+const u32 black = 0, ghost = 1, hard = 2, mass = 3, coil = 4, rod = 5, stand = 6, plank = 7, damper = 9,
           pin = 10, regulator = 11;
 }
 // Geometry (make_panel.py has the same), px.
 namespace plate {
-const i32 hook_left = 66, hook_right = 414, row_y = 112;
-const i32 lamp_x = 240, lamp_y = 174;
-const i32 pivot_x = 420, pivot_y = 74;
-const i32 pendulum_x = 38, pendulum_y = 62;   // the regulator's knife edge
-const i32 fast = 20, slow = 100;              // its bob's travel down the rod
+const i32 centre = 230, row_y = 124;          // the chain's middle and rest line
+const i32 span = 210, span_step = 25;         // hook to hook at 8 masses, and each step of masses more
+const i32 stand_out = 8;                      // a stand's rod outside its hook
+const i32 plank_y = 200, plank_out = 30;      // the plank's halves hang from their ends, past the hooks
+const i32 pendulum_out = 34, pendulum_y = 72; // the regulator's knife edge, right of the right hook
+const i32 fast = 24, slow = 90;               // its bob's travel down the rod
+const i32 pivot_y = 74;                       // the damper's lever pivot, on the left stand's top
+const i32 lever = 170, pad = 8;               // the lever's reach to its felt pad, and the pad's height
 const i32 bob = 5734;               // a bob's radius at unit scale, Q10 px (5.6)
 const i32 coil = 32;                // a coil as authored
 const i32 groove = 5734;            // a bob's rim from its centre, where the coils hook on, Q10 px (5.6) at unit scale
-const i32 lowered = 171;            // the damper's swing, from 7 degrees up to its pad on the chain, tenths
 }
 
 struct DisplayState {
@@ -43,7 +48,7 @@ struct DisplayState {
     nonagon_amp::Follower amp;     // the track's amp envelope, as the screen follows it (amp.h)
     u32 initialized, track, serial;
     chain::Chain chain;            // the latest note's chain, run as its voice runs it
-    u32 running;                   // 1 while the strobe lights the chain
+    u32 running;                   // 1 while the strobe holds the chain
     i32 linger;                    // Q10 s it runs on after the last key is let go
     u32 owed;                      // blocks of time owed, Q16
     u32 strobe;                    // the struck mode's velocity at the last step (its sign)
@@ -54,12 +59,10 @@ struct DisplayState {
     i32 reach;                     // energy's draw: px a unit of strain, Q8, eased
     i32 slide;                     // the regulator's bob down its rod, px Q8, eased
     i32 swing;                     // its swing's amplitude, tenths of a degree, eased
-    i32 damper;                    // tenths of a degree, eased
+    i32 damper;                    // the lever's turn, tenths of a degree, eased
     i32 lump;                      // the dispersion the weights are drawn for, Q15, eased
     i32 lift;                      // the seed's pin off its bob, px Q8, eased (4 px while the chain runs)
     u32 phase;                     // the pendulum's phase in its swing, tenths of a degree
-    i32 glow;                      // the flash, Q10 s since it fired
-    u32 breaths;                   // predicted returns flashed this note
     u32 rotor;                     // where the budgeted redraw resumes
     u32 keys[4];                   // the outlines' geometry keys
     u32 ghost_shown;

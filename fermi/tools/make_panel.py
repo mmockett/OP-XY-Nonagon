@@ -2,34 +2,40 @@
 """Writes panel.svg.fragment, Fermi's screen artwork. Run it after changing a
 shape here and commit both.
 
-One object: the chain as a laboratory apparatus. Brass bobs strung on coil
-springs between the clamps of two retort stands, on a plank. A stroboscope on
-the plank lights the chain once a period of its struck mode, clocked by a
-regulator pendulum hung from the left stand: its bob slides up the rod to run
-the clock fast, down to run it slow. A felt damper hangs on a lever from the
-right stand. A flagged pin presses the bob the seed nudges hardest.
+One object: the chain as a laboratory apparatus. Bobs strung on coil springs
+between the clamps of two retort stands, on a plank. A regulator pendulum hangs
+from a bracket on the right stand: its bob slides up the rod to run the clock
+fast, down to run it slow. A felt damper hangs on a lever from the left stand.
+A flagged pin presses the bob the seed nudges hardest.
 
-Drawn for the screen at 1:1, 480 x 222, in two weights of line and three
-greys: the chain brightest, the apparatus around it a step down, the swing's
-ghost faint. Lines are closed ribbons; the bobs are the only fills."""
+Drawn in the stock look's grey code, each part in the grey of the encoder that
+moves it, left to right in encoder order: the bobs hollow in a CDCDCD line
+(encoder 1, energy and dispersion), the stands dark solids (2, masses, which
+moves them apart), the coils and the felt mid grey (3, springs and damping),
+the pendulum and the seed's flag light (4, time and seed). The plank and the
+swing's ghost belong to no encoder. Lines are closed ribbons; the bobs, stands,
+plank, felt and pendulum bob are the fills."""
 import math
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 ID = "fermi"
 FONT = 'font-family="UniversNextPro-Light"'
-CHAIN, FRAME, GHOST_GREY = "#e6e6e6", "#a6a6a6", "#3a3a3a"   # the three greys
-BOLD, FINE = 0.55, 0.45                                         # and two weights
+G1, G2, G3, G4 = "#191919", "#4B4B4B", "#969696", "#CDCDCD"   # the grey code, encoders 1..4
+GHOST_GREY, PLANK = "#323232", "#262626"                       # no encoder
+BOLD, FINE = 0.55, 0.45                                         # two weights of line
 
 # Geometry, shared with display.h (namespace plate).
-LEFT_POST, RIGHT_POST, POST_TOP = 60, 420, 56   # the stands' rods
-HOOK_L, HOOK_R, ROW_Y = 66, 414, 112            # where the chain hangs, and its rest line
-BASE_TOP, BASE_BOTTOM, BASE_L, BASE_R = 186, 198, 36, 444
-LAMP_X, LAMP_Y = 240, 174                       # the stroboscope's lens
-PIVOT = (420, 74)                               # the damper's lever pivot
-PENDULUM = (38, 62)                             # the regulator's knife edge
-ROD = 108                                       # its rod's length, px
-SLIDE = (20, 100)                               # its bob's travel down the rod: fast to slow
+CENTRE, ROW_Y = 230, 124                        # the chain's middle and rest line
+SPAN, SPAN_STEP = 210, 25                       # hook to hook at 8 masses, and a step of masses more
+STAND_OUT = 8                                   # a stand's rod outside its hook
+POST_TOP, FOOT = 72, 196                        # the rods' tops and the feet's tops
+PLANK_Y, PLANK_OUT, PLANK_HALF = 200, 30, 212   # the plank under the feet, past the hooks, each half's length
+PENDULUM_OUT, PENDULUM_Y = 34, 72               # the regulator's knife edge, right of the right hook
+ROD = 96                                        # its rod's length, px
+SLIDE = (24, 90)                                # its bob's travel down the rod: fast to slow
+PIVOT_Y = 74                                    # the damper's lever pivot, on the left stand's top
+LEVER, PAD_W, PAD_H = 170, 20, 8                # the lever's reach to its felt pad's middle, and the pad
 COIL = 32                                       # a coil as authored, px
 
 # Nodes (display.h).
@@ -37,28 +43,28 @@ GHOST = 0
 HEADER = 4
 MASS, MASSES = 12, 32
 CONE, STRAIGHT, COILS = 44, 77, 33
-ROD_NODE, FLASH, DAMPER, PIN, BOB = 110, 111, 112, 113, 114
-NODES = 115
+ROD_NODE, STAND_L, DAMPER, PIN, BOB, STAND_R, PLANK_L, PLANK_R = 110, 111, 112, 113, 114, 115, 116, 117
+NODES = 118
 POINTS = 64
 
 # Palette (display.h: shade).
 PALETTE = [
     ("#000000", "#000000", 0.5),   # 0 black
     ("none", GHOST_GREY, 0.5),     # 1 the ghost of the swing
-    ("none", "#ffffff", 0.7),      # 2 a hard (cubic) coil
-    ("#000000", CHAIN, BOLD),      # 3 a bob
-    ("none", FRAME, FINE),         # 4 a coil
-    ("none", FRAME, FINE),         # 5 the pendulum's rod
-    ("none", "#000000", 0.5),      # 6 the flash, out
-    ("none", "#7a7a7a", BOLD),     # 7 the flash, fading
-    ("none", CHAIN, 0.6),          # 8 the flash
-    ("none", FRAME, FINE),         # 9 the damper
-    ("none", CHAIN, BOLD),         # 10 the seed's pin
-    ("#000000", FRAME, FINE),      # 11 the pendulum's bob
-    ("none", FRAME, FINE),         # 12
-    ("none", FRAME, FINE),         # 13
-    ("none", FRAME, FINE),         # 14
-    ("none", FRAME, FINE),         # 15
+    ("none", G3, 0.7),             # 2 a hard (cubic) coil
+    ("#000000", G4, BOLD),         # 3 a bob, hollow
+    ("none", G3, FINE),            # 4 a coil
+    ("none", G4, FINE),            # 5 the pendulum's rod
+    (G2, G2, 0.5),                 # 6 a stand
+    (PLANK, PLANK, 0.5),           # 7 the plank
+    ("none", G3, FINE),            # 8
+    (G3, G3, FINE),                # 9 the felt damper
+    ("none", G4, BOLD),            # 10 the seed's pin
+    (G4, G4, FINE),                # 11 the pendulum's bob
+    ("none", G3, FINE),            # 12
+    ("none", G3, FINE),            # 13
+    ("none", G3, FINE),            # 14
+    ("none", G3, FINE),            # 15
 ]
 
 
@@ -90,10 +96,6 @@ def circle(cx, cy, r, fill, stroke="none", width=None, node=None, at=None):
     return f'<circle{ident}{move} cx="{num(cx)}" cy="{num(cy)}" r="{num(r)}" fill="{fill}" stroke="{stroke}"{w}/>'
 
 
-def text(x, y, size, fill, words):
-    return f'<text transform="matrix(1 0 0 1 {num(x)} {num(y)})" fill="{fill}" {FONT} font-size="{num(size)}px">{words}</text>'
-
-
 def ribbon(points, h):
     """A thin line: out along the points, back offset along each point's normal by h."""
     back = []
@@ -104,26 +106,6 @@ def ribbon(points, h):
         length = math.hypot(tx, ty) or 1
         back.append((points[i][0] - ty / length * h, points[i][1] + tx / length * h))
     return points + back
-
-
-def line(x0, y0, x1, y1, ink=FRAME, h=0.5, width=FINE):
-    return path(outline(ribbon([(x0, y0), (x1, y1)], h), 1), "none", ink, width)
-
-
-def poly(points, ink=FRAME, h=0.5, width=FINE):
-    return path(outline(ribbon(points, h)), "none", ink, width)
-
-
-def rect(x0, y0, x1, y1, ink=FRAME, width=FINE, fill="none"):
-    return path(outline([(x0, y0), (x1, y0), (x1, y1), (x0, y1)]), fill, ink, width)
-
-
-def arc(cx, cy, r, a0, a1, n=12):
-    return [(cx + r * math.cos(a0 + (a1 - a0) * i / (n - 1)), cy + r * math.sin(a0 + (a1 - a0) * i / (n - 1))) for i in range(n)]
-
-
-def ring(cx, cy, r, n=40):
-    return [(cx + r * math.cos(2 * math.pi * i / n), cy + r * math.sin(2 * math.pi * i / n)) for i in range(n)]
 
 
 out = [f'<g id="{ID}_panel">',
@@ -140,20 +122,33 @@ for i, (x, y, ink, size) in enumerate(texts):
     out.append(f'<text id="{ID}_text_{i}" transform="matrix(1 0 0 1 {num(x)} {num(y)})" fill="{ink}" {FONT} '
                f'font-size="{size}px">-</text>')
 
-# ---- The plank, and the stands: rods on footed bases, each with a boss
-# clamp holding a hook at the chain's height.
-out.append(rect(BASE_L, BASE_TOP, BASE_R, BASE_BOTTOM))
-for x in (LEFT_POST, RIGHT_POST):
-    out.append(line(x, POST_TOP, x, BASE_TOP - 4, h=1.0))
-    out.append(path(outline([(x - 11, BASE_TOP), (x + 11, BASE_TOP), (x + 8, BASE_TOP - 4), (x - 8, BASE_TOP - 4)]), "none", FRAME, FINE))
-    out.append(rect(x - 5, ROW_Y - 5, x + 5, ROW_Y + 5, fill="#000000"))
-out.append(line(LEFT_POST + 5, ROW_Y, HOOK_L, ROW_Y))
-out.append(line(HOOK_R, ROW_Y, RIGHT_POST - 5, ROW_Y))
+# ---- The plank, in two overlapping halves that slide apart with the stands
+# (masses): each half hangs from its outer end.
+out.append(path(outline([(0, 0), (PLANK_HALF, 0), (PLANK_HALF, 5), (0, 5)]), PLANK, PLANK, 0.5, node=PLANK_L,
+                at=(CENTRE - SPAN / 2 - PLANK_OUT, PLANK_Y)))
+out.append(path(outline([(-PLANK_HALF, 0), (0, 0), (0, 5), (-PLANK_HALF, 5)]), PLANK, PLANK, 0.5, node=PLANK_R,
+                at=(CENTRE + SPAN / 2 + PLANK_OUT, PLANK_Y)))
+
+# ---- The stands: each one dark solid about its rod at the chain's height, a
+# rod on a foot with a boss clamp and a short lead to its hook. The left one
+# carries the damper's pivot boss on its top, the right one the pendulum's
+# bracket. Masses slides them apart.
+top, foot = POST_TOP - ROW_Y, FOOT - ROW_Y
+left_stand = [(-3, top - 1), (3, top - 1), (3, top + 5), (2, top + 5), (2, -4), (4, -4), (4, -0.7), (STAND_OUT, -0.7),
+              (STAND_OUT, 0.7), (4, 0.7), (4, 4), (2, 4), (2, foot), (14, foot), (14, foot + 4), (-14, foot + 4),
+              (-14, foot), (-2, foot), (-2, 4), (-4, 4), (-4, -4), (-2, -4), (-2, top + 5), (-3, top + 5)]
+bracket = PENDULUM_OUT - STAND_OUT          # the knife edge, right of the right rod
+right_stand = [(-2, top - 3), (bracket + 6, top - 3), (bracket + 6, top + 1), (2, top + 1), (2, -4), (4, -4), (4, 4),
+               (2, 4), (2, foot), (14, foot), (14, foot + 4), (-14, foot + 4), (-14, foot), (-2, foot), (-2, 4), (-4, 4),
+               (-4, 0.7), (-STAND_OUT, 0.7), (-STAND_OUT, -0.7), (-4, -0.7), (-4, -4), (-2, -4)]
+out.append(path(outline(left_stand, 1), G2, G2, 0.5, node=STAND_L, at=(CENTRE - SPAN / 2 - STAND_OUT, ROW_Y)))
+out.append(path(outline(right_stand, 1), G2, G2, 0.5, node=STAND_R, at=(CENTRE + SPAN / 2 + STAND_OUT, ROW_Y)))
 
 # ---- The swing's ghost: four reshaping outlines, a quarter of the chain each.
 for q in range(4):
-    pts = [(-44 + 88 * i / 31, -0.3) for i in range(32)] + [(44 - 88 * i / 31, 0.3) for i in range(32)]
-    cx = HOOK_L + (HOOK_R - HOOK_L) * (q + 0.5) / 4
+    quarter = SPAN / 4
+    pts = [(-quarter / 2 + quarter * i / 31, -0.3) for i in range(32)] + [(quarter / 2 - quarter * i / 31, 0.3) for i in range(32)]
+    cx = CENTRE - SPAN / 2 + quarter * (q + 0.5)
     out.append(path(outline(pts, 1), "none", GHOST_GREY, 0.5, node=GHOST + q, at=(cx, ROW_Y)))
 
 # ---- The coils. A conical spring (quadratic: it stiffens one way) and a
@@ -175,42 +170,35 @@ def coil(radius_at, turns):
 cone_d = coil(lambda t: 0.8 + 4.4 * t, 3)
 straight_d = coil(lambda t: 4.6, 4)
 for i in range(COILS):
-    out.append(path(cone_d, "none", FRAME, FINE, node=CONE + i, at=(640, 320)))
+    out.append(path(cone_d, "none", G3, FINE, node=CONE + i, at=(640, 320)))
 for i in range(COILS):
-    out.append(path(straight_d, "none", "#ffffff", 0.7, node=STRAIGHT + i, at=(640, 320)))
+    out.append(path(straight_d, "none", G3, 0.7, node=STRAIGHT + i, at=(640, 320)))
 
-# ---- The bobs: plain rings, filled so the coils' ends hide behind them.
+# ---- The bobs: plain rings, filled black so the coils' ends hide behind them.
 R = 5.6
 bob = [(R * math.cos(a), R * math.sin(a)) for a in [2 * math.pi * i / 20 for i in range(20)]]
 for i in range(MASSES):
-    out.append(path(outline(bob, 1), "#000000", CHAIN, BOLD, node=MASS + i, at=(640, 320)))
+    out.append(path(outline(bob, 1), "#000000", G4, BOLD, node=MASS + i, at=(640, 320)))
 
-# ---- The stroboscope on the plank: a lamp housing and its lens; the flash
-# is a ring about the lens.
-out.append(rect(LAMP_X - 14, LAMP_Y - 12, LAMP_X + 14, BASE_TOP))
-out.append(path(outline(ring(LAMP_X, LAMP_Y, 5, 28)), "none", FRAME, FINE))
-out.append(path(outline(ring(0, 0, 8.6, 36)), "none", "#000000", 0.5, node=FLASH, at=(LAMP_X, LAMP_Y)))
+# ---- The regulator: a pendulum on a knife edge in the right stand's bracket.
+# Its rod (a node, so it can swing) and its bob (a node) slide.
+px, py = CENTRE + SPAN / 2 + PENDULUM_OUT, PENDULUM_Y
+out.append(path(outline([(-0.5, 0), (0.5, 0), (0.5, ROD), (-0.5, ROD)], 1), "none", G4, FINE, node=ROD_NODE, at=(px, py)))
+bob_d = outline([(5 * math.cos(a), 8 * math.sin(a)) for a in [2 * math.pi * i / 24 for i in range(24)]], 1)
+out.append(path(bob_d, G4, G4, FINE, node=BOB, at=(px, py + SLIDE[1])))
 
-# ---- The regulator: a pendulum on a knife edge, on a bracket from the left
-# stand's top. Its rod (a node, so it can swing) and its bob (a node) slide.
-px, py = PENDULUM
-out.append(line(LEFT_POST, POST_TOP + 2, px - 3, POST_TOP + 2))
-out.append(path(outline([(px - 4, POST_TOP), (px + 4, POST_TOP), (px + 4, POST_TOP + 3), (px, py), (px - 4, POST_TOP + 3)]), "none", FRAME, FINE))
-out.append(path(outline([(-0.5, 0), (0.5, 0), (0.5, ROD), (-0.5, ROD)], 1), "none", FRAME, FINE, node=ROD_NODE, at=PENDULUM))
-bob_d = outline([(7.2 * math.cos(a), 4.6 * math.sin(a)) for a in [2 * math.pi * i / 24 for i in range(24)]], 1)
-out.append(path(bob_d, "#000000", FRAME, FINE, node=BOB, at=(px, py + SLIDE[1])))
-
-# ---- The damper: a long lever from the right stand to a felt pad over the
-# chain's middle, about its pivot; damping lowers the pad onto the chain.
-out.append(path(outline(ring(PIVOT[0], PIVOT[1], 3, 20)), "#000000", FRAME, FINE))
-lever = [(-3, -0.8), (-168, -0.8), (-168, -3.6), (-186, -3.6), (-186, 4.2), (-168, 4.2), (-168, 0.8), (-3, 0.8)]
-out.append(path(outline(lever, 1), "none", FRAME, FINE, node=DAMPER, at=PIVOT))
+# ---- The damper: a lever from the left stand's top to a felt pad over the
+# chain, about its pivot; the pad hangs from the lever's end, and damping
+# lowers it onto the chain.
+lever = [(3, -0.6), (LEVER + PAD_W / 2, -0.6), (LEVER + PAD_W / 2, PAD_H - 0.6), (LEVER - PAD_W / 2, PAD_H - 0.6),
+         (LEVER - PAD_W / 2, 0.6), (3, 0.6)]
+out.append(path(outline(lever, 1), G3, G3, FINE, node=DAMPER, at=(CENTRE - SPAN / 2 - STAND_OUT, PIVOT_Y)))
 
 # ---- The seed's pin: a pin with a round head and a paper flag, its point
 # pressing the bob the seed nudges hardest.
 head = [(3.4 * math.sin(t), -27 + 3.4 * math.cos(t)) for t in [0.12 + (2 * math.pi - 0.24) * i / 19 for i in range(20)]]
 pin = [(0, 0), (0.4, -3), (0.4, -12), (9, -13), (9, -20), (0.4, -21)] + head + [(-0.4, -3)]   # the shaft runs into the head
-out.append(path(outline(pin, 1), "none", CHAIN, BOLD, node=PIN, at=(640, 320)))
+out.append(path(outline(pin, 1), "none", G4, BOLD, node=PIN, at=(640, 320)))
 
 # The palette, parked off screen.
 for i, (fill, stroke, width) in enumerate(PALETTE):

@@ -1,43 +1,48 @@
 #include "display.h"
 
 // Fermi's screen: the chain as a laboratory apparatus (tools/make_panel.py).
-// Brass bobs on coil springs between two stands, a stroboscope on the
-// plank clocked by a regulator pendulum, a felt damper on a lever.
+// Bobs on coil springs between two retort stands on a plank, a regulator
+// pendulum on the right stand, a felt damper on a lever from the left one,
+// each part in the grey of the encoder that moves it.
 //
 // The screen cannot hear the voices. It runs its own copy of the latest
 // note's chain with the voices' code (chain.h), a block of time at a time,
 // so with the controls held still it is the same chain, step for step.
 //
-// The bobs swing far too fast to see, so the stroboscope lights them once
-// a period of the struck mode, at the peak of that mode's own swing; the
-// struck mode then stands still and only the energy's flow moves the shape.
-// While the chain breathes, the arch ripples into higher modes and comes back
-// clean at each return, when the strobe flashes; in chaos it
-// shivers. A faint ghost holds the swing's recent extremes, a long exposure.
+// The bobs swing far too fast to see, so the chain is drawn as a strobe
+// would light it: once a period of the struck mode, at the peak of that
+// mode's own swing; the struck mode then stands still and only the energy's
+// flow moves the shape. While the chain breathes, the arch ripples into
+// higher modes and comes back clean at each return; in chaos it shivers. A
+// faint ghost holds the swing's recent extremes, a long exposure.
 //
 // Every control acts on a part. Energy is how far the chain is drawn, masses
-// the number of bobs, springs the coils (conical for the quadratic law,
-// straight and tall for the cubic), time the regulator's bob (up the rod
-// fast, down it slow; while a note runs the pendulum swings once a breath),
+// the number of bobs, strung at a near-even spacing so that more of them
+// make a longer chain and move the stands (and the plank's halves, the
+// pendulum and the damper with them) apart, springs the coils (conical for
+// the quadratic law, straight and tall for the cubic), time the regulator's
+// bob (up the rod fast, down it slow; while a note runs the pendulum swings
+// once a breath),
 // dispersion the bobs themselves (beads on a near-continuous spring sound
 // harmonic; lumped into heavy bobs, the lattice disperses), mode the arch's
-// humps, damping the felt pad's long lever, and the seed the starting shape
+// humps, damping the felt pad, lowered on its lever to just above the
+// chain as it is drawn back, and the seed the starting shape
 // itself: the arch drawn with its nudge (three times over), and a flagged pin
 // on the bob it moves most, lifting off when the note lets the chain go.
 //
 // Where the OP-XY tells the screen its amp envelope (SDK 1.10, amp.h), the
-// strobe runs for as long as the sound lasts, as the voice's chain runs on
+// chain runs for as long as the sound lasts, as the voice's chain runs on
 // until the envelope ends it, and the chain is drawn as it is heard: the
 // arch, its ghost and the regulator's swing scaled by the envelope, swelling
 // with its attack, holding at its sustain while keys are held and fading
 // over its release, in 32 steps. The felt and the chain's own damping still
 // take the swing down sooner. Without it, the screen keeps its own timing:
-// the strobe runs while keys are held and two seconds after.
+// the chain runs while keys are held and two seconds after.
 namespace fermi {
 namespace screen {
 using namespace opxy::draw;
 const u32 budget = 20;            // nodes changed a frame, at most
-const i32 linger = 2048;          // Q10 s the strobe runs on after the last key is let go
+const i32 linger = 2048;          // Q10 s the chain runs on after the last key is let go
 const u32 catch_up = 172;         // blocks a frame at most (0.25 s)
 const i32 steps = 32;             // the envelope's level as the chain is drawn
 
@@ -212,8 +217,6 @@ inline void load(DisplayState& st, const chain::Setup& s) {
     chain::init(st.chain, s);
     st.owed = 0;
     st.strobe = 0;
-    st.breaths = 0;
-    st.glow = 0;
     strobe(st, s);
 }
 // A block of time, exactly as a voice runs it, strobing the row at each peak
@@ -234,7 +237,20 @@ inline void block(DisplayState& st, const chain::Setup& s) {
 }
 // The ghost: each quarter of the chain's swing, out along its highs and back
 // along its lows, as one outline about the quarter's middle.
-inline u32 ghost(DisplayState& st, Frame& frame, i32 spacing, bool shown) {
+// Where the chain hangs for its number of masses, Q10 px: the bobs strung at
+// near-even spacing, the span between the hooks growing by a step a size.
+struct Layout {
+    i32 hook_left, hook_right, spacing;
+};
+inline Layout layout(u32 size, u32 n) {
+    Layout l;
+    const i32 span = (plate::span + plate::span_step * static_cast<i32>(size)) * unit;
+    l.spacing = span / static_cast<i32>(n + 1);
+    l.hook_left = plate::centre * unit - span / 2;
+    l.hook_right = l.hook_left + l.spacing * static_cast<i32>(n + 1);
+    return l;
+}
+inline u32 ghost(DisplayState& st, Frame& frame, const Layout& l, bool shown) {
     if (!shown) {
         u32 changed = 0;
         for (u32 q = 0; q < 4; ++q) changed += conceal(frame, node::ghost + q);
@@ -242,15 +258,16 @@ inline u32 ghost(DisplayState& st, Frame& frame, i32 spacing, bool shown) {
         return changed;
     }
     const u32 n = st.chain.n;
-    const u32 inverse = (1u << 30) / static_cast<u32>(spacing);   // once a frame
-    const i32 quarter = ((plate::hook_right - plate::hook_left) * unit) / 4;
+    const u32 inverse = (1u << 30) / static_cast<u32>(l.spacing);   // once a frame
+    const i32 quarter = (l.hook_right - l.hook_left) / 4;
+    const i32 reach = quarter / 2 + unit, pitch = (2 * reach) / 31;   // each quarter overlaps its neighbours by a pixel
     u32 changed = 0;
     for (u32 q = 0; q < 4; ++q) {
-        const i32 centre = plate::hook_left * unit + quarter * static_cast<i32>(q) + quarter / 2;
+        const i32 centre = l.hook_left + quarter * static_cast<i32>(q) + quarter / 2;
         Point pts[64];
         for (u32 i = 0; i < 32; ++i) {
-            const i32 off = -44 * unit + static_cast<i32>(i) * 2907;
-            const i32 from_hook = centre + off - plate::hook_left * unit;   // the first sample sits just left of the hook
+            const i32 off = -reach + static_cast<i32>(i) * pitch;
+            const i32 from_hook = centre + off - l.hook_left;   // the first sample sits just left of the hook
             const u32 rel = static_cast<u32>(from_hook < 0 ? 0 : from_hook);
             const u32 p = ((rel >> 4) * inverse) >> 16;   // Q10 masses along the chain
             const u32 at = p >> 10, frac = p & 1023;
@@ -266,7 +283,7 @@ inline u32 ghost(DisplayState& st, Frame& frame, i32 spacing, bool shown) {
         Frame::path_type& path = frame.paths[q];
         bool moved = !st.ghost_shown || !path.key;
         for (u32 i = 0; i < 64 && !moved; ++i)
-            moved = magnitude(pts[i].y - path.points[i].y) >= 384;
+            moved = magnitude(pts[i].y - path.points[i].y) >= 384 || pts[i].x != path.points[i].x;
         if (moved) {
             for (u32 i = 0; i < 64; ++i) path.points[i] = pts[i];
             st.keys[q] = st.keys[q] + 1 ? st.keys[q] + 1 : 1;
@@ -302,7 +319,7 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
         // The ghost's outlines start flat (and hidden), each point distinct.
         for (u32 r = 0; r < 4; ++r) {
             for (u32 i = 0; i < 32; ++i) {
-                frame.paths[r].points[i].x = frame.paths[r].points[63 - i].x = -44 * unit + static_cast<i32>(i) * 2907;
+                frame.paths[r].points[i].x = frame.paths[r].points[63 - i].x = -27 * unit + static_cast<i32>(i) * 1783;
                 frame.paths[r].points[i].y = -307;
                 frame.paths[r].points[63 - i].y = 307;
             }
@@ -349,20 +366,14 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
             ++blocks;
         }
         if (st.owed >= 65536) st.owed = 0;   // too far behind: let it go
-        // The stroboscope flashes at each predicted return.
+        // The pendulum swings once a breath, out at each predicted return.
         const u32 period = chain::exp2_q24(chain::period_log2(s) + 3 * 4096 - 24 * 4096);   // ticks
-        if (period && st.chain.ticks >= (st.breaths + 1) * period) {
-            st.breaths = st.chain.ticks / period;
-            st.glow = 0;
-        }
-        // The pendulum swings once a breath, out at each flash.
         if (period) {
             u32 rem = st.chain.ticks % period, p = period;
             while (p > (1u << 20)) { p >>= 1; rem >>= 1; }
             st.phase = rem * 3600 / p;
         }
     }
-    st.glow = st.glow > 4096 ? 4096 : st.glow + dt;
 
     // The header.
     static const char* const titles[8] = {"energy", "masses", "springs", "time", "dispersion", "mode", "damping", "seed"};
@@ -413,25 +424,43 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
     // The parts the other controls turn, eased.
     st.slide = ease(st.slide, (plate::fast << 8) + (((plate::slow - plate::fast) * chain::amount(input.slots[chain::TIME])) >> 7), left);
     st.swing = ease(st.swing, st.running && !input.reduced_motion ? (30 << 8) * heard / steps : 0, left);
-    st.damper = ease(st.damper, 70 - ((plate::lowered * chain::amount(input.slots[chain::DAMPING])) >> 15), left);
+    {
+        // The felt: its pad's foot lowered by damping from 34 px above the
+        // top of the chain as energy draws it back to 4 px above it, its top
+        // kept 14 px under the header, the lever turned to put it there.
+        const i32 damping = chain::amount(input.slots[chain::DAMPING]);
+        i32 top = plate::row_y * unit - (st.reach << 2) - 34 * unit + ((30 * unit * damping) >> 15) - plate::pad * unit;
+        top = top < 52 * unit ? 52 * unit : top;
+        const i32 sine_q14 = ((top - plate::pivot_y * unit) << 4) / plate::lever;
+        const i32 cube = (((sine_q14 * sine_q14) >> 14) * sine_q14) >> 14;
+        const i32 tenths16 = ((sine_q14 + cube / 6) * 573) >> 10;   // asin, sixteenths of a tenth of a degree
+        st.damper = snap ? tenths16 : ease(st.damper, tenths16, left);
+    }
     st.lump = ease(st.lump, s.dispersion, left);
     st.lift = ease(st.lift, st.running ? 1024 : 0, left);
+    const Layout l = layout(st.chain.size, st.chain.n);
     u32 spent = 0;
+    // The stands, the plank's halves, the pendulum and the damper, where the
+    // chain's span puts them.
+    const i32 left_stand = l.hook_left - plate::stand_out * unit, right_stand = l.hook_right + plate::stand_out * unit;
+    spent += put(frame, node::plank_left, l.hook_left - plate::plank_out * unit, plate::plank_y * unit, unit, shade::plank, fill_and_stroke);
+    spent += put(frame, node::plank_right, l.hook_right + plate::plank_out * unit, plate::plank_y * unit, unit, shade::plank, fill_and_stroke);
+    spent += put(frame, node::stand_left, left_stand, plate::row_y * unit, unit, shade::stand, fill_and_stroke);
+    spent += put(frame, node::stand_right, right_stand, plate::row_y * unit, unit, shade::stand, fill_and_stroke);
     {
         // The regulator: its rod on the knife edge, the bob slid along it.
         const i32 sway = ((st.swing >> 8) * rotation(st.phase).cos) >> 10;   // tenths
         const Turn t = rotation(normal(sway));
         const i32 along = st.slide << 2;   // Q10 px
-        spent += put_turned(frame, node::rod, plate::pendulum_x * unit, plate::pendulum_y * unit, unit, t.cos, t.sin, shade::rod, stroke);
-        spent += put_turned(frame, node::regulator, plate::pendulum_x * unit - ((t.sin * along) >> 10),
-                            plate::pendulum_y * unit + ((t.cos * along) >> 10), unit, t.cos, t.sin, shade::regulator, fill_and_stroke);
+        const i32 px = l.hook_right + plate::pendulum_out * unit, py = plate::pendulum_y * unit;
+        spent += put_turned(frame, node::rod, px, py, unit, t.cos, t.sin, shade::rod, stroke);
+        spent += put_turned(frame, node::regulator, px - ((t.sin * along) >> 10), py + ((t.cos * along) >> 10), unit, t.cos, t.sin,
+                            shade::regulator, fill_and_stroke);
     }
-    spent += put_angle(frame, node::damper, plate::pivot_x * unit, plate::pivot_y * unit, unit, st.damper, shade::damper, stroke);
-    spent += put(frame, node::flash, plate::lamp_x * unit, plate::lamp_y * unit, unit,
-                 !st.running ? shade::dark : st.glow < 61 ? shade::lit : st.glow < 184 ? shade::fading : shade::dark, stroke);
+    spent += put_angle(frame, node::damper, left_stand, plate::pivot_y * unit, unit, st.damper >> 4, shade::damper, fill_and_stroke);
 
-    const i32 spacing = static_cast<i32>(tables::spacing[st.chain.size]);
-    spent += ghost(st, frame, spacing, st.running && !input.reduced_motion);
+    const i32 spacing = l.spacing;
+    spent += ghost(st, frame, l, st.running && !input.reduced_motion);
     u32 room = fresh ? 0xffffu : budget > spent ? budget - spent : 0;
 
     // The chain: a bob moves (half a pixel or more) with both its coils,
@@ -447,11 +476,11 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
     scale = scale > 2 * unit ? 2 * unit : scale < 112 ? 112 : (scale + 8) & ~15;
     const i32 groove = (plate::groove * scale) >> 10;
     const bool cubic = s.springs >= 16384;
-    auto weight_x = [&](u32 j) { return plate::hook_left * unit + static_cast<i32>(j + 1) * spacing; };
+    auto weight_x = [&](u32 j) { return l.hook_left + static_cast<i32>(j + 1) * spacing; };
     auto place_coil = [&](u32 j) -> u32 {   // the coil on weight j's left (j = n: the last, to the right hook)
-        const i32 x0 = j == 0 ? plate::hook_left * unit : weight_x(j - 1) + groove;
+        const i32 x0 = j == 0 ? l.hook_left : weight_x(j - 1) + groove;
         const i32 y0 = j == 0 ? plate::row_y * unit : plate::row_y * unit - (st.shown[j - 1] << 2);
-        const i32 x1 = j == n ? plate::hook_right * unit : weight_x(j) - groove;
+        const i32 x1 = j == n ? l.hook_right : weight_x(j) - groove;
         const i32 y1 = j == n ? plate::row_y * unit : plate::row_y * unit - (st.shown[j] << 2);
         const i32 dx = x1 - x0, dy = y1 - y0;
         const u32 length = chain::root(static_cast<u32>((dx >> 4) * (dx >> 4) + (dy >> 4) * (dy >> 4))) << 4;   // Q10
