@@ -1,8 +1,8 @@
 // Fermi's screen under the track's amp envelope (SDK 1.10, amp.h), run by
 // sdk.py test:
 // - with the envelope unknown, every frame is as it was before the screen
-//   read the envelope (a checksum of a scene's frames, taken from the screen
-//   before this change);
+//   read the envelope (a checksum of a scene's frames, first taken from the
+//   screen before it read the envelope, and retaken for the stock-look redraw);
 // - a short envelope stops the strobe soon after the note-off, a long one
 //   keeps it running, the chain swinging, until its release ends; a slow
 //   attack draws the chain out less at first, and a long release still
@@ -138,7 +138,7 @@ int main() {
         hash = fnv(hash, &h, sizeof h);
     }
     std::printf("envelope: unknown, frames hash %016llx\n", hash);
-    const unsigned long long before = 0xe68259ccfd266030ull;  // the screen at origin/main, 59f7414
+    const unsigned long long before = 0x1bbed8a292c689b4ull;  // the stock-look redraw, 3ccd1f7 (the envelope already unknown-safe since 59f7414)
     if (hash != before) { std::printf("FAIL unknown envelope: frames hash %016llx, before %016llx\n", hash, before); ++failures; }
 
     // 2. A short envelope against a long one: the init sound, and the same
