@@ -346,10 +346,12 @@ and contact sheets come from `tools/frames.cpp` on the host.
 ## CPU
 
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`
-(`opxy-sample-callback-v1`), in three runs at `v0.8.0`: Ghost's sample callback
+(`opxy-sample-callback-v1`), in two runs at `v0.9.0`: Ghost's sample callback
 at its default settings, playing the SDK's generated two-second test sample,
-costs **3.03%** of the 580,352-cycle audio block. This test plays one setting;
-heavier settings cost more.
+costs **3.02%** of the 580,352-cycle audio block on average, and its worst
+single block **5.69%**. In the same firmware v0.8.0 measured 3.02% and 6.39%:
+a new note's lines are now cleared as they are read, not all in its first
+block. This test plays one setting; heavier settings cost more.
 
 The figures below are host estimates made during development.
 

@@ -33,9 +33,8 @@ out after the key is let go.
 
 **Status: experimental.** Coin passes the SDK's tests and runs on an
 OP-XY, and its CPU is measured there
-(below). Its screen now follows the track's amp envelope, which needs
-version 1.10 of the Open-XY SDK: this version can't ship until SDK 1.10 is
-released.
+(below). Its screen follows the track's amp envelope, which needs
+version 1.10 of the Open-XY SDK, on its `staging` branch.
 
 ## Controls
 
