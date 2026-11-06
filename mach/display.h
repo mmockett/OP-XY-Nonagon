@@ -1,5 +1,6 @@
 #pragma once
 #include <opxy/page_header.hpp>
+#include "amp.h"
 #include "flight.h"
 
 namespace mach {
@@ -39,6 +40,7 @@ struct Mark { i32 x, y, r; };
 struct DisplayState {
     opxy::draw::PageHeader header;
     opxy::draw::NoteTracker notes;
+    nonagon_amp::Follower amp;  // the track's amp envelope, as the screen follows it (amp.h)
     u32 initialized, track, serial;
     Scene eased;               // the controls as the idle photograph shows them, eased
     Scene flight;              // the latest flight's, fixed at its note-on

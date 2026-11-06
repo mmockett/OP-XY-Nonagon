@@ -3,7 +3,8 @@
 // a flight at every control's setting (each swept in twentieths, also below
 // Mach 1 and at Mach 3), every outline it reshapes is one the OP-XY draws
 // cleanly, every header caption fits its column in the OP-XY's font, and its churn (nodes whose transform or paint changed, outlines
-// re-keyed) stays within budget, and no spark is drawn over the projectile. With arguments it measures one scenario and
+// re-keyed) stays within budget, no spark is drawn over the projectile, and a flight leaves past the field's right side
+// whole, behind the mask, never a part at a time. With arguments it measures one scenario and
 // prints chosen frames as JSON for tools/frame2svg.py:
 //   c++ -std=c++11 -O2 -I<sdk>/sdk/include tests/screen.cpp -o screen
 //   ./screen <flight|session|echo|subsonic|tour|gallery|still:<control>:<value>|sweep:<control>:<value>[:<mach>]> [fps] [snapshot seconds ...]
@@ -88,6 +89,45 @@ static void outlines(const mach::Frame& f, const char* scenario, double t) {
             ++outline_faults;
         }
     }
+}
+
+// A flight leaves the field whole: no part of it (the projectile, its shocks,
+// its wake) is hidden while any of that part still shows left of the mask, or
+// would after one more frame's flight; nor, once the projectile's nose is
+// behind the mask, any of its sparks. Unless its sound has ended with the
+// projectile short of the mask: then it all goes at once, where the sound
+// ended. (In the field a spark gives up its node to the newest, every quarter
+// second, and the sound-wave rings end at their own reach, all flight.)
+static int exit_faults = 0;
+static opxy::i32 leftmost(const mach::Frame& f, unsigned i) {
+    const opxy::draw::Node& n = f.nodes[i];
+    if (i < mach::Frame::path_count) {
+        opxy::i32 least = 0;
+        for (unsigned k = 0; k < mach::Frame::point_count; ++k)
+            if (f.paths[i].points[k].x < least) least = f.paths[i].points[k].x;
+        return n.x + static_cast<opxy::i32>((static_cast<long long>(least) * n.scale) >> 10);
+    }
+    if (i >= mach::node::projectile && i < mach::node::projectile + mach::node::projectiles)
+        return n.x + mach::plate::tail[i - mach::node::projectile];
+    return n.x - 820;   // a spark, 0.8 px either side
+}
+static void exits(const mach::Frame& was, const mach::Frame& f, bool& through, bool ended, opxy::i32 step, const char* scenario, double t) {
+    const opxy::i32 off = opxy::draw::hidden_x * opxy::draw::unit;
+    for (unsigned s = 0; s < mach::node::projectiles; ++s) {
+        const opxy::draw::Node& p = was.nodes[mach::node::projectile + s];
+        if (p.x < off && p.x + mach::plate::nose[s] >= mach::plate::mask) through = true;
+    }
+    if (ended && !through) return;
+    unsigned parts[3 + mach::node::projectiles + mach::node::sparks] = {mach::node::bow, mach::node::tail, mach::node::wake};
+    for (unsigned k = 0; k < mach::node::projectiles; ++k) parts[3 + k] = mach::node::projectile + k;
+    for (unsigned k = 0; k < mach::node::sparks; ++k) parts[3 + mach::node::projectiles + k] = mach::node::spark + k;
+    for (unsigned i : parts)
+        if (was.nodes[i].x < off && f.nodes[i].x >= off && leftmost(was, i) + (i >= mach::node::spark ? 0 : step) < mach::plate::mask &&
+            (through || i < mach::node::spark)) {
+            if (exit_faults < 12) std::printf("FAIL exit in %s at %.3f s: node %u hidden %.1f px short of the mask\n", scenario, t, i,
+                                              (mach::plate::mask - leftmost(was, i)) / 1024.0);
+            ++exit_faults;
+        }
 }
 
 static Churn run(const char* scenario, double fps, const std::vector<double>& snaps, bool quiet);
@@ -178,6 +218,10 @@ int main(int argc, char** argv) {
                 clean ? "ok  " : "FAIL", outline_faults, 8 * 21 * 3);
     (void)before;
     ok = ok && clean;
+    const bool whole = exit_faults == 0;
+    std::printf("%s exits: every flight past the field's right side leaves whole behind the mask (%d parts cut away early)\n",
+                whole ? "ok  " : "FAIL", exit_faults);
+    ok = ok && whole;
     const bool apart = spark_faults == 0;
     std::printf("%s sparks: none drawn over the projectile, over the sessions and sweeps (%d were)\n",
                 apart ? "ok  " : "FAIL", spark_faults);
@@ -259,6 +303,8 @@ static Churn run(const char* scenario, double fps, const std::vector<double>& sn
     static mach::Frame last;
     mach::display_reset(state);
     opxy::draw::Input input = {};
+    // The envelope unknown, as before SDK 1.10 (tests/envelope.cpp follows one).
+    input.amp.attack = input.amp.decay = input.amp.sustain = input.amp.release = opxy::draw::envelope_unavailable;
     input.track = 1;
     input.held_notes = 0;
     for (unsigned i = 0; i < 4; ++i) input.shown[i] = static_cast<opxy::u8>(i);
@@ -268,6 +314,7 @@ static Churn run(const char* scenario, double fps, const std::vector<double>& sn
     int held = 0;
     double total = 0, worst = 0, worst_at = 0, total_flying = 0;
     int flying_frames = 0;
+    bool through = false, was_flying = false;   // this flight's projectile has reached the mask; a flight shown
     for (int n = 0; n < frames; ++n) {
         const double t = n / fps;
         while (next < steps.size() && steps[next].at <= t) {
@@ -284,6 +331,12 @@ static Churn run(const char* scenario, double fps, const std::vector<double>& sn
         if (!opxy::draw::valid(frame)) { std::printf("FAIL invalid frame in %s at %.3f s\n", scenario, t); return Churn{0, 0, 0, false}; }
         outlines(frame, scenario, t);
         sparks(frame);
+        if (n && state.flying && was_flying)
+            exits(last, frame, through, state.line.start + (state.elapsed << 6) > state.flight.length - state.before,
+                  // a frame's flight, and a pixel: Q14 pixels a millisecond, as display.cpp has it
+                  (((((state.flight.scale * (state.flight.mach >> 4)) / 1000) >> 2) * tick) >> 4) + opxy::draw::unit, scenario, t);
+        else through = false;
+        was_flying = state.flying != 0;
         int churn = 0;
         if (n) {
             for (unsigned i = 0; i < mach::Frame::node_count; ++i) {

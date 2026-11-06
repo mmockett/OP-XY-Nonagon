@@ -63,3 +63,21 @@ that is beside this repository).
 
 When a change reaches the device, ask for a photo of the screen, and check
 each machine at its heaviest settings before calling it finished.
+
+## The amp envelope on the synths' screens
+
+The seven synths' screens follow the track's stock amp envelope (SDK 1.10's
+`input.amp`) through `tools/amp.h`, which reads stock's times and shapes from
+`tools/amp_curve.h`. A machine builds from its own folder, so each synth
+holds byte-identical copies of both: edit them in `tools/`, copy them to every
+synth, and check with
+`for m in sand cocoa coin fermi mach butterfly drop; do cmp tools/amp.h $m/amp.h; cmp tools/amp_curve.h $m/amp_curve.h; done`.
+Its functions are `static`, so the copies never clash in one firmware.
+The envelope scales or times each screen's own note-driven motion; it adds
+no decoration. With the envelope unknown a screen draws exactly as before,
+which each synth's `tests/envelope.cpp` checks against a checksum of its
+frames; a host test that zeroes its `Input` gets a known envelope of zeros,
+so set `input.amp` to `envelope_unavailable` where a test means the old
+timing. The curves are stock OS 1.2.1's: a larger release word is a SHORTER
+release. Keep both headers to 32-bit multiplies and shifts by constants: the
+macOS firmware build has no arithmetic runtime for 64-bit ones.

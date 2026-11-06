@@ -17,6 +17,7 @@ const u32 pool_size = 16;       // notes that sound at once, on every track
 struct Lines {
     opxy::i16 comb[2][2 * line_length];
     i32 tail[2][ear_tail];
+    u32 zero_from;   // a new note's lower copies are silent from here up, and stale from write to here (sample.cpp, clean)
 };
 
 // A voice: what it plays from, its resonators' state and where its

@@ -163,17 +163,29 @@ void check_frame(const Frame& frame, const std::vector<Art>& art, const std::str
 }
 
 // Frames of one setting: a held note struck after a few frames, then 2 s of
-// its animation at 30 frames a second, then released.
-void play(const double* c, const std::vector<Art>& art, const std::string& name, DisplayState& state, Frame& frame) {
+// its animation at 30 frames a second, then released. With `envelope`, under
+// a slow amp envelope (a 1.25 s attack, a 3.4 s release; amp.h), its
+// release played out: the wingbeat's depth through every level; without
+// it, the envelope unknown, as before SDK 1.10.
+void play(const double* c, const std::vector<Art>& art, const std::string& name, DisplayState& state, Frame& frame,
+          bool envelope = false) {
     display_reset(state);
     opxy::draw::Input in = {};
+    if (envelope) {
+        in.amp.attack = in.amp.decay = 1073741823;
+        in.amp.sustain = 1610612735;
+        in.amp.release = 1503238553;
+    } else {
+        in.amp.attack = in.amp.decay = in.amp.sustain = in.amp.release = opxy::draw::envelope_unavailable;
+    }
     in.track = 1;
     for (int i = 0; i < 8; ++i) in.slots[i] = q31(c[i]);
     for (int i = 0; i < 4; ++i) {
         in.parameters[i] = in.slots[i];
         in.shown[i] = static_cast<opxy::u8>(i);
     }
-    for (int t = 0; t < 70; ++t) {
+    const int frames = envelope ? 180 : 70;
+    for (int t = 0; t < frames; ++t) {
         in.elapsed = 34;
         if (t == 3) {
             in.note_serial = 1;
@@ -200,6 +212,7 @@ int main(int argc, char**) {
             for (int i = 0; i < 8; ++i) c[i] = presets[0].c[i];
             c[k] = v / 20.0;
             play(c, art, std::string(names[k]) + " " + std::to_string(v * 5), state, frame);
+            play(c, art, std::string(names[k]) + " " + std::to_string(v * 5) + " under a slow envelope", state, frame, true);
             ++settings;
         }
     // Every control at 0, 1/2 and 1 together, and each preset.
@@ -211,6 +224,7 @@ int main(int argc, char**) {
     }
     for (const Preset& pr : presets) {
         play(pr.c, art, pr.name, state, frame);
+        play(pr.c, art, std::string(pr.name) + " under a slow envelope", state, frame, true);
         ++settings;
     }
     // As a device showed the root's spike: flux .293, coupling 0.19, spread
@@ -222,7 +236,8 @@ int main(int argc, char**) {
         std::printf("FAIL  %d outline(s) the OP-XY would draw as streaks or slivers; the first: %s\n", failures, first_failure.c_str());
         return 1;
     }
-    std::printf("ok    every outline, over %d settings and their animation, has area, turns no sharper than 168 degrees, keeps "
+    std::printf("ok    every outline, over %d settings and their animation (each control alone and each preset under a slow "
+                "amp envelope too), has area, turns no sharper than 168 degrees, keeps "
                 "its points apart and closes over at least a quarter of a pixel\n",
                 settings);
     return 0;

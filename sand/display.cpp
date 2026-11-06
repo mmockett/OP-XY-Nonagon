@@ -21,6 +21,13 @@
 // draw the figure; a note while the
 // plate still sounds keeps its sand, as the sound does, and a strike jolts
 // it. Settled grains stop moving, so a still plate redraws nothing.
+//
+// Where the OP-XY tells the screen its amp envelope (SDK 1.10, amp.h), the
+// plate is bowed as long as the sound lasts, as the voice bows it until the
+// envelope ends it, and the sand is thrown by what is heard: the plate's
+// swing scaled by the envelope, swelling with its attack, holding at its
+// sustain and fading over its release. Without it, the screen keeps its own
+// timing: bowed while keys are held, ringing down after.
 #include "display.h"
 
 namespace sand {
@@ -152,6 +159,7 @@ inline void part(F& frame, u32 node, Turn r, u32 grey, Paint paint) {
 inline void display_reset(DisplayState& state) {
     state.header.reset();
     state.notes.reset();
+    nonagon_amp::reset(state.amp);
     state.started = 0;
 }
 
@@ -195,6 +203,10 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     // the plate as hard as it is not bowed, and the strike jolts the sand.
     const bool fresh = !state.started || !state.notes.initialized || state.notes.track != input.track;
     state.notes.update(input);
+    // What the last frame heard of the plate, through the amp envelope (Q15;
+    // all of it without one): a plate the envelope has silenced pours fresh sand.
+    const i32 was = nonagon_amp::known(state.amp) ? nonagon_amp::level(state.amp) : 32768;
+    const bool started = !fresh && state.serial != input.note_serial;
     const i32 dt = clamp(input.elapsed, 0, 102);
     const i32 strike = strike_share(bow);
     const i32 tilt_target = -(tilt * kTiltMost / 32767) * unit;  // the far (left) edge goes down
@@ -212,7 +224,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         state.struck = kRebound;
     } else if (state.serial != input.note_serial) {
         state.serial = input.note_serial;
-        if (state.swing + state.ring < kSilent) {
+        if (((state.swing + state.ring) * was >> 15) < kSilent) {
             pour(state.grains, grains_shown, state.seed);
             poured = true;
         }
@@ -223,7 +235,13 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     }
     state.since = state.since > (1 << 20) ? state.since : state.since + dt;
     const bool unknown = input.held_notes > 128;
-    const bool held = unknown ? state.since < 1536 : input.held_notes != 0;  // without activity: 1.5 s a note
+    // With the amp envelope known, the voice bows the plate until the
+    // envelope ends the sound, and the sand hears the swing at the envelope's
+    // level; without it, the plate is bowed while keys are held.
+    const bool follows = nonagon_amp::follow(state.amp, input, started);
+    const i32 heard = follows ? nonagon_amp::level(state.amp) : 32768;  // Q15
+    const bool held = follows ? nonagon_amp::sounding(state.amp) && heard > 0
+                              : unknown ? state.since < 1536 : input.held_notes != 0;  // without activity: 1.5 s a note
 
     // Run the sand: one look per 5.8 ms. The bowed mode swells toward the
     // bow's level while held (as fast as it is bowed) and rings down after;
@@ -244,7 +262,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         state.tilt = tilt_target;
         state.struck = kRebound;
         if (poured || fresh) {
-            t.weight[0] = figure_weight(state.swing, modes[0].ratio);
+            t.weight[0] = figure_weight(state.swing * heard >> 15, modes[0].ratio);
             for (u32 n = 0; n < kSettleLooks; ++n) look_all(state, modes, t, count);
         }
         state.jolted = 0;
@@ -257,10 +275,11 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             state.swing = held ? state.swing + ((target - state.swing) * rise >> 15) : state.swing * mat.fall >> 15;
             state.ring = state.ring * mat.fall >> 15;
             if (held) state.ring -= state.ring * rise >> 15;  // the bow damps the strike
-            t.weight[0] = figure_weight(state.swing + state.ring, modes[0].ratio);
+            const i32 swung = (state.swing + state.ring) * heard >> 15;
+            t.weight[0] = figure_weight(swung, modes[0].ratio);
             // Shake jolts the plate while it sounds, as the sound's shake does.
-            const bool sounding = held || state.swing + state.ring >= kSilent;
-            t.jitter = (sounding ? calm : 0) + (state.jolted ? strike * kJolt >> 15 : 0);
+            const bool sounding = held || swung >= kSilent;
+            t.jitter = (sounding ? calm : 0) + (state.jolted ? (strike * kJolt >> 15) * heard >> 15 : 0);
             t.jolts = state.jolted ? 32767 : shake;
             state.jolted = 0;
             look_all(state, modes, t, count);

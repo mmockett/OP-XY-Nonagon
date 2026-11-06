@@ -22,6 +22,8 @@ bool same(const Node& a, const Node& b) {
 }
 void prepare(Input& input, const double* c) {
     std::memset(&input, 0, sizeof input);
+    // The envelope unknown, as before SDK 1.10 (tests/envelope.cpp follows one).
+    input.amp.attack = input.amp.decay = input.amp.sustain = input.amp.release = envelope_unavailable;
     for (int k = 0; k < 8; ++k) input.slots[k] = q31(c[k]);
     for (int k = 0; k < 4; ++k) { input.parameters[k] = input.slots[k]; input.shown[k] = static_cast<opxy::u8>(k); }
 }

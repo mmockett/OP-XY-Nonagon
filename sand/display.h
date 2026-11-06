@@ -1,5 +1,6 @@
 #pragma once
 #include <opxy/page_header.hpp>
+#include "amp.h"
 #include "sand.h"
 #include "view.h"
 
@@ -24,6 +25,7 @@ const u32 bare_grey = 4;
 struct DisplayState {
     opxy::draw::PageHeader header;
     opxy::draw::NoteTracker notes;
+    nonagon_amp::Follower amp;  // the track's amp envelope, as the screen follows it (amp.h)
     Grain grains[grains_shown];
     u32 started;    // the first frame has set every element
     u32 serial;     // the note-start serial last seen

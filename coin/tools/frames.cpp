@@ -48,6 +48,9 @@ void start() {
     std::memset(&frame, 0, sizeof frame);
     std::memset(&input, 0, sizeof input);
     coin::display_reset(state);
+    // The amp envelope unknown, as the builder's preview has it: the screen's
+    // own timing (tools/amp_sheet.py draws it under an envelope).
+    input.amp.attack = input.amp.decay = input.amp.sustain = input.amp.release = envelope_unavailable;
     input.track = 1;
     input.elapsed = 17;   // 60 frames a second, Q10 s
 }

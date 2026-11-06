@@ -39,9 +39,20 @@
 // waves spread from where it was; its wake churns; a spark marks where it
 // was every quarter second; and two marks on the line
 // of flight show where the sound heard now left it, parting forwards and
-// backwards after the cone. Releasing every note eases the photograph back.
+// backwards after the cone. A flight that reaches the field's right side flies
+// on behind a mask at the glass's edge (make_panel.py), its wake and shocks
+// with it, until all of it has passed: it leaves the plate whole, even after
+// its sound has ended, and the sound it sends from past the edge spreads back
+// into the field. Releasing every note eases the photograph back.
 // The screen cannot hear the engine: it derives the flight from the controls
 // and time through flight.h, as the engine does.
+//
+// Where the OP-XY tells the screen its amp envelope (SDK 1.10, amp.h), a
+// flight flies on after the keys are up, as the voice does, until the
+// envelope ends the sound or the flight its own; and the sound waves reach
+// as far as the sound is loud: they spread further as the attack swells,
+// hold at the sustain and draw in over the release. Without it, the screen
+// keeps its own timing: a flight ends as the last key is released.
 namespace mach {
 namespace screen {
 using opxy::draw::unit;
@@ -95,13 +106,19 @@ inline Scene scene_of(const opxy::draw::Input& in) {
     return s;
 }
 
-// Is a ring of radius r (Q10) about (x, y) whole inside the photograph's
-// rectangular field, `margin` pixels in?
-inline bool inside(i32 x, i32 y, i32 r, i32 margin) {
+// Is a ring of radius r (Q10) about (x, y) to be drawn: whole inside the
+// photograph's field on the left, top and bottom, `margin` pixels in, and not
+// wholly behind the mask on the right? What crosses the right side passes
+// behind the mask, so it is drawn on until all of it has gone.
+inline bool in_view(i32 x, i32 y, i32 r, i32 margin) {
     const i32 pr = (r >> 10) + margin;
-    return (x >> 10) - pr >= plate::left && (x >> 10) + pr <= plate::right &&
+    return (x >> 10) - pr >= plate::left && x - r < plate::mask &&
            (y >> 10) - pr >= plate::top && (y >> 10) + pr <= plate::bottom;
 }
+// Nothing the projectile trails (its wake, its shocks' arms) lies further
+// behind its tail than this, Q10 pixels: those outlines reach at most 64 of
+// their points' units either way, drawn at twice that size.
+const i32 trail = 128 * unit;
 
 // How far (whole pixels, at most `most`) a line from (x, y) Q10 runs along the
 // unit direction (dx, dy) Q16 before it leaves the field.
@@ -212,6 +229,7 @@ inline void display_reset(DisplayState& state) {
     state = DisplayState();
     state.header.reset();
     state.notes.reset();
+    nonagon_amp::reset(state.amp);
     state.boom_age = state.echo_age = -1;
 }
 
@@ -256,9 +274,15 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         e.reach = ease(e.reach, target.reach, dt);
     }
 
-    // A note launches a flight, fixed at note-on; releasing every note, or
-    // the flight's last sound arriving, ends it.
-    if (input.note_serial != state.serial) {
+    // A note launches a flight, fixed at note-on; releasing every note (with
+    // the amp envelope known, the envelope's end), or the flight's last sound
+    // arriving, ends it. heard is the envelope's level in sixteenths (all of
+    // it without one).
+    const bool started = input.note_serial != state.serial;
+    const bool follows = nonagon_amp::follow(state.amp, input, started);
+    const i32 heard = follows ? nonagon_amp::level_steps(state.amp, 16) : 16;
+    const bool let_go = follows ? !nonagon_amp::sounding(state.amp) || heard <= 0 : events.hold_ended;
+    if (started) {
         state.serial = input.note_serial;
         if (!input.reduced_motion) {
             state.flying = 1;
@@ -286,7 +310,10 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         if (state.boom_age >= 0) state.boom_age += dt;
         if (state.echo_age >= 0) state.echo_age += dt;
     }
-    if (state.flying && (events.hold_ended || input.reduced_motion || (state.elapsed << 6) > state.line.length + 22938)) {
+    // A flight's own end (its last sound heard) waits for a projectile still
+    // leaving the plate behind the mask; nothing else is shown by then.
+    const bool over = (state.elapsed << 6) > state.line.length + 22938 && !state.bullet.r;
+    if (state.flying && (let_go || input.reduced_motion || over)) {
         state.flying = 0;
         state.boom_age = state.echo_age = -1;
     }
@@ -311,14 +338,19 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 t_ms = ((now >> 6) * 1000) >> 10;
         const i32 limit = speed > 0 ? 11468800 / speed : 1 << 20;     // keep |x| under 700 px
         bx = cx + clamp((clamp(t_ms, -limit, limit) * speed) >> 4, -800 * unit, 800 * unit);
-        shown = now >= -before && now <= after && inside(bx, ly, 0, 30);
+        // Once its nose is behind the mask it flies on, past its sound's end,
+        // until all it trails has passed the mask too: it leaves whole.
+        const bool through = !started && state.bullet.r && bx + plate::nose[shape] >= plate::mask;
+        shown = now >= -before && (now <= after || through) && (bx >> 10) - 30 >= plate::left &&
+                bx + plate::tail[shape] - trail < plate::mask;
     }
     if (state.flying || snap || !state.bullet.r) state.bullet.x = bx;
     else state.bullet.x = ease(state.bullet.x, bx, dt);
     state.bullet.y = ly;
     state.bullet.r = shown ? 1 : 0;
+    const bool body = shown && state.bullet.x + plate::tail[shape] < plate::mask;   // not yet wholly behind it
     for (u32 i = 0; i < node::projectiles; ++i) {
-        if (i == shape && shown) place(frame, node::projectile + i, state.bullet.x & ~255, ly, unit, metal, fill_and_stroke);
+        if (i == shape && body) place(frame, node::projectile + i, state.bullet.x & ~255, ly, unit, metal, fill_and_stroke);
         else hide(frame, node::projectile + i);
     }
 
@@ -334,14 +366,23 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         place(frame, node::pointer, (plate::scale_x + 3) * unit, py & ~255, unit, pointer_grey, stroke);
         const i32 t_ms = state.flying ? ((now >> 6) * 1000) >> 10 : 0;
         const i32 first_ms = state.flying ? -(((before >> 6) * 1000) >> 10) : -(1 << 20);
-        const i32 newest = state.flying ? (t_ms >= 0 ? t_ms / spark_ms : -((-t_ms + spark_ms - 1) / spark_ms)) : -1;
+        i32 newest = state.flying ? (t_ms >= 0 ? t_ms / spark_ms : -((-t_ms + spark_ms - 1) / spark_ms)) : -1;
+        // Once the projectile's nose reaches the mask no new spark takes a
+        // node (none could be laid on the plate), so none of those on it gives
+        // up its node; they stay for the rest of the flight, as marks on the
+        // plate, after the projectile has gone.
+        bool out = false;
+        if (state.flying && speed > 0) {
+            const i32 edge = ((plate::mask - plate::nose[shape] - cx) << 4) / (spark_ms * speed);
+            if (newest > edge) { newest = edge; out = true; }
+        }
         const u32 count = state.flying ? node::sparks : 4;
         bool used[node::sparks] = {};
         u32 shown = 0;
         for (i32 j = newest; j > newest - static_cast<i32>(node::sparks) && shown < count; --j) {
-            if (j * spark_ms < first_ms || !state.bullet.r) continue;
+            if (j * spark_ms < first_ms || !(state.bullet.r || out)) continue;
             const i32 x = cx + clamp(((j * spark_ms) * speed) >> 4, -800 * unit, 800 * unit);
-            if (!inside(x, ly, 0, 4) || x > state.bullet.x + plate::tail[shape] - 3 * unit) continue;   // clear of its tail
+            if ((x >> 10) - 4 < plate::left || x - 820 >= plate::mask || x > state.bullet.x + plate::tail[shape] - 3 * unit) continue;   // clear of its tail
             const u32 n = static_cast<u32>(((j % 8) + 8) % 8);
             place(frame, node::spark + n, x & ~511, ly, unit, spark_grey, stroke);
             used[n] = true;
@@ -356,7 +397,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     // while its tangent point lies on the cone's drawn arm, r sqrt(M^2 - 1)
     // within its reach, so the cone holds every ring ---
     const i32 air = flight::amount(input.slots[AIR]);
-    const i32 extent = radius * unit - ((radius * unit) >> 10) * ((air * 655) >> 15);
+    i32 extent = radius * unit - ((radius * unit) >> 10) * ((air * 655) >> 15);
+    if (state.flying && follows) extent = extent * heard / 16;               // as far as the sound is loud
     i32 contain = 1 << 20;                                                     // the largest ring the cone holds, pixels
     if (sc.mach > flight::one + 256) {
         const i32 rt = static_cast<i32>(flight::isqrt(static_cast<u32>(flight::mul16(sc.mach, sc.mach) - flight::one) << 12)) << 2;   // sqrt(M^2 - 1), Q16
@@ -385,7 +427,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             r = (static_cast<i32>(i) + 1) * sc.wave;
             x = cx - ((r * (sc.mach >> 4)) >> 12);
         }
-        if (r > extent || (r >> 10) > contain || (r && !inside(x, ly, r, 1))) r = 0;
+        if (r > extent || (r >> 10) > contain || (r && !in_view(x, ly, r, 1))) r = 0;
         Mark& m = state.ring[i];
         if (state.flying || snap || !m.r || !r) { m.x = x; m.r = r; }
         else { m.x = ease(m.x, x, dt); m.r = ease(m.r, r, dt); }
@@ -420,12 +462,15 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 offset = which ? plate::tail[shape] : plate::nose[shape] + (standoff << 6);
         const i32 ax = state.bullet.x + offset;
         i32* last = state.shock[which];
-        if (!(cone || (bow_wave && !which)) || !state.bullet.r || !inside(ax, ly, 0, 2)) { hide(frame, n); last[2] = -1; continue; }
+        if (!(cone || (bow_wave && !which)) || !state.bullet.r || (ax >> 10) - 2 < plate::left) { hide(frame, n); last[2] = -1; continue; }
         // the arms run to the field's edge, as far as the node reaches; the tail's a fifth shorter
         const i32 span = (arm_reach << 16) / (cos_mu > sin_mu ? cos_mu : sin_mu);
         const i32 most = bow_wave ? 10 + ((18 * sc.mach) >> 16) : which ? (span * 4) / 5 : span;
         const i32 up = reach_edge(ax, ly, -cos_mu, -sin_mu, most) & ~3, down = reach_edge(ax, ly, -cos_mu, sin_mu, most) & ~3;
         if (up < 8 || down < 8) { hide(frame, n); last[2] = -1; continue; }
+        // Past the field's right side the shock goes on behind the mask, until
+        // the ends of its arms (no further back than (up or down) cos mu) pass it.
+        if (ax - (((up > down ? up : down) * cos_mu) >> 6) - unit >= plate::mask) { hide(frame, n); last[2] = -1; continue; }
         if (last[2] != up || last[3] != down || state.shock_mach != shape_mach || state.shock_look != look) {
             shock_points(frame.paths[n], shape_mach, which ? 8 + (blunt >> 1) : standoff, up, down, which && width > 400 ? (width * 3) >> 2 : width);
             frame.paths[n].key = ++state.key;
@@ -481,7 +526,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 phase = state.flying ? static_cast<i32>((state.frames >> 2) * 470 % 3600) : 0;            // a step every 4 frames
         const i32 tx = state.bullet.x + plate::tail[shape];
         const i32 room = reach_edge(tx, ly, -65536, 0, length);
-        if (state.bullet.r && room >= 12) {
+        // shown until its far end, too, has passed behind the mask
+        if (state.bullet.r && room >= 12 && tx - room * unit < plate::mask) {
             if (state.wake[0] != room || state.wake[1] != phase) {
                 wake_points(frame.paths[node::wake], room, phase);
                 frame.paths[node::wake].key = ++state.key;
@@ -525,7 +571,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
                 for (u32 j = 0; j < count; ++j) {
                     if (sigma[j] < -(before >> 6) || sigma[j] > (after >> 6)) continue;
                     const i32 hx = cx + clamp((sigma[j] * speed) >> 4, -800 * unit, 800 * unit);
-                    if (!inside(hx, ly, 0, 4)) continue;
+                    if ((hx >> 10) - 4 < plate::left || hx - 4 * unit >= plate::mask) continue;
                     place(frame, node::heard + marks, hx & ~511, ly, unit, bright, stroke);
                     ++marks;
                 }

@@ -285,6 +285,8 @@ void screen_follows() {
     static coin::DisplayState state;
     static coin::Frame frame;
     opxy::draw::Input input = {};
+    // The envelope unknown, as before SDK 1.10 (tests/envelope.cpp follows one).
+    input.amp.attack = input.amp.decay = input.amp.sustain = input.amp.release = opxy::draw::envelope_unavailable;
     const double c[8] = {0.5, 0.5, 0, 0, 0.3, 0, 0.3, 0.6};
     for (int k = 0; k < 8; ++k) input.slots[k] = q31(c[k]);
     for (int k = 0; k < 4; ++k) { input.parameters[k] = input.slots[k]; input.shown[k] = static_cast<opxy::u8>(k); }

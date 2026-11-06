@@ -10,7 +10,8 @@
 //     the size and turn its node gives it, has neighbouring points within an
 //     eighth of a pixel (the device merges them), a closing edge under a
 //     quarter of a pixel (a sliver), or no area (a streak). Checked in every
-//     frame of every scene here, and over a sweep of each control.
+//     frame of every scene here, and over a sweep of each control, with the
+//     amp envelope unknown and with a slow one swelling in and fading out.
 //   - Every caption fits its column in the device's face (tests/widths.h):
 //     a value at 20 px within 53 px, a title at 10 px within 56, over a fine
 //     sweep of every control and their combinations.
@@ -93,6 +94,8 @@ struct Screen {
         std::memset(&state, 0, sizeof state);
         std::memset(&frame, 0, sizeof frame);
         std::memset(&input, 0, sizeof input);
+        // The envelope unknown, as before SDK 1.10 (tests/envelope.cpp follows one).
+        input.amp.attack = input.amp.decay = input.amp.sustain = input.amp.release = opxy::draw::envelope_unavailable;
         input.track = 1;
         fermi::display_reset(state);
     }
@@ -227,28 +230,39 @@ void valid_everywhere() {
 void drawn_as_the_device_draws() {
     // Each control swept over nine settings, the others at their defaults,
     // idle and through a note; then the smallest and largest bobs and coils.
+    // The sweep runs again under a slow amp envelope (a 1.25 s attack and a
+    // 3.4 s release, amp.h), so the chain and its ghost are drawn at every
+    // level as they swell in and fade out.
     const double defaults[8] = {0.5, 2.5 / 7, 0, 0.39, 0.15, 0.125, 0, 0.5 / 64};
     unsigned faults = 0, frames = 0, reported = 0;
     auto run = [&](Screen& s) {
+        const int after = s.input.amp.release == opxy::draw::envelope_unavailable ? 15 : 120;
         s.reported = reported;
         s.tick(1 / 30.0, false);
         for (int f = 0; f < 15; ++f) s.tick(1 / 30.0, false);
         s.note();
         for (int f = 0; f < 45; ++f) s.tick(1 / 30.0, false);
         s.release();
-        for (int f = 0; f < 15; ++f) s.tick(1 / 30.0, false);
+        for (int f = 0; f < after; ++f) s.tick(1 / 30.0, false);
         faults += s.faults;
-        frames += 76;
+        frames += 61 + after;
         reported = s.reported;
     };
-    for (int k = 0; k < 8; ++k)
-        for (int v = 0; v <= 8; ++v) {
-            Screen s;
-            s.scene_name = "the sweep";
-            for (int j = 0; j < 8; ++j) s.controls[j] = defaults[j];
-            s.controls[k] = v / 8.0;
-            run(s);
-        }
+    for (int slow = 0; slow < 2; ++slow)
+        for (int k = 0; k < 8; ++k)
+            for (int v = 0; v <= 8; ++v) {
+                Screen s;
+                s.scene_name = slow ? "the sweep under a slow envelope" : "the sweep";
+                if (slow) {
+                    s.input.amp.attack = q31(0.5);
+                    s.input.amp.decay = q31(0.5);
+                    s.input.amp.sustain = q31(0.75);
+                    s.input.amp.release = q31(0.7);
+                }
+                for (int j = 0; j < 8; ++j) s.controls[j] = defaults[j];
+                s.controls[k] = v / 8.0;
+                run(s);
+            }
     for (int masses = 0; masses < 7; masses += 6)
         for (int corner = 0; corner < 8; ++corner) {
             Screen s;
@@ -261,7 +275,7 @@ void drawn_as_the_device_draws() {
             s.controls[5] = corner & 4 ? 3.5 / 4 : 0.5 / 4;
             run(s);
         }
-    std::printf("screen: %u frames over a sweep of every control and the bobs' and coils' extremes, %u outlines the device would "
+    std::printf("screen: %u frames over a sweep of every control (also under a slow amp envelope) and the bobs' and coils' extremes, %u outlines the device would "
                 "streak or merge\n", frames, faults);
     check(faults == 0, "an outline breaks the device's drawing rules");
 }

@@ -1,12 +1,8 @@
 {
   "schema": 1,
-  "sdk": "1.4",
+  "sdk": "1.10",
   "kind": "synth",
   "description": "Euler's disks spun on a mirror: each note's whirr rises along a finite-time power law through its ring, then stops dead.",
-  "identity": {
-    "engine": 57,
-    "page": 115
-  },
   "presetDefaults": {
     "amp": {
       "attack": 0,

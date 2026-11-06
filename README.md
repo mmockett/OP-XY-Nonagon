@@ -21,7 +21,8 @@ than nine sounds you won't have heard from a synth before.
 OP-XY, their screens are checked against how it draws, and their CPU is
 measured on it (below). v0.8.0's Ghost and Recur, with Shift on the sampler's
 markers and gain, Recur's own break and its trim as the loop, have been played
-and measured on the OP-XY. Expect rough edges.
+and measured on the OP-XY. The seven synths' screens now follow the track's
+amp envelope, which needs version 1.10 of the Open-XY SDK. Expect rough edges.
 
 All nine are live in the [open-xy.com](https://open-xy.com) builder:
 [Sand](https://open-xy.com/#preview/machines/sand),
@@ -349,13 +350,14 @@ sampler's own mixing, so they don't compare directly with the synths.
 
 ## Building
 
-The seven synths need SDK 1.4 (the two-page header), on the `staging` branch
-of [etcetc000/open-xy](https://github.com/etcetc000/open-xy). Ghost and Recur
+The seven synths need SDK 1.10 (their screens read the track's amp
+envelope), on the `staging` branch of
+[etcetc000/open-xy](https://github.com/etcetc000/open-xy). Ghost and Recur
 are sample engines with their own screens, Shift on the stock sampler's
-markers and gain, and screens that follow the amp envelope, which need SDK
-1.10, also on `staging`, as is `samples`, which lets Recur ship its own break.
-Build all nine from `staging`, checked out beside this repository as
-`../open-xy` (one firmware comes from one SDK checkout):
+markers and gain, and screens that follow the amp envelope, also SDK 1.10 on
+`staging`, as is `samples`, which lets Recur ship its own break. Build all
+nine from `staging`, checked out beside this repository as `../open-xy` (one
+firmware comes from one SDK checkout):
 
 ```sh
 git clone -b staging https://github.com/etcetc000/open-xy ../open-xy
@@ -371,8 +373,9 @@ describes, including `content/samples/recur/break.wav`. Pass the layout read
 from your OP-XY (`/layout.json`) so the machines already on it keep their
 numbers.
 
-They ask for these numbers; a build gives them out when they're free, and
-otherwise the lowest free ones:
+A build gives each machine its numbers and keeps them in `layout.json`.
+These are the numbers they have had so far; a build with your last layout
+keeps them:
 
 | | Engine | Page |
 | --- | --- | --- |
@@ -396,7 +399,18 @@ the screen's own size in `docs/controls-1x.png` where present). Screens are
 checked the way the OP-XY draws them, not just in the browser preview: text
 measured in the device's font at its real size (`tools/caption_width.py`),
 outlines against the device's drawing rules, and churn kept low;
-[AGENTS.md](AGENTS.md) has the rules. The
+[AGENTS.md](AGENTS.md) has the rules.
+
+The synths' screens follow the track's amp envelope through one helper,
+`tools/amp.h`, copied into each synth's folder as `amp.h`: a note's motion
+swells with the attack, holds at the sustain while keys are held and fades
+over the release, so it lasts as long as the sound. It uses the OP-XY's own
+times and curves (`tools/amp_curve.h`): a larger attack or decay is a longer
+stage, but a larger release is a shorter one. The attack rises quickly and
+rounds off at the top, the decay and release fade exponentially, and the
+sustain is a plain level. Without the envelope (an older OS, the builder's preview) each
+screen keeps its own timing. `tools/amp_sheet.py` draws a synth's screen
+under a short envelope against a long one, at 1:1. The
 animations in `docs/screens` are rendered from the real display code through
 the SDK's browser preview, at the OP-XY's 480 × 220 and in its screen font,
 Univers Next Pro Light, by

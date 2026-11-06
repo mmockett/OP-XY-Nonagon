@@ -33,7 +33,9 @@ out after the key is let go.
 
 **Status: experimental.** Coin passes the SDK's tests and runs on an
 OP-XY, and its CPU is measured there
-(below).
+(below). Its screen now follows the track's amp envelope, which needs
+version 1.10 of the Open-XY SDK: this version can't ship until SDK 1.10 is
+released.
 
 ## Controls
 
@@ -187,7 +189,8 @@ into a line: it leans away at most 11°, and its face's engraving is left out
 when seen at under 12°. A big disk thrown far would reach the header, so it
 leans only as far as the stage lets it, and wobble's ghost comes down with it:
 at 1:32 from spin about 65, at 1:16 from about 75. `tests/frames.cpp` checks
-every outline and node through each control's range and a note's animation, and
+every outline and node through each control's range and a note's animation,
+also under a slow amp envelope, and
 `tests/churn.cpp` that the disk and its ghost stay below y 38.
 
 The note's first disk is the four reshaping outlines, projected each frame:
@@ -204,6 +207,17 @@ rises, as a real disk's does. When it leaves the surface it falls flat in
 frame, and fade over the ring's time, and it is still. Companion disks lean,
 wobble and stop on their own. They are drawn smaller than they are (they
 differ by under 1%), so that three fit on the mirror.
+
+Where the OP-XY tells the screen the track's amp envelope (SDK 1.10), the
+disks spin for as long as the sound lasts, and what is seen is what is
+heard: the lean, the rattle, the ghost's rocking and the ripples' flare
+follow the envelope, swelling with its attack, holding at its sustain while
+keys are held and fading over its release. A slow attack lifts the thrown
+disk from flat; a short release lays it flat at once, and a long one lets
+it settle as it would, or, at hold, keeps it spinning, leaning lower, until
+the release ends. Without the envelope (an older OS, the builder's preview)
+the screen keeps its own timing. The shared `amp.h` follows the envelope;
+its note gives stock's envelope times and shapes.
 
 Every control changes the toy at a glance ([`docs/controls.png`](docs/controls.png):
 a row per control at 0, 50 and 100, enlarged; [`docs/controls-1x.png`](docs/controls-1x.png)
@@ -280,7 +294,17 @@ are the ones the host times as dearest. The firmware compile
 - `display.cpp`, `display.h`, `plate.h`, `panel.svg.fragment`: the screen.
   The artwork and face patterns are written by `tools/make_panel.py`; run it
   after changing a shape, and commit all three.
+- `amp.h`: the amp envelope as the screen follows it, a copy of the
+  suite's `tools/amp.h`.
+- `amp_curve.h`: stock's amp envelope times and shapes, which `amp.h`
+  follows, a copy of the suite's `tools/amp_curve.h`.
 - `tests/sound.cpp`: the sound and screen checks, run by `sdk.py test`.
+- `tests/envelope.cpp`: the screen under the amp envelope, run by
+  `sdk.py test`: unchanged frames with the envelope unknown, a short
+  envelope's motion ending soon after the note-off and laying the disk flat,
+  a long one keeping a disk at hold spinning through its release, a slow
+  attack leaning the disk less at first, and churn under a held note and its
+  release.
 - `tests/frames.cpp`: every frame's outlines and nodes against what the
   OP-XY draws cleanly, run by `sdk.py test`.
 - `tests/captions.cpp`: every header caption against the OP-XY's font, run

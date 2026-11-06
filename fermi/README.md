@@ -26,7 +26,9 @@ settles toward its struck mode, as a string's does.
 
 **Status: experimental.** Fermi passes the SDK's tests and runs on an
 OP-XY, where its CPU is
-measured (below).
+measured (below). Its screen now follows the track's amp envelope, which
+needs version 1.10 of the Open-XY SDK: this version can't ship until SDK 1.10
+is released.
 
 ## Controls
 
@@ -206,8 +208,16 @@ controls still it is the same chain, step for step, even in chaos:
 `tests/screen.cpp` checks that the screen's chain and a voice's are
 bit-identical after 9,600 blocks at energy 0.9.
 
-The strobe runs while a key is held and for 2 s after the last release. Then
-the chain eases back to its drawn rest. Motion eases out in 0.15 s, and
+Where the OP-XY tells the screen the track's amp envelope (SDK 1.10), the
+strobe runs for as long as the sound lasts, and the chain is drawn as it is
+heard: the arch, its ghost and the regulator's swing scaled by the envelope,
+swelling with its attack, holding at its sustain while keys are held and
+fading over its release. A short release stops the strobe at once; a long
+one keeps the chain swinging, ever smaller, until the sound ends. Damping
+still takes the swing down sooner. Without the envelope (an older OS, the
+builder's preview) the screen keeps its own timing: the strobe runs while a
+key is held and for 2 s after the last release. Either way the chain then
+eases back to its drawn rest. Motion eases out in 0.15 s, and
 reduced motion snaps. A bob moves with both its coils, three nodes at a time,
 so the chain never tears, however the budget falls. The idle screen is still.
 
@@ -350,7 +360,7 @@ masses or mode change). Ten voiced partials are what fit this budget.
 
 ## Tests
 
-`sdk.py test` passes, with two host tests.
+`sdk.py test` passes, with three host tests.
 
 `tests/sound.cpp` checks:
 - **Reversibility:** 200,000 steps at energy 0.9 return to the start bit for
@@ -381,7 +391,8 @@ masses or mode change). Ten voiced partials are what fit this budget.
 - every frame is drawn as the device draws it: no outline it shows, at the
   size and turn its node gives it, merges points, closes over a sliver or
   has no area. It runs over every frame of its scenes and a sweep of each
-  control through a note (6,688 frames), from each node's outline as
+  control through a note, and the sweep again under a slow amp envelope
+  swelling in and fading out (19,720 frames), from each node's outline as
   `tools/make_panel.py` writes it to `tests/outlines.h`;
 - every caption fits its column in the device's face, Univers Next Pro
   Light (its advance widths in `tests/widths.h`, from `tools/make_widths.py`):
@@ -394,6 +405,17 @@ masses or mode change). Ten voiced partials are what fit this budget.
 
 `tests/screen.cpp` also writes the GIF's frames, the contact sheet and the
 captions.
+
+`tests/envelope.cpp` checks the screen under the amp envelope:
+- with the envelope unknown, every frame of a scene is as the screen drew it
+  before it read the envelope;
+- a short envelope (instant attack, a release of about 40 ms) stops the
+  strobe 0.05 s after the note-off, and a long one (a 1.25 s attack, a 3.4 s
+  release) keeps it running 3.5 s; a quarter second in, the slow attack has
+  drawn the chain out 3.7 px against the instant one's 18.8;
+- churn under a held note and its release, at the defaults and the heaviest
+  settings, under each: at most 15.3 nodes a frame on average, a peak of 19,
+  none at rest.
 
 ## Prior art
 
@@ -414,7 +436,9 @@ clock and voices the energy flow between its modes.
 | `display.h`, `display.cpp`, `panel.svg.fragment` | The apparatus (`tools/make_panel.py`, which also writes `tests/outlines.h`) |
 | `tools/make_widths.py` | `tests/widths.h`: the header face's advance widths, for the captions' check |
 | `tools/calibrate.py`, `tools/calibration.json` | The energy knob's and the clock's calibration |
-| `tests/sound.cpp`, `tests/screen.cpp` | Host checks |
+| `amp.h` | The amp envelope as the screen follows it, a copy of the suite's `tools/amp.h` |
+| `amp_curve.h` | Stock's amp envelope times and shapes, which `amp.h` follows, a copy of the suite's `tools/amp_curve.h` |
+| `tests/sound.cpp`, `tests/screen.cpp`, `tests/envelope.cpp` | Host checks |
 | `tools/render.cc`, `tools/phrases.py`, `tools/sweep.py`, `tools/measure.py` | Phrase renders, Hexagon comparisons, the control sweep and the measurements |
 | `tools/make_gif.py` | `docs/fermi.gif`, `docs/controls.png` and `docs/controls-1x.png`, and stills such as `docs/breathing.png`, `docs/into-chaos.png` and `docs/cubic.png` |
 

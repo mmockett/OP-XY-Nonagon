@@ -26,7 +26,9 @@ lines closer than about 3 px, nothing finer than a pixel, no text under
   - two marks on the line of flight: where the sound heard now left;
   - a spark mark every quarter second where the projectile was, so their
     spacing is its speed on the plate;
-  - in the data strip, a pointer beside the Mach scale (0.3 to 3).
+  - in the data strip, a pointer beside the Mach scale (0.3 to 3);
+  - over them all, a mask at the glass's right edge: the projectile flies
+    on behind it and leaves the plate whole.
 Node numbers are display.h's."""
 import math
 import pathlib
@@ -56,6 +58,7 @@ POINTS = 64
 EDGE = (12, 44, 468, 216)                         # the glass's edge: left, top, right, bottom
 STRIP = 56                                        # the data strip's divider
 FIELD = (STRIP + 4, 44, 468, 216)                 # where the photograph draws, right of the strip
+MASK = EDGE[2] - 1.2                              # the glass's right edge, inside: the mask covers from here
 CENTRE_X = 288                                    # the closest pass, right of the field's middle: the cone opens left
 LINE_Y = 130                                      # the line of flight, the field's middle
 SCALE = (40, 176, 66)                             # the Mach scale: its line's x, M 0.3's y, M 3's y
@@ -265,6 +268,14 @@ out.append(node(POINTER, outline([(0.0, 0.0), (6.0, -3.5), (6.0, 3.5)]), 13, (SC
 for i in range(SPARKS):
     out.append(node(SPARK + i, outline([(-0.8, -4.5), (0.8, -4.5), (0.8, 4.5), (-0.8, 4.5)]), 9, HIDDEN))
 
+# The mask, drawn after every node so it covers them: black from the glass's
+# right edge to the screen's, and that edge drawn again over it. What flies on
+# past the field's right side passes behind the frame and leaves the plate
+# whole (display.cpp), never cut away a part at a time. Static: it never
+# changes, so it costs no redraws of its own.
+out.append(f'<path d="{outline([(MASK, T - 4), (480, T - 4), (480, 220), (MASK, 220)], 2)}" fill="#000000" stroke="#000000" stroke-width="0.3"/>')
+out.append(f'<path d="{outline([(MASK, T), (R, T), (R, B), (MASK, B)], 2)}" fill="{G(9)}" stroke="{G(9)}" stroke-width="0.3"/>')
+
 for i, grey in enumerate(GREYS):
     out.append(f'<circle id="{ID}_palette_{i}" cx="640" cy="0" r="1" fill="{grey}" stroke="{grey}" '
                f'stroke-width="{num(LINE)}"/>')
@@ -290,6 +301,8 @@ plate_h = ["// Written by tools/make_panel.py: do not edit.",
            "namespace plate {",
            "// The photograph's field (pixels), right of the data strip, and the closest pass.",
            f"const opxy::i32 left = {FIELD[0]}, top = {FIELD[1]}, right = {FIELD[2]}, bottom = {FIELD[3]};",
+           "// The mask's left side, Q10 pixels: anything wholly right of it is hidden behind it.",
+           f"const opxy::i32 mask = {math.floor(MASK * 1024)};",
            f"const opxy::i32 centre_x = {CENTRE_X};",
            "// The data strip's Mach scale: its line, and where M 0.3 and M 3 fall on it.",
            f"const opxy::i32 scale_x = {SCALE[0]}, scale_bottom = {SCALE[1]}, scale_top = {SCALE[2]};",

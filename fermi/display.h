@@ -1,5 +1,6 @@
 #pragma once
 #include <opxy/page_header.hpp>
+#include "amp.h"
 #include "chain.h"
 
 namespace fermi {
@@ -39,6 +40,7 @@ const i32 lowered = 171;            // the damper's swing, from 7 degrees up to 
 struct DisplayState {
     opxy::draw::PageHeader header;
     opxy::draw::NoteTracker notes;
+    nonagon_amp::Follower amp;     // the track's amp envelope, as the screen follows it (amp.h)
     u32 initialized, track, serial;
     chain::Chain chain;            // the latest note's chain, run as its voice runs it
     u32 running;                   // 1 while the strobe lights the chain

@@ -24,6 +24,13 @@
 // steam's plume and how fast they shrink; seed in the water
 // stars' turns, the puddles' shapes and the hops. Integer
 // arithmetic only.
+//
+// Where the OP-XY tells the screen its amp envelope (SDK 1.10, amp.h), the
+// drops sound as long as the envelope does: their stars' lobes are as deep
+// as the sound is loud, swelling with its attack, holding at its sustain
+// while keys are held, and they boil away over its release, as fast or as
+// slowly as it fades, gone when it ends. Without it, the screen keeps its
+// own timing: a released drop boils away within a second.
 namespace drop {
 // The SDK's draw::sine, kept local to this machine: the
 // Blackfin compiler emits an inline function it doesn't inline as a strong
@@ -223,6 +230,7 @@ inline void captions(const physics::Plate& p, const i32* slots, char values[8][o
 inline void display_reset(DisplayState& state) {
     state.header.reset();
     state.notes.reset();
+    nonagon_amp::reset(state.amp);
     state.initialized = 0;   // the next frame snaps everything into place
 }
 
@@ -243,7 +251,15 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     const bool fresh = !state.initialized || state.track != input.track;
     const bool reduced = input.reduced_motion != 0;
     const i32 dt = fresh ? 0 : clamp(input.elapsed, 0, 102);   // motion eases on at most 0.1 s a frame
-    const bool held = input.held_notes != 0 && input.held_notes <= 128;
+    // With the amp envelope known, a drop sounds until the envelope ends it,
+    // as loud as its level; without it, while keys are held.
+    const bool started = !fresh && input.note_serial != state.serial;
+    const i32 was = nonagon_amp::level(state.amp);   // the last frame's level, Q15
+    const bool follows = nonagon_amp::follow(state.amp, input, started);
+    const i32 heard = follows ? nonagon_amp::level(state.amp) : 32768;   // Q15
+    const bool fading = follows && input.held_notes == 0 && heard < was;   // the release, to its end
+    const bool held = follows ? nonagon_amp::sounding(state.amp) && heard > 0
+                              : input.held_notes != 0 && input.held_notes <= 128;
     if (fresh) {
         state.initialized = 1;
         state.track = input.track;
@@ -293,7 +309,10 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
     for (u32 k = 0; k < scene::most; ++k) {
         ScreenDrop& d = state.drops[k];
         if (!d.used) continue;
-        // Let go, the amp fades the note, and the drop boils away with it.
+        // Let go, the amp fades the note, and the drop boils away with it:
+        // over the envelope's release as it falls, gone as it ends.
+        if (fading && !reduced)
+            d.drop.life = (d.drop.life >> 15) * (heard * 32768 / was);
         if (!held) d.drop.life -= reduced ? physics::one : (physics::one >> 10) * dt * 4 / 3;
         if (!held && d.drop.life <= 0) d.drop.lobes = 0;
         for (i32 b = 0; b < blocks && d.drop.lobes; ++b) {
@@ -369,7 +388,7 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         if (floating) {
             const u32 n = dr.lobes >= 2 ? dr.lobes : 2;
             const i32 depth = dr.lobes >= 3 ? star_amount : dr.lobes == 2 ? pair_amount : round_amount;
-            const i32 amount = (((depth * swing >> 10) * dr.star >> 15) * p.floating >> 15) * breathing >> 10;   // Q10
+            const i32 amount = ((((depth * swing >> 10) * dr.star >> 15) * p.floating >> 15) * breathing >> 10) * heard >> 15;   // Q10
             // A puddle (twice the capillary length and over) is seen as its
             // rim, 3/4 of its height up; a small drop is a bead, seen round,
             // its middle a radius up. Between the two it rounds.
@@ -389,7 +408,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
             put(frame, rim, x, y, unit, 15, stroke);
             const i32 gap = mm_px(vapour + lift) * scene::cos_e >> 10;
             const i32 size = clamp(radius / scene::ring, 16, 2 * unit);
-            if (size >= 430) nudge(frame, under, x, y - gap, size, d.flash ? 15 : 10);   // it flashes as the vapour vents
+            // It flashes as the vapour vents, while the sound is a quarter loud or more.
+            if (size >= 430) nudge(frame, under, x, y - gap, size, d.flash && heard >= 8192 ? 15 : 10);
             else conceal(frame, under);   // too small to draw cleanly
             // Its shadow stays on the iron, a dark footprint the vapour lifts it off.
             nudge(frame, node::shadow + k, x, y, size, 2, fill_and_stroke);
@@ -458,7 +478,8 @@ inline void display(DisplayState& state, const opxy::draw::Input& input, Frame& 
         const i32 rate = physics::contacts(p) > 12 ? 12 : physics::contacts(p);
         for (u32 k = 0; k < scene::most; ++k) {
             if (!state.drops[k].used || !dt) continue;
-            if (static_cast<i32>(next(state.dice) & 0xffffu) >= rate * dt * 64) continue;
+            const i32 chance = rate * dt * 64;   // of 65536: fewer as the sound fades
+            if (static_cast<i32>(next(state.dice) & 0xffffu) >= (heard < 32768 ? chance * (heard >> 3) >> 12 : chance)) continue;
             for (u32 j = 0; j < node::sparks; ++j)
                 if (state.sparks[j].left <= 0) {
                     state.sparks[j].left = spark_time;
