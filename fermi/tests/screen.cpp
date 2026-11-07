@@ -231,7 +231,7 @@ void drawn_as_the_device_draws() {
     // Each control swept over nine settings, the others at their defaults,
     // idle and through a note; then the smallest and largest bobs and coils.
     // The sweep runs again under a slow amp envelope (a 1.25 s attack and a
-    // 3.4 s release, amp.h), so the chain and its ghost are drawn at every
+    // 3.4 s release, amp.h), so the chain is drawn at every
     // level as they swell in and fade out.
     const double defaults[8] = {0.5, 2.5 / 7, 0, 0.39, 0.15, 0.125, 0, 0.5 / 64};
     unsigned faults = 0, frames = 0, reported = 0;

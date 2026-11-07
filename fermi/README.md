@@ -146,9 +146,9 @@ in the same roles, on the same phrases, through each engine's own `render()`:
 One object (`tools/make_panel.py`): **the chain as a laboratory apparatus**,
 drawn in the stock look's grey code. Each part takes the grey of the encoder
 that moves it, and the four run left to right in encoder order: the bobs
-hollow in a light line (encoder 1), the stands dark solids (2), the coils and
-the felt mid grey (3), the pendulum and the seed's flag light (4). The plank
-and the swing's ghost belong to no encoder.
+strung on their coils in one light line (encoder 1), the stands dark solids
+(2), the felt mid grey (3), the pendulum and the seed's flag light (4). The
+plank belongs to no encoder.
 
 ![Fermi's screen: energy drawing the chain back, a breathing note, the crossing into chaos, then eight bobs on cubic coils](docs/fermi.gif)
 
@@ -161,8 +161,6 @@ and the swing's ghost belong to no encoder.
     stands still and only the energy's flow moves the shape. While the chain
     breathes, the arch ripples into higher modes and comes back clean at each
     return. In chaos it shivers.
-  - A faint ghost around the chain holds the swing's recent extremes, like a
-    long exposure.
   - A **regulator pendulum** in a bracket on the right stand, and a felt
     damper on a lever from the left stand.
 - **Every control moves a part of it.** `docs/controls.png` shows each
@@ -173,8 +171,8 @@ and the swing's ghost belong to no encoder.
   - **Masses** sets the number of bobs (8 to 32). They hang at a near-even
     spacing, so more bobs make a longer chain and the stands move apart, from
     226 px between them to 376.
-  - **Springs** swaps the coils. Quadratic coils are open, conical and grey
-    (they stiffen one way). Cubic coils are straight and tall (alike both
+  - **Springs** swaps the coils. Quadratic coils open out along their
+    length (they stiffen one way). Cubic coils are straight and even (alike both
     ways).
   - **Time** slides the regulator's bob down its rod, from fast near the
     knife edge to slow at the rod's foot: the longer the pendulum, the slower
@@ -201,10 +199,16 @@ of its own.
 It is drawn for the device's renderer too, which merges an outline's
 neighbouring points within an eighth of a pixel, draws a closing edge under
 a quarter of a pixel as a sliver, and streaks an outline with no area. Every
-line is a closed ribbon, started on its longest edge. A coil's ribbon is a
-pixel wide with a straight lead at each end, so its ends stay a fifth of a
-pixel across at the smallest a coil is drawn, and the bobs never grow so big
-that the coils between them shrink below 6.4 px.
+line is a closed ribbon. The chain is four reshaping outlines, a quarter of
+its springs each, redrawn whole every frame: a 0.6 px ribbon out along the
+string, over the top of each bob and along each coil's turns, and back under
+them, so the stroke draws each bob as a hollow ring and each coil as a zigzag.
+A coil meets its bob on the line between their centres, so the ribbon never
+folds back onto the rim; a coil stretched steeper than 2 in 1 is drawn
+straight, pulled taut; the bobs never grow so big that the string between
+them is under 6.4 px. With 64 points an outline, the coils lose turns as the
+masses grow: seven at 8 masses, three at 16, one at 24, and at 28 and 32 the
+bobs are beads on a straight string.
 
 The screen cannot hear the voices. It runs its own copy of the latest note's
 chain with the same code (`chain.h`), a block of time at a time. With the
@@ -214,7 +218,7 @@ bit-identical after 9,600 blocks at energy 0.9.
 
 Where the OP-XY tells the screen the track's amp envelope (SDK 1.10), the
 chain runs for as long as the sound lasts, and it is drawn as it is
-heard: the arch, its ghost and the regulator's swing scaled by the envelope,
+heard: the arch and the regulator's swing scaled by the envelope,
 swelling with its attack, holding at its sustain while keys are held and
 fading over its release. A short release stops the chain at once; a long
 one keeps the chain swinging, ever smaller, until the sound ends. Damping
@@ -222,16 +226,14 @@ still takes the swing down sooner. Without the envelope (an older OS, the
 builder's preview) the screen keeps its own timing: the chain runs while a
 key is held and for 2 s after the last release. Either way the chain then
 eases back to its drawn rest. Motion eases out in 0.15 s, and
-reduced motion snaps. A bob moves with both its coils, three nodes at a time,
-so the chain never tears, however the budget falls. The idle screen is still.
+reduced motion snaps. The whole chain moves every frame, in at most four
+changed nodes. The idle screen is still.
 
-**Churn** (host, `tests/envelope.cpp`, a note held 3 s and released): a mean
-of 5.9 to 6.5 nodes a frame at the defaults and 14.0 to 14.2 at the heaviest
-settings, peaking at 19. `tests/screen.cpp` holds the GIF's 31 s scene, a
-change of masses included (it moves the stands, the plank's halves, the
-pendulum and the damper), to a mean of 20 and a peak of 30.
-The swinging pendulum is 2 of those a frame. Idle: 0. The artwork is 118
-nodes and no static paths, and is 39 KB (the preview's limit is 64 KiB).
+**Churn** (host, `tests/envelope.cpp`, a note held 3 s and released): CHURN.
+`tests/screen.cpp` holds the GIF's 31 s scene, a change of masses included
+(it moves the stands, the plank's halves, the pendulum and the damper), to a
+mean of 20 and a peak of 30. Idle: 0. The artwork is 20 nodes and no static
+paths.
 
 ## How it works
 
@@ -367,7 +369,7 @@ masses or mode change). Ten voiced partials are what fit this budget.
   the 2040 KiB module region.
 - There is no division per sample, and one per block (the tilt's gain).
 - **Memory:** a voice is 556 bytes, the voices' shared starting shape and setup 288
-  and the screen state 1,068.
+  and the screen state 804.
 
 ## Tests
 

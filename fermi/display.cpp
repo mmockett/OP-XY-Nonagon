@@ -41,7 +41,6 @@
 namespace fermi {
 namespace screen {
 using namespace opxy::draw;
-const u32 budget = 20;            // nodes changed a frame, at most
 const i32 linger = 2048;          // Q10 s the chain runs on after the last key is let go
 const u32 catch_up = 172;         // blocks a frame at most (0.25 s)
 const i32 steps = 32;             // the envelope's level as the chain is drawn
@@ -235,8 +234,6 @@ inline void block(DisplayState& st, const chain::Setup& s) {
     chain::damp(c, s);
     chain::guard(c, s);
 }
-// The ghost: each quarter of the chain's swing, out along its highs and back
-// along its lows, as one outline about the quarter's middle.
 // Where the chain hangs for its number of masses, Q10 px: the bobs strung at
 // near-even spacing, the span between the hooks growing by a step a size.
 struct Layout {
@@ -250,51 +247,49 @@ inline Layout layout(u32 size, u32 n) {
     l.hook_right = l.hook_left + l.spacing * static_cast<i32>(n + 1);
     return l;
 }
-inline u32 ghost(DisplayState& st, Frame& frame, const Layout& l, bool shown) {
-    if (!shown) {
-        u32 changed = 0;
-        for (u32 q = 0; q < 4; ++q) changed += conceal(frame, node::ghost + q);
-        st.ghost_shown = 0;
-        return changed;
+// The chain, drawn whole every frame as four reshaping outlines, a quarter
+// of its springs each: a thin ribbon out along the string, over the top of
+// each bob and along each coil's turns, and back under them, so the stroke
+// draws each bob as a hollow ring and each coil as a zigzag. A quarter ends
+// at a bob's right rim (or a hook), where the next begins.
+// The angle of (x, y), y up, tenths of a degree, -1800..1800: a CORDIC in
+// 32-bit integers (|x| and |y| under about 2^28).
+inline i32 angle_of(i32 x, i32 y) {
+    static const i32 step[14] = {7200, 4250, 2246, 1140, 572, 286, 143, 72, 36, 18, 9, 4, 2, 1};   // atan 2^-i, 1/160 degree
+    i32 a = 0;
+    if (x < 0) { x = -x; y = -y; a = y > 0 ? -28800 : 28800; }
+    for (u32 i = 0; i < 14; ++i) {
+        const i32 nx = y > 0 ? x + (y >> i) : x - (y >> i);
+        const i32 ny = y > 0 ? y - (x >> i) : y + (x >> i);
+        a += y > 0 ? step[i] : -step[i];
+        x = nx;
+        y = ny;
     }
-    const u32 n = st.chain.n;
-    const u32 inverse = (1u << 30) / static_cast<u32>(l.spacing);   // once a frame
-    const i32 quarter = (l.hook_right - l.hook_left) / 4;
-    const i32 reach = quarter / 2 + unit, pitch = (2 * reach) / 31;   // each quarter overlaps its neighbours by a pixel
-    u32 changed = 0;
-    for (u32 q = 0; q < 4; ++q) {
-        const i32 centre = l.hook_left + quarter * static_cast<i32>(q) + quarter / 2;
-        Point pts[64];
-        for (u32 i = 0; i < 32; ++i) {
-            const i32 off = -reach + static_cast<i32>(i) * pitch;
-            const i32 from_hook = centre + off - l.hook_left;   // the first sample sits just left of the hook
-            const u32 rel = static_cast<u32>(from_hook < 0 ? 0 : from_hook);
-            const u32 p = ((rel >> 4) * inverse) >> 16;   // Q10 masses along the chain
-            const u32 at = p >> 10, frac = p & 1023;
-            const i32 h0 = at == 0 || at > n ? 0 : st.high[at - 1], h1 = at + 1 > n ? 0 : st.high[at];
-            const i32 l0 = at == 0 || at > n ? 0 : st.low[at - 1], l1 = at + 1 > n ? 0 : st.low[at];
-            const i32 h = h0 + (((h1 - h0) * static_cast<i32>(frac)) >> 10);
-            const i32 l = l0 + (((l1 - l0) * static_cast<i32>(frac)) >> 10);
-            pts[i].x = off;
-            pts[i].y = -(h << 2) - 307;
-            pts[63 - i].x = off;
-            pts[63 - i].y = -(l << 2) + 307;
-        }
-        Frame::path_type& path = frame.paths[q];
-        bool moved = !st.ghost_shown || !path.key;
-        for (u32 i = 0; i < 64 && !moved; ++i)
-            moved = magnitude(pts[i].y - path.points[i].y) >= 384 || pts[i].x != path.points[i].x;
-        if (moved) {
-            for (u32 i = 0; i < 64; ++i) path.points[i] = pts[i];
-            st.keys[q] = st.keys[q] + 1 ? st.keys[q] + 1 : 1;
-            path.key = st.keys[q];
-            ++changed;
-        }
-        changed += put(frame, node::ghost + q, centre, plate::row_y * unit, unit, shade::ghost, stroke);
-    }
-    st.ghost_shown = 1;
-    return changed;
+    a /= 16;
+    return a > 1800 ? a - 3600 : a < -1800 ? a + 3600 : a;
 }
+const i32 ribbon = 307;            // half the ribbon's thickness, Q10 px (0.3)
+const u32 side = 32;               // points a side
+struct Strand { i32 x[side], y[side]; u32 count; };
+inline void add(Strand& t, i32 x, i32 y) { if (t.count < side) { t.x[t.count] = x; t.y[t.count] = y; ++t.count; } }
+// Fills a side out to its 32 points, splitting its longest segment in turn.
+inline void pad(Strand& t) {
+    while (t.count < side) {
+        u32 at = 1;
+        i32 longest = -1;
+        for (u32 i = 1; i < t.count; ++i) {
+            const i32 d = magnitude(t.x[i] - t.x[i - 1]) + magnitude(t.y[i] - t.y[i - 1]);
+            if (d > longest) { longest = d; at = i; }
+        }
+        for (u32 i = t.count; i > at; --i) { t.x[i] = t.x[i - 1]; t.y[i] = t.y[i - 1]; }
+        t.x[at] = (t.x[at - 1] + t.x[at + 1]) / 2;
+        t.y[at] = (t.y[at - 1] + t.y[at + 1]) / 2;
+        ++t.count;
+    }
+}
+// Points a side for a quarter of `spacings` springs and `bobs` bobs, with
+// `arc` points over each bob and `turns` on each coil.
+inline u32 needed(u32 spacings, u32 bobs, bool hook, u32 arc, u32 turns) { return 1 + spacings * turns + bobs * arc + (hook ? 1 : 0); }
 }
 
 inline void display_reset(DisplayState& state) {
@@ -316,7 +311,7 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
     const i32 dt = clamp(input.elapsed, 0, 256);
     if (fresh) {
         for (u32 n = 0; n < Frame::node_count; ++n) conceal(frame, n);
-        // The ghost's outlines start flat (and hidden), each point distinct.
+        // The chain's outlines start flat (and hidden), each point distinct.
         for (u32 r = 0; r < 4; ++r) {
             for (u32 i = 0; i < 32; ++i) {
                 frame.paths[r].points[i].x = frame.paths[r].points[63 - i].x = -27 * unit + static_cast<i32>(i) * 1783;
@@ -330,8 +325,6 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
         st.running = 0;
         st.linger = 0;
         st.serial = input.note_serial;
-        st.rotor = 0;
-        st.ghost_shown = 0;
         st.initialized = 1;
         st.track = input.track;
         nonagon_amp::reset(st.amp);
@@ -348,7 +341,6 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
         load(st, s);
         st.running = 1;
         st.linger = linger;
-        for (u32 j = 0; j < chain::most; ++j) st.high[j] = st.low[j] = st.drawn[j];
     } else if (s.n != st.chain.n || s.m != st.chain.m) {
         load(st, s);
     }
@@ -383,7 +375,6 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
 
     // How far the chain is drawn: 4 px a unit of strain at no energy, 34 at full.
     const u32 left = snap ? 0 : opxy::draw::page_header_detail::remaining(static_cast<u32>(dt));
-    const u32 slow = snap ? 0 : opxy::draw::page_header_detail::remaining(static_cast<u32>(dt) / 8);
     st.reach = ease(st.reach, 1024 + ((7680 * s.energy) >> 15), left);
     const u32 n = st.chain.n;
     // Between notes the chain is drawn back in the next note's starting
@@ -415,10 +406,7 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
         target = clamp(target, -8704, 8704);
         if (follows && st.running) target = target * heard / steps;
         st.drawn[j] = ease(st.drawn[j], target, left);
-        if (st.running) {
-            st.high[j] = target > st.high[j] ? target : ease(st.high[j], target, slow);
-            st.low[j] = target < st.low[j] ? target : ease(st.low[j], target, slow);
-        }
+        st.shown[j] = st.drawn[j];
     }
 
     // The parts the other controls turn, eased.
@@ -460,65 +448,143 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
     spent += put_angle(frame, node::damper, left_stand, plate::pivot_y * unit, unit, st.damper >> 4, shade::damper, fill_and_stroke);
 
     const i32 spacing = l.spacing;
-    spent += ghost(st, frame, l, st.running && !input.reduced_motion);
-    u32 room = fresh ? 0xffffu : budget > spent ? budget - spent : 0;
+    (void)spent;
 
-    // The chain: a bob moves (half a pixel or more) with both its coils,
-    // three nodes at a time, as many as the budget allows, resuming where the
-    // last frame stopped; the coils always span the bobs as they stand.
-    // A bob's radius is a share of the spacing that grows with dispersion,
-    // from 0.085 (beads) to 0.3 (heavy bobs), in steps of 1/64.
-    // A bob never leaves its coils under 6.4 px, the shortest the device
-    // draws cleanly (tools/make_panel.py), and is never under 0.6 px across.
-    i32 scale = (spacing * (497 + ((1260 * st.lump) >> 15))) >> 15;   // radius / 5.6 px, Q10
-    const i32 roomiest = ((spacing - 6554) * 183) >> 11;
-    scale = scale > roomiest ? roomiest : scale;
-    scale = scale > 2 * unit ? 2 * unit : scale < 112 ? 112 : (scale + 8) & ~15;
-    const i32 groove = (plate::groove * scale) >> 10;
+    // The chain, whole, every frame: four outlines, a quarter of its springs
+    // each (screen::Strand). A bob's radius is a share of the spacing that
+    // grows with dispersion, from 0.085 (beads) to 0.3 (heavy bobs); it never
+    // leaves its string under 6.4 px, and is never under 1.5 px.
+    i32 radius = (spacing * (87 + ((220 * st.lump) >> 15))) >> 10;   // Q10 px
+    const i32 roomiest = (spacing - 6554) / 2;
+    radius = radius > roomiest ? roomiest : radius;
+    radius = radius < 1536 ? 1536 : radius;
     const bool cubic = s.springs >= 16384;
-    auto weight_x = [&](u32 j) { return l.hook_left + static_cast<i32>(j + 1) * spacing; };
-    auto place_coil = [&](u32 j) -> u32 {   // the coil on weight j's left (j = n: the last, to the right hook)
-        const i32 x0 = j == 0 ? l.hook_left : weight_x(j - 1) + groove;
-        const i32 y0 = j == 0 ? plate::row_y * unit : plate::row_y * unit - (st.shown[j - 1] << 2);
-        const i32 x1 = j == n ? l.hook_right : weight_x(j) - groove;
-        const i32 y1 = j == n ? plate::row_y * unit : plate::row_y * unit - (st.shown[j] << 2);
-        const i32 dx = x1 - x0, dy = y1 - y0;
-        const u32 length = chain::root(static_cast<u32>((dx >> 4) * (dx >> 4) + (dy >> 4) * (dy >> 4))) << 4;   // Q10
-        const i32 safe = length < 64 ? 64 : static_cast<i32>(length);
-        i32 c = (dx << 10) / safe, sn = (dy << 10) / safe;   // a few coils a frame
-        c = c > unit ? unit : c;
-        sn = sn > unit ? unit : sn < -unit ? -unit : sn;
-        i32 coil_scale = static_cast<i32>(length / plate::coil);
-        coil_scale = coil_scale < 64 ? 64 : coil_scale > 2 * unit ? 2 * unit : coil_scale;
-        const u32 on = cubic ? node::straight + j : node::cone + j, off = cubic ? node::cone + j : node::straight + j;
-        return put_turned(frame, on, (x0 + x1) / 2, (y0 + y1) / 2, coil_scale, c, sn, cubic ? shade::hard : shade::coil, stroke) +
-               conceal(frame, off);
-    };
-    // Bobs and coils past the chain's end hide; a new spacing or coil
-    // kind redraws everything, a group at a time.
-    for (u32 j = n; j < chain::most && room; ++j) {
-        const u32 changed = conceal(frame, node::mass + j) + conceal(frame, node::cone + j + 1) + conceal(frame, node::straight + j + 1);
-        room -= changed > room ? room : changed;
+    // Each quarter's springs: the first (n + 1) % 4 quarters take one more.
+    u32 first[5];
+    first[0] = 0;
+    for (u32 q = 0; q < 4; ++q) first[q + 1] = first[q] + (n + 1) / 4 + (q < (n + 1) % 4 ? 1 : 0);
+    // The most points over each bob and turns on each coil that every quarter can hold.
+    u32 arc = 5, turns = 7;
+    for (;;) {
+        bool fits = true;
+        for (u32 q = 0; q < 4 && fits; ++q) {
+            const u32 springs = first[q + 1] - first[q];
+            const bool hook = first[q + 1] == n + 1;
+            fits = needed(springs, hook ? springs - 1 : springs, hook, arc, turns) <= side;
+        }
+        if (fits) break;
+        if (turns > 2 || (arc == 3 && turns > 0)) --turns;
+        else if (arc == 5) { arc = 3; turns = 7; }
+        else break;
     }
-    const u32 from = st.rotor;
-    for (u32 pass = 0; pass < n && room >= 3; ++pass) {
-        const u32 j = (from + pass) % n;
-        const Node& d = frame.nodes[node::mass + j];
-        const Node& c = frame.nodes[cubic ? node::straight + j : node::cone + j];
-        const bool stale = fresh || d.scale != scale || d.x != weight_x(j) || magnitude(st.drawn[j] - st.shown[j]) >= 128 ||
-                           (c.scale == unit && c.x == hidden_x * unit);   // its coil is the other kind
-        if (!stale) continue;
-        st.shown[j] = st.drawn[j];
-        u32 changed = put(frame, node::mass + j, weight_x(j), plate::row_y * unit - (st.shown[j] << 2), scale, shade::mass, fill_and_stroke);
-        changed += place_coil(j);
-        changed += place_coil(j + 1);
-        room -= changed > room ? room : changed;
-        st.rotor = (j + 1) % n;
+    // Each bob's joins: the coils meet its rim on the line to their other
+    // end, so the ribbon never folds back where it turns onto the rim; the
+    // arc runs over the top between them going out, under the bottom coming back.
+    auto bob_x = [&](u32 j) { return l.hook_left + static_cast<i32>(j + 1) * spacing; };
+    auto bob_y = [&](u32 j) { return plate::row_y * unit - (st.shown[j] << 2); };
+    const i32 edge = (ribbon * 573) / radius;   // where the ribbon's edge meets the rim, tenths of a degree off the join
+    i32 toward_left[chain::most], toward_right[chain::most];   // tenths, counterclockwise from the right, y up
+    for (u32 j = 0; j < n; ++j) {
+        const i32 lx = j == 0 ? l.hook_left : bob_x(j - 1), ly = j == 0 ? plate::row_y * unit : bob_y(j - 1);
+        const i32 rx = j + 1 == n ? l.hook_right : bob_x(j + 1), ry = j + 1 == n ? plate::row_y * unit : bob_y(j + 1);
+        toward_left[j] = angle_of(lx - bob_x(j), bob_y(j) - ly);
+        if (toward_left[j] < 0) toward_left[j] += 3600;
+        toward_right[j] = angle_of(rx - bob_x(j), bob_y(j) - ry);
+    }
+    auto rim_x = [&](u32 j, i32 tenths) { return bob_x(j) + ((radius * sine(tenths + 900)) >> 10); };
+    auto rim_y = [&](u32 j, i32 tenths) { return bob_y(j) - ((radius * sine(tenths)) >> 10); };
+    for (u32 q = 0; q < 4; ++q) {
+        const i32 left_x = first[q] == 0 ? l.hook_left : bob_x(first[q] - 1);
+        const i32 right_x = first[q + 1] == n + 1 ? l.hook_right : bob_x(first[q + 1] - 1);
+        const i32 cx = (left_x + right_x) / 2, cy = plate::row_y * unit;
+        Strand out, back;   // relative to (cx, cy); back is built left to right, then reversed
+        out.count = back.count = 0;
+        if (first[q]) {   // the previous quarter's last bob, where its arc ended
+            const u32 p = first[q] - 1;
+            add(out, rim_x(p, toward_right[p] + edge) - cx, rim_y(p, toward_right[p] + edge) - cy);
+            add(back, rim_x(p, toward_right[p] - edge) - cx, rim_y(p, toward_right[p] - edge) - cy);
+        }
+        for (u32 i = first[q]; i < first[q + 1]; ++i) {
+            const bool hook = i == n;
+            // The coil from the left hook or the last bob's join to this bob's join or the right hook.
+            const i32 px = i == 0 ? l.hook_left : rim_x(i - 1, toward_right[i - 1]);
+            const i32 py = i == 0 ? cy : rim_y(i - 1, toward_right[i - 1]);
+            const i32 ex = hook ? l.hook_right : rim_x(i, toward_left[i]), ey = hook ? cy : rim_y(i, toward_left[i]);
+            const i32 dx = ex - px, dy = ey - py;
+            const i32 length = static_cast<i32>(chain::root(static_cast<u32>((dx >> 4) * (dx >> 4) + (dy >> 4) * (dy >> 4))) << 4);
+            const i32 safe = length < 64 ? 64 : length;
+            const i32 nx = -((dy << 10) / safe), ny = (dx << 10) / safe;   // the unit normal, Q10
+            // The ribbon's half-thickness across the coil, so its ends are square to it.
+            const i32 ox = (nx * ribbon) >> 10, oy = (ny * ribbon) >> 10;
+            if (i == 0) {
+                add(out, px - cx - ox, py - cy - oy);
+                add(back, px - cx + ox, py - cy + oy);
+            }
+            // A coil stretched steeper than 2 in 1 is drawn straight, pulled taut.
+            const u32 coil = magnitude(dy) > 2 * magnitude(dx) ? 0 : turns;
+            for (u32 k = 1; k <= coil; ++k) {
+                const i32 t = static_cast<i32>((k << 10) / (turns + 1));   // Q10
+                // Conical for the quadratic law (opening along it), straight for the cubic.
+                const i32 wide = cubic ? 147 : 26 + ((141 * t) >> 10);   // Q10 of the coil's length
+                // Tapered toward its ends (4 t (1 - t)), and never wider than a turn's step.
+                i32 swing = ((((length >> 4) * wide >> 6) >> 2) * (((t * (1024 - t)) >> 10) << 2)) >> 8;   // Q10 px
+                const i32 cap = length / static_cast<i32>(turns + 1);
+                swing = swing > cap ? cap : swing;
+                if (k & 1) swing = -swing;
+                const i32 x = px + ((dx >> 4) * t >> 6) + ((nx * swing) >> 10) - cx;
+                const i32 y = py + ((dy >> 4) * t >> 6) + ((ny * swing) >> 10) - cy;
+                add(out, x - ox, y - oy);
+                add(back, x + ox, y + oy);
+            }
+            if (hook) {
+                add(out, ex - cx - ox, ey - cy - oy);
+                add(back, ex - cx + ox, ey - cy + oy);
+            } else {
+                // Over the top going out, under the bottom coming back, each from join to join.
+                // Where both coils come in from one side, that side's arc is
+                // short: it takes fewer points (a point at its middle at the
+                // least), each at least a fifth of a pixel from the next.
+                const i32 top0 = toward_left[i] - edge, top1 = toward_right[i] + edge;
+                const i32 bottom0 = toward_left[i] + edge, bottom1 = toward_right[i] - edge + 3600;
+                const i32 apart = (205 * 573) / radius;   // tenths of a degree a fifth of a pixel spans
+                for (u32 side_of = 0; side_of < 2; ++side_of) {
+                    const i32 from = side_of ? bottom0 : top0, to = side_of ? bottom1 : top1;
+                    const i32 span = side_of ? to - from : from - to;
+                    u32 points = span <= apart ? 1 : static_cast<u32>(span / apart) + 1;
+                    points = points > arc ? arc : points;
+                    for (u32 a = 0; a < points; ++a) {
+                        const i32 angle = points == 1 ? (from + to) / 2 : from + (to - from) * static_cast<i32>(a) / static_cast<i32>(points - 1);
+                        add(side_of ? back : out, rim_x(i, angle) - cx, rim_y(i, angle) - cy);
+                    }
+                }
+            }
+        }
+        pad(out);
+        pad(back);
+        Frame::path_type& path = frame.paths[q];
+        bool moved = !path.key;
+        for (u32 i = 0; i < side && !moved; ++i) {
+            const Point& o = path.points[i];
+            const Point& b = path.points[2 * side - 1 - i];
+            moved = magnitude(o.x - clamp(out.x[i], -63 * unit, 63 * unit)) >= 128 || magnitude(o.y - clamp(out.y[i], -63 * unit, 63 * unit)) >= 128 ||
+                    magnitude(b.x - clamp(back.x[i], -63 * unit, 63 * unit)) >= 128 || magnitude(b.y - clamp(back.y[i], -63 * unit, 63 * unit)) >= 128;
+        }
+        const Node& d = frame.nodes[node::chain + q];
+        if (moved || fresh || d.x != cx) {
+            for (u32 i = 0; i < side; ++i) {
+                path.points[i].x = clamp(out.x[i], -63 * unit, 63 * unit);
+                path.points[i].y = clamp(out.y[i], -63 * unit, 63 * unit);
+                path.points[2 * side - 1 - i].x = clamp(back.x[i], -63 * unit, 63 * unit);
+                path.points[2 * side - 1 - i].y = clamp(back.y[i], -63 * unit, 63 * unit);
+            }
+            st.keys[q] = st.keys[q] + 1 ? st.keys[q] + 1 : 1;
+            path.key = st.keys[q];
+        }
+        put(frame, node::chain + q, cx, cy, unit, shade::chain, stroke);
     }
 
     // The seed's pin, its point on the bob's crown, lifted 4 px while the chain runs.
     if (!most) conceal(frame, node::pin);
-    else put(frame, node::pin, weight_x(most - 1),
-             plate::row_y * unit - (st.shown[most - 1] << 2) - ((plate::bob * scale) >> 10) - (st.lift << 2), unit, shade::pin, stroke);
+    else put(frame, node::pin, bob_x(most - 1), bob_y(most - 1) - radius - (st.lift << 2), unit, shade::pin, stroke);
 }
 }

@@ -9,12 +9,13 @@ fast, down to run it slow. A felt damper hangs on a lever from the left stand.
 A flagged pin presses the bob the seed nudges hardest.
 
 Drawn in the stock look's grey code, each part in the grey of the encoder that
-moves it, left to right in encoder order: the bobs hollow in a CDCDCD line
-(encoder 1, energy and dispersion), the stands dark solids (2, masses, which
-moves them apart), the coils and the felt mid grey (3, springs and damping),
-the pendulum and the seed's flag light (4, time and seed). The plank and the
-swing's ghost belong to no encoder. Lines are closed ribbons; the bobs, stands,
-plank, felt and pendulum bob are the fills."""
+moves it, left to right in encoder order: the chain, hollow bobs on coiled
+springs in one CDCDCD line (encoder 1, energy and dispersion; springs shapes
+its coils), the stands dark solids (2, masses, which moves them apart), the
+felt mid grey (3, damping), the pendulum and the seed's flag light (4, time
+and seed). The plank belongs to no encoder. The chain is four reshaping
+outlines redrawn whole every frame; the stands, plank, felt and pendulum bob
+are the fills."""
 import math
 import pathlib
 
@@ -22,7 +23,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 ID = "fermi"
 FONT = 'font-family="UniversNextPro-Light"'
 G1, G2, G3, G4 = "#191919", "#4B4B4B", "#969696", "#CDCDCD"   # the grey code, encoders 1..4
-GHOST_GREY, PLANK = "#323232", "#262626"                       # no encoder
+PLANK = "#262626"                                               # no encoder
 BOLD, FINE = 0.55, 0.45                                         # two weights of line
 
 # Geometry, shared with display.h (namespace plate).
@@ -36,24 +37,21 @@ ROD = 96                                        # its rod's length, px
 SLIDE = (24, 90)                                # its bob's travel down the rod: fast to slow
 PIVOT_Y = 74                                    # the damper's lever pivot, on the left stand's top
 LEVER, PAD_W, PAD_H = 170, 20, 8                # the lever's reach to its felt pad's middle, and the pad
-COIL = 32                                       # a coil as authored, px
 
 # Nodes (display.h).
-GHOST = 0
+CHAIN = 0
 HEADER = 4
-MASS, MASSES = 12, 32
-CONE, STRAIGHT, COILS = 44, 77, 33
-ROD_NODE, STAND_L, DAMPER, PIN, BOB, STAND_R, PLANK_L, PLANK_R = 110, 111, 112, 113, 114, 115, 116, 117
-NODES = 118
+ROD_NODE, STAND_L, DAMPER, PIN, BOB, STAND_R, PLANK_L, PLANK_R = 12, 13, 14, 15, 16, 17, 18, 19
+NODES = 20
 POINTS = 64
 
 # Palette (display.h: shade).
 PALETTE = [
     ("#000000", "#000000", 0.5),   # 0 black
-    ("none", GHOST_GREY, 0.5),     # 1 the ghost of the swing
-    ("none", G3, 0.7),             # 2 a hard (cubic) coil
-    ("#000000", G4, BOLD),         # 3 a bob, hollow
-    ("none", G3, FINE),            # 4 a coil
+    ("none", G4, BOLD),            # 1 the chain: hollow bobs on coiled springs
+    ("none", G3, FINE),            # 2
+    ("none", G3, FINE),            # 3
+    ("none", G3, FINE),            # 4
     ("none", G4, FINE),            # 5 the pendulum's rod
     (G2, G2, 0.5),                 # 6 a stand
     (PLANK, PLANK, 0.5),           # 7 the plank
@@ -96,18 +94,6 @@ def circle(cx, cy, r, fill, stroke="none", width=None, node=None, at=None):
     return f'<circle{ident}{move} cx="{num(cx)}" cy="{num(cy)}" r="{num(r)}" fill="{fill}" stroke="{stroke}"{w}/>'
 
 
-def ribbon(points, h):
-    """A thin line: out along the points, back offset along each point's normal by h."""
-    back = []
-    n = len(points)
-    for i in range(n - 1, -1, -1):
-        a, b = points[max(0, i - 1)], points[min(n - 1, i + 1)]
-        tx, ty = b[0] - a[0], b[1] - a[1]
-        length = math.hypot(tx, ty) or 1
-        back.append((points[i][0] - ty / length * h, points[i][1] + tx / length * h))
-    return points + back
-
-
 out = [f'<g id="{ID}_panel">',
        "<!-- SDK two-page header: keep this block before machine artwork below y=38. -->",
        '<path d="M0,0 L480,0 L480,38 L0,38 Z" fill="#000000"/>']
@@ -144,41 +130,14 @@ right_stand = [(-2, top - 3), (bracket + 6, top - 3), (bracket + 6, top + 1), (2
 out.append(path(outline(left_stand, 1), G2, G2, 0.5, node=STAND_L, at=(CENTRE - SPAN / 2 - STAND_OUT, ROW_Y)))
 out.append(path(outline(right_stand, 1), G2, G2, 0.5, node=STAND_R, at=(CENTRE + SPAN / 2 + STAND_OUT, ROW_Y)))
 
-# ---- The swing's ghost: four reshaping outlines, a quarter of the chain each.
+# ---- The chain: four reshaping outlines, a quarter of its springs each,
+# redrawn whole every frame by display.cpp (a ribbon out over the bobs and the
+# coils' turns, back under them). Authored as flat ribbons.
 for q in range(4):
     quarter = SPAN / 4
     pts = [(-quarter / 2 + quarter * i / 31, -0.3) for i in range(32)] + [(quarter / 2 - quarter * i / 31, 0.3) for i in range(32)]
     cx = CENTRE - SPAN / 2 + quarter * (q + 0.5)
-    out.append(path(outline(pts, 1), "none", GHOST_GREY, 0.5, node=GHOST + q, at=(cx, ROW_Y)))
-
-# ---- The coils. A conical spring (quadratic: it stiffens one way) and a
-# straight, tall one (cubic: alike both ways), about the origin, each with a
-# straight lead at either end. Their ribbon is a pixel wide, and the leads
-# end it square, so its ends stay a fifth of a pixel across at the smallest a
-# coil is drawn (6.4 px long, a fifth of its size here) at any turn:
-# narrower, the device would merge them into a streak.
-def coil(radius_at, turns):
-    pts = [(-COIL / 2, 0), (-COIL / 2 + 3, 0)]
-    for i in range(1, 2 * turns):
-        t = i / (2 * turns)
-        x = -COIL / 2 + 3 + (COIL - 6) * t
-        pts.append((x, (-1 if i % 2 else 1) * radius_at(t)))
-    pts += [(COIL / 2 - 3, 0), (COIL / 2, 0)]
-    return outline(ribbon(pts, 1.0), 1)
-
-
-cone_d = coil(lambda t: 0.8 + 4.4 * t, 3)
-straight_d = coil(lambda t: 4.6, 4)
-for i in range(COILS):
-    out.append(path(cone_d, "none", G3, FINE, node=CONE + i, at=(640, 320)))
-for i in range(COILS):
-    out.append(path(straight_d, "none", G3, 0.7, node=STRAIGHT + i, at=(640, 320)))
-
-# ---- The bobs: plain rings, filled black so the coils' ends hide behind them.
-R = 5.6
-bob = [(R * math.cos(a), R * math.sin(a)) for a in [2 * math.pi * i / 20 for i in range(20)]]
-for i in range(MASSES):
-    out.append(path(outline(bob, 1), "#000000", G4, BOLD, node=MASS + i, at=(640, 320)))
+    out.append(path(outline(pts, 1), "none", G4, BOLD, node=CHAIN + q, at=(cx, ROW_Y)))
 
 # ---- The regulator: a pendulum on a knife edge in the right stand's bracket.
 # Its rod (a node, so it can swing) and its bob (a node) slide.

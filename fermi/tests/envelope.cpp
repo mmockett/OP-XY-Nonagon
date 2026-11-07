@@ -71,13 +71,11 @@ unsigned long long fnv(unsigned long long h, const void* data, unsigned bytes) {
     for (unsigned i = 0; i < bytes; ++i) h = (h ^ p[i]) * 1099511628211ull;
     return h;
 }
-// The bobs' widest swing off the row, px.
+// The bobs' widest swing off the row, px, as the screen draws them.
 double widest() {
     double most = 0;
-    for (unsigned j = 0; j < fermi::chain::most; ++j) {
-        const Node& d = frame.nodes[fermi::node::mass + j];
-        if (d.x == hidden_x * unit) continue;
-        const double off = (d.y - fermi::plate::row_y * unit) / 1024.0;
+    for (unsigned j = 0; j < state.chain.n; ++j) {
+        const double off = state.shown[j] / 256.0;
         most = off > most ? off : -off > most ? -off : most;
     }
     return most;
