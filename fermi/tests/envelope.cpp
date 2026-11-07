@@ -90,7 +90,7 @@ struct Run {
     int last_change;      // the last frame after the note-off that changed anything
     int stopped;          // the frame after the note-off the strobe stopped (-1: never)
     double early;         // the widest swing a quarter second into the note, px
-    double late;          // the widest swing 0.75 s after the note-off, px
+    double late;          // the widest swing 0.7 to 0.8 s after the note-off, px
 };
 Run play(const double* c, const Amp& e, int hold, int after, bool again) {
     Input input;
@@ -111,7 +111,7 @@ Run play(const double* c, const Amp& e, int hold, int after, bool again) {
         r.hash = fnv(r.hash, &frame, sizeof frame);
         const int n = count[t] = changed();
         if (t == 15) r.early = widest();
-        if (t == hold + 45) r.late = widest();
+        if (t >= hold + 42 && t <= hold + 48 && widest() > r.late) r.late = widest();   // the chain as strobed, 0.7 to 0.8 s on
         if (t >= hold && !state.running && r.stopped < 0) r.stopped = t - hold;
         if (t >= hold && n) r.last_change = t - hold;
         if (t >= frames - 60) r.rest += n;
@@ -136,7 +136,7 @@ int main() {
         hash = fnv(hash, &h, sizeof h);
     }
     std::printf("envelope: unknown, frames hash %016llx\n", hash);
-    const unsigned long long before = 0x1bbed8a292c689b4ull;  // the stock-look redraw, 3ccd1f7 (the envelope already unknown-safe since 59f7414)
+    const unsigned long long before = 0x4c70169f67987d83ull;  // the stock-look redraw, the chain whole every frame, f5bb96f
     if (hash != before) { std::printf("FAIL unknown envelope: frames hash %016llx, before %016llx\n", hash, before); ++failures; }
 
     // 2. A short envelope against a long one: the init sound, and the same

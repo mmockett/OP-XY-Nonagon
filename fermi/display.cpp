@@ -13,8 +13,8 @@
 // would light it: once a period of the struck mode, at the peak of that
 // mode's own swing; the struck mode then stands still and only the energy's
 // flow moves the shape. While the chain breathes, the arch ripples into
-// higher modes and comes back clean at each return; in chaos it shivers. A
-// faint ghost holds the swing's recent extremes, a long exposure.
+// higher modes and comes back clean at each return; in chaos it shivers.
+// The chain is four reshaping outlines, redrawn whole every frame.
 //
 // Every control acts on a part. Energy is how far the chain is drawn, masses
 // the number of bobs, strung at a near-even spacing so that more of them
@@ -33,7 +33,7 @@
 // Where the OP-XY tells the screen its amp envelope (SDK 1.10, amp.h), the
 // chain runs for as long as the sound lasts, as the voice's chain runs on
 // until the envelope ends it, and the chain is drawn as it is heard: the
-// arch, its ghost and the regulator's swing scaled by the envelope, swelling
+// arch and the regulator's swing scaled by the envelope, swelling
 // with its attack, holding at its sustain while keys are held and fading
 // over its release, in 32 steps. The felt and the chain's own damping still
 // take the swing down sooner. Without it, the screen keeps its own timing:

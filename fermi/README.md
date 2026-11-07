@@ -229,7 +229,9 @@ eases back to its drawn rest. Motion eases out in 0.15 s, and
 reduced motion snaps. The whole chain moves every frame, in at most four
 changed nodes. The idle screen is still.
 
-**Churn** (host, `tests/envelope.cpp`, a note held 3 s and released): CHURN.
+**Churn** (host, `tests/envelope.cpp`, a note held 3 s and released): a mean
+of 2.4 to 2.6 nodes a frame at the defaults and 5.3 at the heaviest
+settings, peaking at 7.
 `tests/screen.cpp` holds the GIF's 31 s scene, a change of masses included
 (it moves the stands, the plank's halves, the pendulum and the damper), to a
 mean of 20 and a peak of 30. Idle: 0. The artwork is 20 nodes and no static
@@ -425,9 +427,9 @@ captions.
 - a short envelope (instant attack, a release of about 40 ms) stops the
   chain 0.05 s after the note-off, and a long one (a 1.25 s attack, a 3.4 s
   release) keeps it running 3.5 s; a quarter second in, the slow attack has
-  drawn the chain out 4.5 px against the instant one's 18.8;
+  drawn the chain out 4.7 px against the instant one's 18.7;
 - churn under a held note and its release, at the defaults and the heaviest
-  settings, under each: at most 14.2 nodes a frame on average, a peak of 19,
+  settings, under each: at most 5.3 nodes a frame on average, a peak of 7,
   none at rest.
 
 ## Prior art
