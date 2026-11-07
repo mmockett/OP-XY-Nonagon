@@ -154,7 +154,10 @@ int main() {
         if (a.last_change > 60) { std::printf("FAIL %s: a short release still moves %d frames after the note-off\n", names[s], a.last_change); ++failures; }
         if (b.stopped < 180) { std::printf("FAIL %s: a long release stops the strobe %d frames after the note-off\n", names[s], b.stopped); ++failures; }
         if (b.early * 2 > a.early) { std::printf("FAIL %s: a slow attack draws the chain out as far early on (%.1f px) as an instant one (%.1f)\n", names[s], b.early, a.early); ++failures; }
-        if (b.late < 2) { std::printf("FAIL %s: a long release shows no swing 0.75 s after the note-off (%.1f px)\n", names[s], b.late); ++failures; }
+        // At least 1.5 px: the chain as drawn (1.9 px for the init sound). Before
+        // f5bb96f this read the bobs' nodes, which lagged behind under the redraw
+        // budget and showed an earlier, wider swing (2.2 px).
+        if (b.late < 1.5) { std::printf("FAIL %s: a long release shows no swing 0.75 s after the note-off (%.1f px)\n", names[s], b.late); ++failures; }
     }
 
     // Stock's directions (amp_curve.h): a larger release word ends the motion
