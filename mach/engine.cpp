@@ -28,10 +28,28 @@
 // delay line. A ground reflection is an image of the flight with its own roots.
 // The engine never sees a note-off: each note launches one flight, and the
 // OP-XY's amp envelope decides how much of it is heard (see README).
+//
+// With echo off the voice is mono, left and right the same. Echo opens the
+// scene: each root is then heard from where it left the object, so the flight
+// crosses the stereo field: the forward and backward roots sound into a bus
+// each, and each bus leans by its own retarded place along the flight, from one
+// end of the line to the other, as the screen spans it. Above Mach 1 the two
+// part, one flying on and one running back. Every note of a chord flies the same
+// path, the same way. The booms stay in the middle, and left plus right is
+// always twice the mono voice.
 namespace mach {
 namespace engine {
 const i32 max31 = 2147483647;
 const i32 unity30 = 1 << 30;
+const i32 half_scale = 1 << 30;      // what a channel may reach
+// How far a root leans at either end of its line, Q15 of half, with echo at two
+// thirds and above: a channel holds 0.3 to 1.7 of it there, and evenly less on
+// the way across.
+const i32 lean = 11469;
+// False flies every voice the same way, as the screen does; true flies half of
+// them back the other way, by the voice's owner.
+const bool both_ways = false;
+const i32 dc_pole = 2145500000;      // the DC blockers' pole, at 6 Hz, Q31
 const i32 rho_scale = 11289650;      // 2^40 / substep_time: a sub-step's change in sigma as Q24 of dtau/dt
 // Each source's level, Q30, matched by measured loudness: one note of a 30 m,
 // 3 s flyby (at Mach 0.6 and 1.67, tune at the end) peaks near -24 LUFS over
@@ -291,6 +309,7 @@ inline void setup(Voice& v, opxy::Parameters p) {
     v.fade_out = ratio(wide::power(32), make(fade_out), 0);
     v.fade_span = fade << 10;
     v.fade_out_span = fade_out << 10;
+    v.across = ratio(wide::power(33), make(length), 0);
     v.loud = unity30 - flight::q16(p[PASS]) * 7373;   // 300 m is 6 dB quieter than 3 m at its closest
     // The bell is struck as the flight begins and again at its closest pass,
     // each ring lasting until the next strike or the flight's end; the siren
@@ -928,21 +947,23 @@ inline void sound(Voice& v, Root& root, i32* out) {
     root.mix = root.mix_to;
 }
 
-// The booms' shock rise and air over a block, from the summed N-waves.
-MACH_LOOP void rumble(Voice& v, const i32* x, opxy::Output out, i32 rise, i32 k) {
+// The booms' shock rise and air over a block, from the summed N-waves,
+// written to out.
+MACH_LOOP void rumble(Voice& v, const i32* x, i32* out, i32 rise, i32 k) {
     i32 low = v.boom_low, lower = v.boom_lower;
     for (u32 i = 0; i < opxy::block_frames; ++i) {
         low += opxy::q31::multiply(x[i] - low, rise);
         lower += opxy::q31::multiply(low - lower, k);
-        out[i] += lower;
+        out[i] = lower;
     }
     v.boom_low = low;
     v.boom_lower = lower;
 }
 
 // The booms: each image's N-wave, through a shock's rise and the air (its
-// corner at the closest pass as w, Q16; -1 open).
-inline void booms(Voice& v, Shared& shared, opxy::Output out, i32 air) {
+// corner at the closest pass as w, Q16; -1 open), written to out. Returns false,
+// writing nothing, with none to play.
+inline bool booms(Voice& v, Shared& shared, i32* out, i32 air) {
     // Nothing to play this block (before a boom, with both low-passes at rest):
     // the loop below would add zeros and leave every state as it is.
     if (!v.boom_low && !v.boom_lower) {
@@ -952,7 +973,7 @@ inline void booms(Voice& v, Shared& shared, opxy::Output out, i32 air) {
             const Image& im = v.image[m];
             if (im.boom_at >= 0 && im.boom_at < last && im.boom_at + (im.boom_length > 0 ? im.boom_length : 1) > first) any = true;
         }
-        if (!any) return;
+        if (!any) return false;
     }
     const i32 rise = v.boom_rise;
     const i32 k = air < 0 ? max31 : absorb(mul30(air, v.boom_near));
@@ -994,34 +1015,91 @@ inline void booms(Voice& v, Shared& shared, opxy::Output out, i32 air) {
         im.boom_value = value;
     }
     rumble(v, x, out, rise, k);
+    return true;
 }
 
-// A DC blocker (a pole at 6 Hz), then twice, within half scale; its state in
-// locals, so stores to output need not reload it.
-MACH_LOOP void finish(Voice& voice, opxy::Output output) {
+// Where a straight root is heard from, Q30: its emission's place along the
+// flight (its last while it is done), at `reach`, Q15 of half. Positive is right.
+inline i32 placed(const Voice& v, const Root& root, i32 reach, bool flip) {
+    const i32 u = wide::shr_within(mul(root.sigma - ((v.sigma_start + v.sigma_end) >> 1), v.across), 26, 65536);   // Q16
+    const i32 at = clamp(u, -65536, 65536) * reach;
+    return flip ? -at : at;
+}
+
+// With no width, what the wide finish below gives in its middle: the same voice
+// in both channels, without the side's work.
+MACH_LOOP void finish_mono(Voice& voice, const i32* mono, opxy::Output output) {
     i32 dc_in = voice.dc_in, dc_out = voice.dc_out;
     for (u32 i = 0; i < opxy::block_frames; ++i) {
-        const i32 x = output[i];
-        dc_out = x - dc_in + opxy::q31::multiply(dc_out, 2145500000);
+        const i32 x = mono[i];
+        dc_out = x - dc_in + opxy::q31::multiply(dc_out, dc_pole);
         dc_in = x;
-        output[i] = knee(dc_out) * 2;
+        const i32 y = knee(dc_out) * 2;
+        output[2 * i] = y;
+        output[2 * i + 1] = y;
     }
     voice.dc_in = dc_in;
     voice.dc_out = dc_out;
 }
 
-inline void render(Voice& voice, Shared& shared, u32, opxy::Output output,
+// A DC blocker on the voice, the knee, then twice, within half scale; and the
+// side, what the voice leaves to half scale at most, so left plus right is
+// exactly twice the voice. The side is the voice at the forward root's lean,
+// which moves across the block, taking no effort a block has no need of: above
+// Mach 1 (Two) the backward root's bus, through its own DC blocker, makes up the
+// difference to its own lean; a boom in progress (Boom) comes out of it again,
+// to stay in the middle. State in locals, so stores to output need not reload it.
+template <bool Two, bool Boom>
+MACH_LOOP void finish(Voice& voice, const i32* front, const i32* back, const i32* thump, opxy::Output output,
+                      i32 a, i32 a_step, i32 b, i32 b_step) {
+    i32 dc_in = voice.dc_in, dc_out = voice.dc_out, side_in = voice.side_in, side_out = voice.side_out;
+    for (u32 i = 0; i < opxy::block_frames; ++i) {
+        i32 x = front[i];
+        if (Two) x += back[i];
+        if (Boom) x += thump[i];
+        dc_out = x - dc_in + opxy::q31::multiply(dc_out, dc_pole);
+        dc_in = x;
+        const i32 y = knee(dc_out) * 2;
+        i32 s = opxy::q31::multiply(y, a);
+        if (Boom) s -= opxy::q31::multiply(thump[i], a) * 2;
+        a += a_step;
+        if (Two) {
+            const i32 z = back[i];
+            side_out = z - side_in + opxy::q31::multiply(side_out, dc_pole);
+            side_in = z;
+            s += opxy::q31::multiply(side_out, b) * 2;
+            b += b_step;
+        }
+        const i32 room = (half_scale - magnitude(y)) >> 1;
+        s = clamp(s, -room, room) * 2;
+        output[2 * i] = y - s;
+        output[2 * i + 1] = y + s;
+    }
+    voice.dc_in = dc_in;
+    voice.dc_out = dc_out;
+    voice.side_in = side_in;
+    voice.side_out = side_out;
+}
+
+inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
                    opxy::Parameters parameters, opxy::Pitch pitch) {
-    for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = 0;
     if (voice.fresh) {
         setup(voice, parameters);
         voice.fresh = 0;
     }
-    if (voice.done) return;
+    if (voice.done) {
+        for (u32 i = 0; i < 2 * opxy::block_frames; ++i) output[i] = 0;
+        return;
+    }
+    // The forward roots' bus and the backward roots', which only a cone has; and the booms.
+    const bool two = voice.image[0].cone;
+    i32 front[opxy::block_frames], back[opxy::block_frames], thump[opxy::block_frames];
+    for (u32 i = 0; i < opxy::block_frames; ++i) front[i] = 0;
+    if (two) for (u32 i = 0; i < opxy::block_frames; ++i) back[i] = 0;
     // Air, live: the low-pass a distance r gets has its corner at
     // 200 Hz * 2^(5.5 (1 - air)) * (12 m / d)^1/4 * sqrt(d / r); with air at 0 it is open.
-    const i32 a = flight::amount(parameters[AIR]);
-    const i32 air = flight::air_w(a);
+    const i32 thickness = flight::amount(parameters[AIR]);
+    const i32 air = flight::air_w(thickness);
     Block block;
     block.f = pitch[0];
     block.inv = voice.source == VOICE ? quotient(97392, pitched(voice, block.f), 32) : 0;
@@ -1030,7 +1108,7 @@ inline void render(Voice& voice, Shared& shared, u32, opxy::Output output,
         for (u32 k = 0; k < 4; ++k) block.part_end[k] = shr(umul(block.f, static_cast<u32>(bell_ratio[k])), 8) * voice.period_samples;
     }
     block.air = air < 0 ? -1 : static_cast<i32>(shr(mul(air, voice.air_near), 16));
-    block.thick = 32768 + a;
+    block.thick = 32768 + thickness;
     u32 live = 0;
     for (i32 sub = 0; sub < static_cast<i32>(opxy::block_frames) / substep; ++sub) {
         voice.t += substep_time;
@@ -1045,15 +1123,44 @@ inline void render(Voice& voice, Shared& shared, u32, opxy::Output output,
                 born(voice, root, f);
             }
             solve(voice, root, block);
-            sound(voice, root, output + sub * substep);
+            sound(voice, root, (root.reversed ? back : front) + sub * substep);
         }
     }
-    if (static_cast<i32>(voice.samples) < voice.boom_end) booms(voice, shared, output, block.air);
+    bool boom = false;
+    if (static_cast<i32>(voice.samples) < voice.boom_end) boom = booms(voice, shared, thump, block.air);
     else if (voice.boom_held) {
         voice.boom_held = 0;
         if (shared.booming) --shared.booming;
     }
-    finish(voice, output);
+    // Echo opens the width, live: none at off, all of it from two thirds up.
+    const i32 opened = flight::q16(parameters[ECHO]) * 3 >> 2;   // Q15
+    const i32 reach = (lean * (opened < 32768 ? opened : 32768)) >> 15;
+    // Each bus leans from where it was to where its straight root is heard from
+    // now (the ground's image is near enough under the same place).
+    const bool flip = both_ways && !(owner * 0x9e3779b9u >> 31);
+    const i32 to0 = placed(voice, voice.root[0], reach, flip);
+    const i32 to1 = two ? placed(voice, voice.root[1], reach, flip) : 0;
+    const i32 a = voice.pan[0], a_step = (to0 - a) >> 6;
+    const i32 b = voice.pan[1] - a, b_step = (to1 - to0 - b) >> 6;
+    if (!a && !to0 && !voice.pan[1] && !to1) {
+        // Mono: both buses and the booms are one voice. The backward bus's DC
+        // blocker is left where it will pick up without a step.
+        if (two) {
+            for (u32 i = 0; i < opxy::block_frames; ++i) front[i] += back[i];
+            voice.side_in = back[opxy::block_frames - 1];
+            voice.side_out = 0;
+        }
+        if (boom) for (u32 i = 0; i < opxy::block_frames; ++i) front[i] += thump[i];
+        finish_mono(voice, front, output);
+    } else if (two) {
+        boom ? finish<true, true>(voice, front, back, thump, output, a, a_step, b, b_step)
+             : finish<true, false>(voice, front, back, thump, output, a, a_step, b, b_step);
+    } else {
+        boom ? finish<false, true>(voice, front, back, thump, output, a, a_step, b, b_step)
+             : finish<false, false>(voice, front, back, thump, output, a, a_step, b, b_step);
+    }
+    voice.pan[0] = to0;
+    voice.pan[1] = to1;
     voice.samples += opxy::block_frames;
     if (!live && static_cast<i32>(voice.samples) >= voice.boom_end) voice.done = 1;
 }

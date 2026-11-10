@@ -60,7 +60,7 @@ int main() {
     for (int v = 0; v < 8; ++v) { mach::initialize(voices[v], shared, v + 1); owner[v] = -1; started[v] = -1; }
     const size_t blocks = static_cast<size_t>(seconds * 44100 / 64);
     std::vector<double> mix(blocks * 64, 0.0);
-    opxy::i32 o[64];
+    opxy::i32 o[128];   // left, right, ...: mixed as the mono sum
     FILE* traced = trace.empty() ? nullptr : std::fopen(trace.c_str(), "w");
     for (size_t b = 0; b < blocks; ++b) {
         const double t = b * 64 / 44100.0;
@@ -90,7 +90,7 @@ int main() {
                 const double ts = t + i / 44100.0;
                 double gate = std::fmin(1.0, (ts - n.on) / 0.005);
                 if (ts > n.off) gate *= std::fmax(0.0, 1 - (ts - n.off) / release);
-                mix[b * 64 + i] += gate * o[i] / 2147483648.0;
+                mix[b * 64 + i] += gate * ((o[2 * i] >> 1) + (o[2 * i + 1] >> 1)) / 2147483648.0;
             }
             if (t > n.off + release) { owner[v] = -1; mach::destroy(voices[v], shared, v + 1); }
         }

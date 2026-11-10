@@ -86,6 +86,9 @@ struct Voice {
     i32 boom_share;    // Q15: this voice's share of a boom heard with others (1 / how many at once)
     u32 boom_held;     // 1 while this voice is counted among the booms in progress
     i32 dc_in, dc_out; // the output's DC blocker
+    i32 side_in, side_out;   // ... and the backward bus's, for the side
+    i32 across;        // 1 / half the flight, Q16 per second: how a root's place on the line is found
+    i32 pan[2];        // where the forward and backward buses lean, Q30: positive right
     u32 fresh;         // 1 until the first block after note-on sets the flight up
     u32 done;
 };

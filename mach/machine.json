@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "sdk": "1.10",
+  "sdk": "1.12",
   "kind": "synth",
   "description": "Each note flies past you at a Mach number you choose. Below Mach 1 a Doppler glide; above it, silence, a boom, then the sound forwards and backwards at once.",
   "presets": "presets"

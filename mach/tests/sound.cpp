@@ -32,7 +32,8 @@ struct Flight {
 // One note: its output, and the voice after each block for the checks that
 // look at its roots.
 struct Take {
-    std::vector<double> out;          // full scale 1
+    std::vector<double> out;          // the mono sum, full scale 1
+    std::vector<double> left, right;  // each channel, full scale 1
     std::vector<mach::Voice> blocks;  // the voice after each block
 };
 
@@ -43,7 +44,7 @@ Take play(const Flight& f, double seconds) {
                                q31(dur_control(f.dur)), q31(f.boom), q31(f.air), q31(f.tune / 2 + 0.5), q31(f.echo)};
     opxy::u32 pitch[opxy::block_frames];
     for (unsigned i = 0; i < opxy::block_frames; ++i) pitch[i] = static_cast<opxy::u32>(std::lround(f.hz / rate * 4294967296.0));
-    opxy::i32 output[opxy::block_frames];
+    opxy::i32 output[2 * opxy::block_frames];
     mach::initialize(voice, shared, 1);
     mach::start(voice, shared, 1);
     Take take;
@@ -56,7 +57,12 @@ Take play(const Flight& f, double seconds) {
             voice.period = static_cast<opxy::i32>(4294967296.0 / (f.strike * 65536));
             voice.period_samples = static_cast<opxy::u32>(f.strike * rate);
         }
-        for (unsigned i = 0; i < opxy::block_frames; ++i) take.out.push_back(output[i] / 2147483648.0);
+        for (unsigned i = 0; i < opxy::block_frames; ++i) {
+            const opxy::i32 l = output[2 * i], r = output[2 * i + 1];
+            take.out.push_back(((l >> 1) + (r >> 1)) / 2147483648.0);
+            take.left.push_back(l / 2147483648.0);
+            take.right.push_back(r / 2147483648.0);
+        }
         take.blocks.push_back(voice);
     }
     mach::destroy(voice, shared, 1);
@@ -418,6 +424,67 @@ int main() {
                       worst, floor, stepped);
         check(first.image[1].cone && (worst <= 2 * floor || 4 * worst < stepped), what);
         check(peak(take.out, 0, take.out.size()) <= declared, "bell and echo: within the declared peak");
+    }
+
+    // Stereo: the flight crosses from left to right; the mono sum is what it was
+    // (the tests above read it); no channel leaves half scale.
+    {
+        Flight f;
+        f.mach = 0.6; f.pass = 30; f.dur = 3; f.echo = 1;
+        const Take take = play(f, 3.5);
+        const auto energy = [](const std::vector<double>& x, size_t from, size_t to) {
+            double e = 0;
+            for (size_t i = from; i < to && i < x.size(); ++i) e += x[i] * x[i];
+            return e;
+        };
+        const size_t early = static_cast<size_t>(0.5 * rate), late = static_cast<size_t>(3 * rate);
+        check(energy(take.left, 0, early) > 2 * energy(take.right, 0, early), "stereo: the flight starts on the left");
+        check(energy(take.right, late - early, late) > 2 * energy(take.left, late - early, late), "stereo: and ends on the right");
+        check(peak(take.left, 0, take.left.size()) <= 0.5 && peak(take.right, 0, take.right.size()) <= 0.5, "stereo: each channel within half scale");
+        // Above Mach 1 the two roots part: a voice's roots lean opposite ways after the cone.
+        f.mach = 2; f.pass = 30; f.dur = 4; f.tune = 0; f.boom = 1; f.echo = 1;
+        const Take fast = play(f, 4);
+        const mach::Voice& v = fast.blocks[fast.blocks.size() / 2];
+        check(v.pan[0] > 0 && v.pan[1] < 0, "stereo: above Mach 1 the forward root leans right and the backward root left");
+        check(peak(fast.left, 0, fast.left.size()) <= 0.5 && peak(fast.right, 0, fast.right.size()) <= 0.5, "stereo: a boom stays within half scale");
+        // Echo opens the width: mono, bit for bit, with it off, wider as it rises.
+        double was = -1;
+        bool grows = true;
+        for (int k = 0; k <= 3; ++k) {
+            Flight g;
+            g.mach = 0.6; g.pass = 30; g.dur = 2; g.echo = k * 0.2;
+            const Take t = play(g, 3);
+            double side = 0;
+            for (size_t i = 0; i < t.left.size(); ++i) side += (t.left[i] - t.right[i]) * (t.left[i] - t.right[i]) / 4;
+            const double width = side / energy(t.out, 0, t.out.size());
+            if (k == 0) check(side == 0, "stereo: echo off is exactly mono");
+            grows = grows && width > was;
+            was = width;
+        }
+        check(grows, "stereo: width grows as echo opens");
+        // Turned up on a held note, the side opens with no step (the voice's own slope bounds it).
+        mach::Voice& voice = *new mach::Voice;
+        mach::Shared shared = {};
+        opxy::i32 parameters[8] = {q31(mach_control(0.6)), q31(pass_control(30)), q31(source_control(mach::ORGAN)), q31(dur_control(3)), 0, q31(0.15), q31(1), 0};
+        opxy::u32 pitch[opxy::block_frames];
+        for (unsigned i = 0; i < opxy::block_frames; ++i) pitch[i] = static_cast<opxy::u32>(std::lround(220 / rate * 4294967296.0));
+        opxy::i32 output[2 * opxy::block_frames];
+        mach::initialize(voice, shared, 1);
+        mach::start(voice, shared, 1);
+        double last_side = 0, last_mono = 0, side_step = 0, mono_step = 0;
+        for (int b = 0; b < 1800; ++b) {
+            if (b == 1400) parameters[mach::ECHO] = q31(1);
+            mach::render(voice, shared, 1, output, parameters, pitch);
+            for (unsigned i = 0; i < opxy::block_frames; ++i) {
+                const double l = output[2 * i] / 2147483648.0, r = output[2 * i + 1] / 2147483648.0;
+                const double m = (l + r) / 2, s = (r - l) / 2;
+                if (b >= 1400 && b < 1403) { side_step = std::fmax(side_step, std::fabs(s - last_side)); mono_step = std::fmax(mono_step, std::fabs(m - last_mono)); }
+                last_side = s;
+                last_mono = m;
+            }
+        }
+        std::printf("      echo turned up on a held note: side's largest step %.5f, the voice's %.5f\n", side_step, mono_step);
+        check(mono_step > 0 && side_step <= mono_step, "stereo: opening echo on a held note makes no step");
     }
 
     // 4. Every source sounds and ends: the voice falls silent after its flight.
