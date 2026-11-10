@@ -14,6 +14,7 @@ struct Mode {
 struct Pop {
     u32 phase, inc, shift;
     i32 amp;
+    i32 lean;    // the side of the drink it bursts on, -0.75 to 0.75, Q15
 };
 const u32 liquid_modes = 6, cup_modes = 3, pops = 2;
 // The rates (engine.cpp): the half-band stage from an eighth to a quarter
@@ -29,6 +30,16 @@ const u32 fade_blocks = 8;
 struct Band {
     opxy::u8 dst, src, left, spare;
     opxy::i32 kept;
+};
+// One path back to the full rate: the half-band stages' histories and each
+// rate's sum still to come.
+struct Chain {
+    i32 eighth[kHistory4 + kBlock / 8];  // the eighth-rate sum, after the last block's tail
+    i32 quarter[kHistory3 + kBlock / 4]; // the quarter-rate stage's input, after its tail
+    i32 half[kHistory3 + kBlock / 2];    // the half-rate stage's input, after its tail
+    i32 quarter_wait[kQuarterWait];      // each rate's sum still to come (tails)
+    i32 half_wait[kHalfWait];
+    i32 full_wait[kFullWait];
 };
 struct Voice {
     Mode liquid[liquid_modes];   // the column's modes, gliding with the sound speed
@@ -67,13 +78,11 @@ struct Voice {
     // faster sums and the pops wait as long as those stages delay the slow ones.
     Band band[liquid_modes + cup_modes];   // each mode's rates
     opxy::u8 live;                             // bits 0-3: rate 2^-r written last block; 4, 5: the quarter and half stages had input
-    opxy::u8 spare[2];
-    i32 eighth[kHistory4 + kBlock / 8];  // the eighth-rate sum, after the last block's tail
-    i32 quarter[kHistory3 + kBlock / 4]; // the quarter-rate stage's input, after its tail
-    i32 half[kHistory3 + kBlock / 2];    // the half-rate stage's input, after its tail
-    i32 quarter_wait[kQuarterWait];      // each rate's sum still to come (tails)
-    i32 half_wait[kHalfWait];
-    i32 full_wait[kFullWait];
+    opxy::u8 side_live;                        // the same for the side's chain
+    opxy::u8 spare;
+    i32 width;                                 // how far Stir had the mug open at the last block's end, Q15
+    Chain tone;                                // everything: the mono voice
+    Chain side;                                // half the difference between left and right: the cup's wall and the pops
 };
 // The drink every voice stirs: one mug a track. The latest stir's drink, and
 // a clock (one tick a block while any voice renders) to clear it by.

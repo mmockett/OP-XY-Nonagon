@@ -43,9 +43,9 @@ struct Mug {
         for (int i = 0; i < 64; ++i) out[i] = 0;
         for (unsigned v = 0; v < 2; ++v) {
             if (!on[v]) continue;
-            opxy::i32 o[64];
+            opxy::i32 o[128];
             cocoa::render(voice[v], shared, v + 1, o, parameters, pitch);
-            for (int i = 0; i < 64; ++i) out[i] += o[i] / 2147483648.0;
+            for (int i = 0; i < 64; ++i) out[i] += ((o[2 * i] >> 1) + (o[2 * i + 1] >> 1)) / 2147483648.0;
         }
     }
     double semitones(unsigned v) const { return 12 * std::log2(voice[v].liquid[0].inc / static_cast<double>(pitch[0])); }

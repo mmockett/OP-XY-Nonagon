@@ -11,7 +11,9 @@
 //   - The output stays within the declared peak, and a single tap falls silent.
 #include "../engine.cpp"
 #include "../display.cpp"
+#include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <cstdio>
 
 namespace {
@@ -47,6 +49,8 @@ struct Mug {
     opxy::i32 parameters[8];
     opxy::u32 pitch[8][64];
     opxy::i32 out[64];
+    opxy::i32 side[64];
+    opxy::i32 channel_peak = 0;
     bool on[8];
     explicit Mug(const Controls& c) : shared() {
         set(c);
@@ -62,9 +66,14 @@ struct Mug {
     void play(unsigned v = 0) {
         for (unsigned u = 0; u < 8; ++u) {
             if (!on[u]) continue;
-            opxy::i32 o[64];
+            opxy::i32 o[128];
             cocoa::render(voice[u], shared, u + 1, o, parameters, pitch[u]);
-            if (u == v) for (int i = 0; i < 64; ++i) out[i] = o[i];
+            // What the sound tests read: the mono sum, which is the mono voice.
+            if (u == v) for (int i = 0; i < 64; ++i) {
+                out[i] = (o[2 * i] >> 1) + (o[2 * i + 1] >> 1);
+                side[i] = (o[2 * i] >> 1) - (o[2 * i + 1] >> 1);
+                channel_peak = std::max(channel_peak, std::max(std::abs(o[2 * i]), std::abs(o[2 * i + 1])));
+            }
         }
     }
     double fundamental(unsigned v = 0) const { return hz_of(voice[v].liquid[0].inc); }
@@ -360,6 +369,72 @@ void sloshes() {
     }
 }
 
+void stereo_width() {
+    // Stir opens it. At and under its default, for any other setting, the
+    // channels are the same, word for word, whatever rings: a tap, taps and pops.
+    const Controls shut[4] = {keys, {{0.87, 0.55, 0.2, 0.1667, 0.5, 0.6, 0.35, 0.6}}, {{0.7, 0.85, 0.35, 0.5, 0.4, 0.9, 1.0, 0.5}},
+                              {{1.0, 1.0, 0.0, 0.8333, 1.0, 1.0, 1.0, 0.0}}};
+    for (const Controls& c : shut) {
+        Mug mug(c);
+        mug.note(0, 261.63);
+        opxy::i32 apart = 0, heard = 0;
+        for (int b = 0; b < 689; ++b) {
+            mug.play();
+            for (int i = 0; i < 64; ++i) {
+                apart = std::max(apart, std::abs(mug.side[i]));
+                heard = std::max(heard, std::abs(mug.out[i]));
+            }
+        }
+        check(apart == 0 && heard > 0, "at and under Stir's default left and right are the same");
+    }
+    // A tap's width grows with Stir, and it is real at the top.
+    const double stirs[4] = {0.65, 0.75, 0.875, 1.0};
+    double was = -200, top = 0;
+    for (double stir : stirs) {
+        Controls c = keys;
+        c.c[cocoa::STIR] = stir;
+        Mug mug(c);
+        mug.note(0, 261.63);
+        double whole = 0, apart = 0;
+        for (int b = 0; b < 689 / 4; ++b) {
+            mug.play();
+            for (int i = 0; i < 64; ++i) {
+                const double m = mug.out[i] / 2147483648.0, d = mug.side[i] / 2147483648.0;
+                whole += m * m;
+                apart += d * d;
+            }
+        }
+        top = 10 * std::log10(apart / whole);
+        std::printf("Stir %.2f: a tap's side is %.1f dB under its whole\n", stir, -top);
+        check(top > was, "a tap's width grows with Stir");
+        was = top;
+    }
+    check(top > -20 && top < -4, "fully open, a tap's side lies 4 to 20 dB under its whole");
+    // A ringing note answers: Stir turned right up mid-ring and down again,
+    // in one move each, does not step the side, and the side shuts.
+    Controls c = keys;
+    c.c[cocoa::TAPS] = 0.6;   // keep it ringing
+    Mug mug(c);
+    mug.note(0, 261.63);
+    for (int b = 0; b < 689; ++b) mug.play();
+    double last = 0, jump = 0, biggest = 0, after = 0;
+    for (int b = 0; b < 2 * 689; ++b) {
+        c.c[cocoa::STIR] = b < 689 ? 1.0 : 0.6;
+        mug.set(c);
+        mug.play();
+        for (int i = 0; i < 64; ++i) {
+            const double x = mug.side[i] / 2147483648.0;
+            if (b < 16 || (b >= 689 && b < 689 + 16)) jump = std::max(jump, std::fabs(x - last));
+            biggest = std::max(biggest, std::fabs(x));
+            if (b > 689 * 3 / 2) after = std::max(after, std::fabs(x));
+            last = x;
+        }
+    }
+    std::printf("Stir moved at once: the side's largest step %.5f, of a swing of %.5f\n", jump, biggest);
+    check(jump < biggest / 3, "a move of Stir does not step the side");
+    check(after == 0, "a ringing note shuts again when Stir returns to its default");
+}
+
 void bounded_and_silent() {
     // The heaviest settings, many keys: within the declared peak.
     Controls c = {{1.0, 1.0, 1.0, 0.8333, 1.0, 1.0, 1.0, 1.0}};
@@ -370,8 +445,10 @@ void bounded_and_silent() {
         mug.note(0, key);
         for (int b = 0; b < 4 * 689; ++b) {
             mug.play();
-            for (int i = 0; i < 64; ++i) bounded = bounded && mug.out[i] >= -697932186 && mug.out[i] <= 697932186;
+            // (The sum of two halved channels can read one under the mono voice.)
+            for (int i = 0; i < 64; ++i) bounded = bounded && mug.out[i] >= -697932187 && mug.out[i] <= 697932186;
         }
+        bounded = bounded && mug.channel_peak <= 912700000;
     }
     check(bounded, "above the declared peak");
     // A single tap rings out and the voice falls silent.
@@ -399,6 +476,7 @@ int main() {
     stir_continues();
     sloshes();
     plays_as_keys();
+    stereo_width();
     bounded_and_silent();
     return failures ? 1 : 0;
 }

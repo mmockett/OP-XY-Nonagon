@@ -101,12 +101,12 @@ void render(const char* folder, const Scene& scene) {
             const Note& n = scene.notes[playing[v]];
             opxy::u32 pitch[64];
             for (unsigned i = 0; i < 64; ++i) pitch[i] = increment(n.midi);
-            opxy::i32 o[64];
+            opxy::i32 o[128];
             cocoa::render(voices[v], shared, v + 1, o, parameters, pitch);
             const bool held = t < n.at + n.held;
             for (unsigned i = 0; i < 64; ++i) {
                 if (!held) gate[v] *= release;
-                mix[i] += o[i] / 2147483648.0 * gate[v];
+                mix[i] += ((o[2 * i] >> 1) + (o[2 * i + 1] >> 1)) / 2147483648.0 * gate[v];
             }
             if (!held && gate[v] < 1e-4) {
                 cocoa::destroy(voices[v], shared, v + 1);
