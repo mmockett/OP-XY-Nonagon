@@ -148,13 +148,13 @@ void render(const char* folder, const Scene& scene) {
             if (!used[v]) continue;
             opxy::u32 pitch[64];
             for (unsigned i = 0; i < 64; ++i) pitch[i] = increment(midi[v]);
-            opxy::i32 o[64];
+            opxy::i32 o[128];
             drop::render(voices[v], shared, v + 1, o, parameters, pitch);
             const double g0 = gain[v];
             if (t >= off[v]) gain[v] *= release;
             for (unsigned i = 0; i < 64; ++i) {
-                if (o[i] > 1073741824 || o[i] < -1073741824) { std::printf("FAIL %s: over the declared peak\n", scene.name); ++failures; }
-                mix[i] += o[i] / 2147483648.0 * (g0 + (gain[v] - g0) * i / 64.0);
+                if (o[2 * i] > 1073741824 || o[2 * i] < -1073741824 || o[2 * i + 1] > 1073741824 || o[2 * i + 1] < -1073741824) { std::printf("FAIL %s: over the declared peak\n", scene.name); ++failures; }
+                mix[i] += ((o[2 * i] >> 1) + (o[2 * i + 1] >> 1)) / 2147483648.0 * (g0 + (gain[v] - g0) * i / 64.0);
             }
             if (gain[v] < 1e-4 || voices[v].quiet) {   // the amp has closed: stock frees the voice
                 drop::destroy(voices[v], shared, v + 1);

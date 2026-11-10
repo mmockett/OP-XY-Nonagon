@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "sdk": "1.10",
+  "sdk": "1.12",
   "kind": "synth",
   "description": "A drop on a hot skillet: past the Leidenfrost point it floats as a star and beats at the key, stepping down its lobes as it evaporates.",
   "presetDefaults": {

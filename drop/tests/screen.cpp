@@ -203,7 +203,7 @@ static Churn run(const char* scenario, double fps, const std::vector<double>& sn
             while (voice_blocks >= 1) {
                 opxy::u32 pitch[64];
                 for (int i = 0; i < 64; ++i) pitch[i] = 21420000u;
-                opxy::i32 o[64];
+                opxy::i32 o[128];
                 drop::render(voice, shared, 1, o, input.slots, pitch);
                 voice_blocks -= 1;
             }

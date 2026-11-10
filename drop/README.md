@@ -33,8 +33,8 @@ back into a flutter.
 
 **Status: experimental.** Drop passes the SDK's tests. It runs on an
 OP-XY, and its CPU is measured there
-(below). Its screen follows the track's amp envelope, which needs
-version 1.10 of the Open-XY SDK, on its `staging` branch.
+(below). Its screen follows the track's amp envelope (SDK 1.10), and it plays in
+stereo, which needs version 1.12 of the Open-XY SDK, on its `staging` branch.
 
 ## Controls
 
@@ -54,7 +54,7 @@ a second).
 | **groove**: the ratchet's teeth swing the pulses | `even`: straight (swing 0.54) | `55%`: 0.57 | `61%`: 0.63 | `66%`: 0.68, running at 7 cm/s, a tooth hopped now and then (centroid 395 Hz) | `72%`: 0.73, a hard shuffle at 9 cm/s, hops dropping a pulse | The sawtooth teeth cut into the pan, brighter as they deepen; the drops run round them |
 | **vapour**: the layer's thickness | `10um`: rings 0.9 s, centroid 246 Hz, over 2.5 kHz −25 dB | `32um`: 282 Hz, −23 dB | `55um`: 374 Hz, −19 dB | `77um`: 552 Hz, −14 dB | `99um`: rings 0.09 s, 1.01 kHz, −10 dB | The drops lift off the iron: at 10 µm each sits on its dark shadow; thicker, it hovers higher, to 20 px over it |
 | **life**: the floating life of an eight-lobe water drop at 250 °C | `0.46s`: gone before its first lobe | `1.5s`: its lobes step down 7 to 2 in 1.7 s | `5.1s` | `17s` | `56s`: a step every few seconds | Each drop's steam: a tall billowing plume swaying over a fast-shrinking drop at 0.5 s, smaller to 15 s, none past it |
-| **crackle**: brief contacts with the iron, a second at this heat | `0/s`: none; over 2.5 kHz −23 dB | `9/s`: −21 dB, 7 clicks a second heard | `26/s`: −18 dB, 20 a second | `49/s`: −14 dB, 41 | `75/s`: −11 dB, 65 a second (six times as many near the point) | Spatter dried on the iron round the landing places, there with no note playing: none to twelve splashes; sparks at the drops' edges |
+| **crackle**: brief contacts with the iron, a second at this heat | `0/s`: none; over 2.5 kHz −23 dB | `9/s`: −21 dB, 7 clicks a second heard | `26/s`: −18 dB, 20 a second | `49/s`: −14 dB, 41 | `75/s`: −11 dB, 65 a second (six times as many near the point) | Spatter dried on the iron round the landing places, there with no note playing: none to twelve splashes; sparks at the drops' edges. Past 25 crackle also opens the stereo: each contact and the hiss lean to where the drop touched, each vent's breath to its lobe, and the pipe's song stays in the middle; at 25 and below the two channels are identical |
 
 Heat, liquid, beat, groove, vapour, life and crackle act on drops already
 sounding: turn heat under the point during a long note and the floating drop
@@ -275,6 +275,8 @@ hottest as well.
 
 ## CPU
 
+These figures are the mono voice's; the stereo voice is yet to be measured.
+
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, at `v0.6.0`,
 as one capture of its sweep: one voice playing middle C with the first four
 controls at their midpoint costs **2.75%** of the 580,352-cycle audio block, so
@@ -295,8 +297,8 @@ The figures below are host estimates made during development.
 - The pipe and filters take 16-bit products. No sample divides; the allpass's
   division comes only when the key or the vapour moves, and two small ones
   remain a block.
-- **Memory.** Compiled for the Blackfin (`--firmware`), Drop takes about 81 KiB
-  of module memory, eight voices of 4,348 bytes.
+- **Memory.** Compiled for the Blackfin (`--firmware`), Drop takes about 87 KiB
+  of module memory, eight voices of 4,364 bytes.
 
 ## Tests
 

@@ -36,9 +36,9 @@ int main(int argc, char** argv) {
     drop::start(voice, shared, 1);
     float out[64];
     for (long b = 0, blocks = static_cast<long>(seconds * 44100 / 64); b < blocks; ++b) {
-        opxy::i32 o[64];
+        opxy::i32 o[128];
         drop::render(voice, shared, 1, o, parameters, pitch);
-        for (int i = 0; i < 64; ++i) out[i] = static_cast<float>(o[i] / 2147483648.0);
+        for (int i = 0; i < 64; ++i) out[i] = static_cast<float>(((o[2 * i] >> 1) + (o[2 * i + 1] >> 1)) / 2147483648.0);
         std::fwrite(out, sizeof(float), 64, stdout);
     }
     return 0;

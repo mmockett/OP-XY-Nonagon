@@ -37,7 +37,7 @@ const Controls defaults = {{0.5, 0.85, 0, 0.18, 0, 0.35, 0.55, 0.25}};   // defi
 
 // One voice's life: its output and, each block, the drop as the engine keeps it.
 struct Life {
-    std::vector<double> out;
+    std::vector<double> out, side;
     std::vector<unsigned> lobes, beats;
     std::vector<double> model_rate;   // the model's beat rate, Hz
     unsigned gone = 0;                // the block the drop was gone, or 0
@@ -58,11 +58,14 @@ Life play(const Controls& controls, int midi, double seconds) {
     const drop::physics::Plate plate = drop::physics::plate(parameters);
     const unsigned blocks = static_cast<unsigned>(seconds * block_rate);
     for (unsigned b = 0; b < blocks; ++b) {
-        opxy::i32 o[64];
+        opxy::i32 o[128];
         drop::render(voice, shared, 1, o, parameters, pitch);
         for (int i = 0; i < 64; ++i) {
-            life.out.push_back(o[i] / 2147483648.0);
-            life.bounded = life.bounded && o[i] >= -1073741824 && o[i] <= 1073741824;
+            // What the sound tests read: the mono sum, which is the mono voice.
+            const opxy::i32 left = o[2 * i], right = o[2 * i + 1], sum = (left >> 1) + (right >> 1);
+            life.out.push_back(sum / 2147483648.0);
+            life.side.push_back(((left >> 1) - (right >> 1)) / 2147483648.0);
+            life.bounded = life.bounded && left >= -1073741824 && left <= 1073741824 && right >= -1073741824 && right <= 1073741824;
         }
         life.lobes.push_back(voice.drop.lobes);
         life.beats.push_back(voice.beats);
@@ -204,6 +207,30 @@ int main() {
     {
         const Life below = play(boiling, 57, 3);
         const Life above = play(floating, 57, 12);
+        // Stereo: Crackle opens it past its default, and up to it left and right
+        // are the same, word for word. The pipe has one place, so a song stays
+        // narrow; a sizzle widens as Crackle rises.
+        {
+            Controls shut_boil = boiling, shut_float = floating;
+            shut_boil.c[7] = shut_float.c[7] = 0.25;
+            double apart = 0;
+            for (const Life& l : {play(shut_boil, 57, 1), play(shut_float, 57, 3), play(defaults, 57, 3)})
+                for (double x : l.side) apart = std::fmax(apart, std::fabs(x));
+            check(apart == 0, "at Crackle's default and below, left and right are the same (largest difference)", apart);
+            double was = 0;
+            const double crackles[3] = {0.3, 0.6, 1.0};
+            for (double c : crackles) {
+                Controls k = boiling;
+                k.c[7] = c;
+                const Life l = play(k, 57, 1);
+                const double sizzling = rms(l.side, 0, 0.2) / rms(l.out, 0, 0.2);
+                check(sizzling > was, "a sizzle's side grows with Crackle (ratio)", sizzling);
+                was = sizzling;
+            }
+            check(was > 0.1 && was < 1, "fully open, a sizzle's side lies 0 to 20 dB under it (ratio)", was);
+            const double singing = rms(above.side, 1, 3) / rms(above.out, 1, 3);
+            check(singing < 0.1, "a song's side lies over 20 dB under it (ratio)", singing);
+        }
         check(below.gone > 0 && below.gone < 0.6 * block_rate, "160 C: the drop boils away within 0.6 s", below.gone / block_rate);
         check(below.quiet > 0 && below.quiet < 1.0 * block_rate, "160 C: silent within 1 s", below.quiet / block_rate);
         const size_t n = 2048;
@@ -375,9 +402,9 @@ int main() {
             for (int v = 0; v < 8; ++v) {
                 opxy::u32 pitch[64];
                 for (int i = 0; i < 64; ++i) pitch[i] = increment(key(chord[v]));
-                opxy::i32 o[64];
+                opxy::i32 o[128];
                 drop::render(voices[v], shared, v + 1, o, parameters, pitch);
-                for (int i = 0; i < 64; ++i) mix[i] += o[i] / 2147483648.0;
+                for (int i = 0; i < 64; ++i) mix[i] += ((o[2 * i] >> 1) + (o[2 * i + 1] >> 1)) / 2147483648.0;
             }
             for (int i = 0; i < 64; ++i)
                 if (std::fabs(mix[i]) > peak) { peak = std::fabs(mix[i]); when = b / block_rate; }

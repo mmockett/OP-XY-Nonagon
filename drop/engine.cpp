@@ -19,6 +19,15 @@
 //
 // A synth voice on this SDK hears its note start but not its release, so a
 // note is the drop's whole life, from the note-on: see README.md.
+//
+// In stereo the skillet is mono until Crackle passes its default: up to it left
+// and right are the same, word for word, and from there to the top Crackle opens
+// it. The pipe stays in the middle: it is one pipe, whatever blows it, so its
+// tone has no side to come from. What is heard directly from the drop has a
+// place on the skillet: each vent's breath leans by its lobe's angle round the
+// star, and each contact, and the frying hiss, by where the drop touched the
+// iron. Left plus right is always twice the mono voice, so a song is narrow and
+// a sizzle wide.
 namespace drop {
 namespace sound {
 using physics::full;
@@ -43,6 +52,8 @@ const i32 gate_floor = 5900;      // the tone between pulses, Q15 (0.18)
 // a shrinking drop fades only 2 dB from eight lobes to two.
 const i32 vents_level[physics::most_lobes + 1] = {0, 42, 42, 35, 29, 23, 20, 17, 16};
 const i32 a3 = 1595990;           // log2 of A3's increment, Q16
+// A lobe's lean, by its angle round the star in sixteenths of a turn, Q15.
+const opxy::i16 round_star[16] = {32767, 30274, 23170, 12540, 0, -12540, -23170, -30274, -32767, -30274, -23170, -12540, 0, 12540, 23170, 30274};
 const i32 pipe_lift = 344000;     // the pipe's input at A3 and no vapour, octaves Q16
 
 inline u32 lcg(u32& s) {
@@ -53,6 +64,20 @@ inline i32 clamp(i32 v, i32 low, i32 high) { return v < low ? low : v > high ? h
 inline i32 magnitude(i32 v) { return v < 0 ? -v : v; }
 // v / 3, truncating as C does, for |v| < 32768, without the Blackfin's divide call.
 inline i32 third(i32 v) { return ((v * 21846) >> 16) - (v >> 31); }
+// As clamp, in a minimum and a maximum, which the Blackfin does without a branch.
+inline i32 bound(i32 x, i32 low, i32 high) {
+    x = x > high ? high : x;
+    return x < low ? low : x;
+}
+const i32 half_scale = 1 << 30;
+// How far Crackle opens the skillet, Q15: not at all up to its default of 0.25,
+// then in proportion to the top.
+inline i32 opening(i32 control) {
+    const i32 over = (control >> 16) - 8192;
+    if (over <= 0) return 0;
+    const i32 width = over * 43691 >> 15;
+    return width > 32767 ? 32767 : width;
+}
 
 // Tunes the pipe to a pitch increment: a delay of one period. The loop's
 // filter delays a sample and the allpass the fraction left, 0.5 to 1.5.
@@ -148,6 +173,9 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     voice.kick = 0;
     voice.puff = voice.jet = voice.spark = voice.pulse = voice.soft_crack = voice.softer_crack = voice.settled = voice.hold = voice.held = voice.lowest = voice.jet_lp = 0;
     voice.splash = 0;
+    voice.crack_lean = voice.vent_lean = 0;
+    voice.turn = 0;
+    voice.width = 0;
     voice.noise = 0x2545f491u + owner * 0x9e3779b9u;
     voice.dice = 0x6c8e9cf5u ^ owner * 0x85ebca6bu;
     voice.write = 0;
@@ -177,7 +205,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     using namespace sound;
     using opxy::block_frames;
     if (voice.quiet) {
-        for (unsigned i = 0; i < block_frames; ++i) output[i] = 0;
+        for (unsigned i = 0; i < 2 * block_frames; ++i) output[i] = 0;
         return;
     }
     const physics::Plate p = physics::plate(parameters);
@@ -195,6 +223,9 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         voice.vents = 0;
         voice.accent = 0;
         voice.noise ^= p.seed * 0x9e3779b9u;
+        // The drop lands in the middle, at an angle of its own.
+        voice.crack_lean = 0;
+        voice.turn = voice.dice >> 28;
         const i32 thump = 5000 + (p.floating >> 4);
         voice.spark = voice.spark > thump << 15 ? voice.spark : thump << 15;
     } else {
@@ -284,6 +315,14 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     i32 puff = voice.puff, jet = voice.jet, spark = voice.spark, pulse = voice.pulse, soft_crack = voice.soft_crack, softer_crack = voice.softer_crack;
     i32 ap_in = voice.ap_in, ap_out = voice.ap_out, f1 = voice.f1, f2 = voice.f2;
     i32 crack_last = voice.crack_last, hiss_last = voice.hiss_last;
+    i32 crack_lean = voice.crack_lean, vent_lean = voice.vent_lean;
+    const u32 turn = voice.turn;
+    // The width glides across the block from the last block's, so turning
+    // Crackle never steps the side; shut, the side is exactly zero.
+    const i32 width = opening(parameters[CRACKLE]);
+    i32 opened = voice.width << 16;
+    const i32 open_step = (width - voice.width) << 10;
+    voice.width = width;
     i32 dc_in = voice.dc_in, dc_out = voice.dc_out;
     i32 e1 = voice.e1, e2 = voice.e2, e3 = voice.e3;
     // The low-passes' rounding leaves them a unit or two off zero, which the
@@ -311,6 +350,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
                 vent = 0;
                 if (puff << 15 > jet) jet = puff << 15;
                 pulse = full;
+                vent_lean = round_star[turn & 15u];
                 // Each vent's tick, of either sign: a vent pushes the gap's air
                 // one way or the other, so chords' beats do not pile up in sign.
                 x += (r2 & 0x40000000u ? puff : -puff) * vent_tick >> 15;
@@ -323,6 +363,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
                 const i32 a = puff * 26000 >> 15;   // 0.8 of the first, which leads the beat
                 if (a << 15 > jet) jet = a << 15;
                 if (25000 > pulse) pulse = 25000;
+                vent_lean = round_star[(turn + (top - vents) * 16u / lobes) & 15u];
                 x += (r2 & 0x40000000u ? a : -a) * vent_tick >> 15;
             }
         }
@@ -334,7 +375,10 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         if (r2 < chance) {
             const i32 u = static_cast<i32>(lcg(dice) >> 17);
             const i32 a = (u * u >> 15) * loudness >> 15;
-            if (a << 15 > spark) spark = a << 15;
+            if (a << 15 > spark) {
+                spark = a << 15;
+                crack_lean = (static_cast<i32>((dice * 2654435761u) >> 16) - 32768) * 7 >> 3;   // where it touched
+            }
         }
         spark -= spark >> 6;   // each burst rings about 1.5 ms
         const i32 crack = (spark >> 15) * (static_cast<i32>(r2) >> 16) >> 15;
@@ -381,7 +425,8 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         // The crackle's clicks, through a difference, softened twice over 3 kHz.
         soft_crack += ((crack - crack_last) - soft_crack) * 11000 >> 15;
         softer_crack += (soft_crack - softer_crack) * 11000 >> 15;
-        const i32 mixed = (gated * tone_gain >> 12) + (softer_crack * crackle_heard >> 13) + hiss + (blow * breath_heard >> 15);
+        const i32 cracked = softer_crack * crackle_heard >> 13, breathed = blow * breath_heard >> 15;
+        const i32 mixed = (gated * tone_gain >> 12) + cracked + hiss + breathed;
         crack_last = crack;
         dc_out += (mixed - dc_in) * 1024 - (dc_out >> 10);   // DC blocker, 7 Hz, its state Q25
         dc_in = mixed;
@@ -394,7 +439,15 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
             o = over >= 858993459 ? 966367642 : o - (opxy::q31::multiply(over, over) >> 10) * 1280;
         }
         o = static_cast<i32>((static_cast<u32>(o) >> 15) * static_cast<u32>(share));
-        output[i] = v < 0 ? -o : o;
+        const i32 heard = v < 0 ? -o : o;
+        // The side: the crackle and hiss by where the drop touched, the breath
+        // by the vent. It gives way to the channels' half scale, the whole never.
+        const i32 room = half_scale - o;
+        const i32 lean = clamp(((cracked + hiss) * crack_lean >> 15) + (breathed * vent_lean >> 15), -32767, 32767);
+        const i32 side = bound((lean * (opened >> 16) >> 15) * share, -room, room);
+        opened += open_step;
+        output[2 * i] = heard + side;
+        output[2 * i + 1] = heard - side;
         loudest = a > loudest ? a : loudest;
     }
     voice.phase = phase;
@@ -422,6 +475,8 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     voice.f2 = f2;
     voice.crack_last = crack_last;
     voice.hiss_last = hiss_last;
+    voice.crack_lean = crack_lean;
+    voice.vent_lean = vent_lean;
     voice.dc_in = dc_in;
     voice.dc_out = dc_out;
     voice.e1 = e1;

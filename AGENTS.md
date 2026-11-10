@@ -5,9 +5,9 @@ This repository holds the Nonagon Suite: nine machines, one per folder
 `drop`). Read README.md and each machine's own README first.
 
 All nine build against the [Open-XY SDK](https://github.com/etcetc000/open-xy)
-on `staging`. Sand, Cocoa, Coin, Fermi, Mach and Butterfly are on SDK 1.12:
-they play in stereo, opened on an existing control and exactly mono at its
-default (left = mono + side, right = mono - side). Drop is on 1.10. Ghost and
+on `staging`. The seven synths are on SDK 1.12: they play in stereo, opened on
+an existing control and exactly mono at its default (left = mono + side,
+right = mono - side). Ghost and
 Recur are sample engines with their own screens, on SDK 1.10 (`stockShift`,
 the sample overview's `gain`, the amp envelope and Recur's own `samples`). Do not
 edit the SDK to make a machine work; propose an SDK change separately.

@@ -22,6 +22,10 @@ struct Voice {
     i32 puff;           // this beat's strength, Q15
     i32 jet;            // the vapour jet's envelope, Q30
     i32 spark;          // the crackle's envelope, Q30
+    i32 crack_lean;     // which side of the drop the latest contact is on, -0.875 to 0.875, Q15
+    i32 vent_lean;      // and the latest vent, by its lobe's angle
+    u32 turn;           // the star's angle as it lands, sixteenths of a turn
+    i32 width;          // how far Crackle had the skillet open at the last block's end, Q15
     i32 pulse;          // the pulses' envelope, Q15: the tone sounds while the vapour vents
     i32 soft_crack, softer_crack;   // the crackle as heard, low-passed twice
     i32 settled;        // the pipe's mean, Q10: its offset, taken out before the gate

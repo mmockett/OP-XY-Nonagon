@@ -307,7 +307,7 @@ Ghost is made for headphones: its pitches exist only between the ears.
 
 ## Stereo
 
-Six of the synths play in stereo (SDK 1.12). Each opens its width on a control
+Seven of the synths play in stereo (SDK 1.12). Each opens its width on a control
 it already has and is exactly mono at that control's default, so a sound stays
 centred until you turn it; left plus right is always the mono voice.
 
@@ -323,8 +323,11 @@ centred until you turn it; left plus right is always the mono voice.
   Mach 1 its two roots part.
 - **Butterfly:** wingbeat, past its resting 15. The chain's odd states lean
   out, so a note struck at the middle site stays centred.
+- **Drop:** crackle, past its default of 25. Each contact and the hiss lean to
+  where the drop touched, each vent's breath to its lobe; the pipe's song
+  stays in the middle.
 
-Ghost has always been stereo. Drop and Recur are mono.
+Ghost has always been stereo. Recur is mono.
 
 Ghost and Recur are sample engines, on the sampler page. With no sample
 loaded, both screens say so ("load a sample · shift + sample"). Recur opens
@@ -377,9 +380,8 @@ sampler's own mixing, so they don't compare directly with the synths.
 
 ## Building
 
-Sand, Cocoa, Coin, Fermi, Mach and Butterfly need SDK 1.12 (stereo output),
-and Drop SDK 1.10 (its screen reads the track's amp envelope), on the
-`staging` branch of
+The seven synths need SDK 1.12 (stereo output; their screens read the
+track's amp envelope, from SDK 1.10), on the `staging` branch of
 [etcetc000/open-xy](https://github.com/etcetc000/open-xy). Ghost and Recur
 are sample engines with their own screens, Shift on the stock sampler's
 markers and gain, and screens that follow the amp envelope, also SDK 1.10 on
