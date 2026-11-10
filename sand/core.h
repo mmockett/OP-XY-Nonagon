@@ -16,9 +16,20 @@ struct Mode { u32 phase; i32 a, b, sa, sb; };
 // rate's 22 and the full rate's, and the rattle, 50.
 const u32 kBlock = 64, kHistory4 = 7, kHistory3 = 5, kQuarterWait = 8, kHalfWait = 22, kFullWait = 50;
 
+// One path back to the full rate: the half-band stages' histories and each
+// rate's sum still to come.
+struct Chain {
+    i32 eighth[kHistory4 + kBlock / 8];    // the eighth-rate sum, after the last block's tail
+    i32 quarter[kHistory3 + kBlock / 4];   // the quarter-rate stage's input, after its tail
+    i32 half[kHistory3 + kBlock / 2];      // the half-rate stage's input, after its tail
+    i32 quarter_wait[kQuarterWait];        // each rate's sum still to come (tails)
+    i32 half_wait[kHalfWait];
+    i32 full_wait[kFullWait];
+};
+
 struct Voice {
     Mode modes[kModes];   // the figure's mode and six of the plate's modes above it
-    Mode twin;            // the bowed mode's near-degenerate twin: its amplitude, and the beat's phase
+    Mode twin;            // the bowed mode's near-degenerate twin: its amplitude, the beat's phase, and (sa, sb) its last sounded on the side
     Mode harmonic;        // the bow's stick and slip, its harmonics: their amplitude (a) and last sounded (sa)
     Grain grains[kGrains];
     i16 shapes[kGrains][kModes];  // each grain's mode shapes where it lies (Q15), shapes[i][0] kMoved once it moves
@@ -33,6 +44,8 @@ struct Voice {
     u32 jolted;           // looks left of the strike's jolt
     u32 rounds;           // rounds of looks, for publishing the sand every fourth
     i32 click1, click2;   // the grain click filter's last two outputs
+    i32 side1, side2;     // and the same for the difference between the plate's two sides
+    i32 width;            // how far Tilt had the plate open at the last block's end, Q15
     i32 lost[kModes];     // each mode's log2 loss its kept and stirs were made for (0: none)
     i32 kept[kModes];     // keep(lost), Q31
     u32 stirs[kModes];    // stir()'s factor for lost, Q16
@@ -43,13 +56,11 @@ struct Voice {
     u8 rate[kModes];      // each mode's rate, 1 / 2^rate
     u8 live;              // bits 0-3: rate 2^-r written last block; 4, 5: the quarter and
                           // half stages had input; 6: a landing waits
-    i32 eighth[kHistory4 + kBlock / 8];    // the eighth-rate sum, after the last block's tail
-    i32 quarter[kHistory3 + kBlock / 4];   // the quarter-rate stage's input, after its tail
-    i32 half[kHistory3 + kBlock / 2];      // the half-rate stage's input, after its tail
-    i32 quarter_wait[kQuarterWait];        // each rate's sum still to come (tails)
-    i32 half_wait[kHalfWait];
-    i32 full_wait[kFullWait];
+    u8 side_live;         // the same for the side's chain; bit 6: a landing waits on it
+    Chain tone;           // the whole plate, which is the mono voice
+    Chain side;           // half the difference between the plate's left and right
     i32 click_wait[kFullWait];             // landings still to come
+    i32 side_wait[kFullWait];              // and what they add to the side
 };
 // The plate's sand as the latest note left it. A note started while another
 // still sounds takes over that sand, so a bowed legato line keeps its figure

@@ -55,9 +55,17 @@ struct Note {
     void tune(double hz) {
         for (unsigned i = 0; i < opxy::block_frames; ++i) pitch[i] = static_cast<u32>(hz / 44100.0 * 4294967296.0);
     }
+    i32 side[opxy::block_frames];
     void block(const i32* p) {
-        sand::render(voice, shared, 1, out, p, pitch);
-        for (unsigned i = 0; i < opxy::block_frames; ++i) bounded = bounded && out[i] >= -kPeak && out[i] <= kPeak;
+        i32 stereo[2 * opxy::block_frames];
+        sand::render(voice, shared, 1, stereo, p, pitch);
+        for (unsigned i = 0; i < opxy::block_frames; ++i) {
+            const i32 left = stereo[2 * i], right = stereo[2 * i + 1];
+            bounded = bounded && left >= -kPeak && left <= kPeak && right >= -kPeak && right <= kPeak;
+            side[i] = (left >> 1) - (right >> 1);
+            // What the sound tests read: the mono sum, which is the mono voice.
+            out[i] = (left >> 1) + (right >> 1);
+        }
     }
 };
 
@@ -348,6 +356,76 @@ int main() {
         std::snprintf(what, sizeof what, "an eight-note chord of %s peaks between 0.4 and 0.8 (%.2f)", preset.name, peak);
         std::printf("%s chord peak %.2f\n", preset.name, peak);
         check(what, peak >= 0.4 && peak <= 0.8);
+    }
+
+    // Stereo: Tilt opens it. At Tilt 0 every setting's channels are the same,
+    // word for word.
+    {
+        const double settings[4][8] = {
+            {pick(2, 12), 0.6, 0.6, 0.3, 0, 0.5, 0, 0},
+            {pick(0, 12), 0, 1, 1, 1, 0, 0, 1},
+            {pick(11, 12), 1, 1, 0, 0.5, 1, 0, 0.5},
+            {pick(7, 12), 0.3, 0, 0.5, 0.17, 0.2, 0, 0.06}
+        };
+        for (const auto& setting : settings) {
+            for (unsigned c = 0; c < 8; ++c) p[c] = word(setting[c]);
+            Note n(110);
+            double loudest = 0, apart = 0;
+            for (unsigned b = 0; b < kSecond; ++b) {
+                n.block(p);
+                for (unsigned i = 0; i < opxy::block_frames; ++i) {
+                    apart = std::fmax(apart, std::fabs(static_cast<double>(n.side[i])));
+                    loudest = std::fmax(loudest, std::fabs(static_cast<double>(n.out[i])));
+                }
+            }
+            check("at Tilt 0 left and right are the same", apart == 0 && loudest > 0);
+        }
+        // The width of a settled, bowed note grows with Tilt, and it is real at
+        // the top; and it answers while the note is held, without a step.
+        defaults(p);
+        const double tilts[4] = {0.05, 0.25, 0.5, 0.75};
+        double was = -200, top = 0;
+        for (double tilt : tilts) {
+            p[kTilt] = word(tilt);
+            Note n(261.63);
+            double whole = 0, apart = 0;
+            for (unsigned b = 0; b < kSecond * 4; ++b) {
+                n.block(p);
+                if (b < kSecond * 2) continue;
+                for (unsigned i = 0; i < opxy::block_frames; ++i) {
+                    whole += (n.out[i] / 2147483648.0) * (n.out[i] / 2147483648.0);
+                    apart += (n.side[i] / 2147483648.0) * (n.side[i] / 2147483648.0);
+                }
+            }
+            top = 10 * std::log10(apart / whole);
+            std::printf("Tilt %.2f: the side is %.1f dB under the whole\n", tilt, -top);
+            check("the width grows with Tilt", top > was);
+            was = top;
+        }
+        check("fully open, the side lies 4 to 20 dB under the whole", top > -20 && top < -4);
+        defaults(p);
+        Note held(261.63);
+        for (unsigned b = 0; b < kSecond * 3; ++b) held.block(p);
+        double before = 0;
+        for (unsigned i = 0; i < opxy::block_frames; ++i) before = std::fmax(before, std::fabs(static_cast<double>(held.side[i])));
+        check("a held note at Tilt 0 is exactly mono", before == 0);
+        // A held note: Tilt turned right up, then right down, in one move each.
+        // The side never jumps by more than its own swing allows, and it shuts.
+        double last = 0, jump = 0, biggest = 0, after = 0;
+        for (unsigned b = 0; b < kSecond * 2; ++b) {
+            p[kTilt] = word(b < kSecond ? 1 : 0);
+            held.block(p);
+            for (unsigned i = 0; i < opxy::block_frames; ++i) {
+                const double x = held.side[i] / 2147483648.0;
+                if (b < kSecond / 100 || (b >= kSecond && b < kSecond + kSecond / 100)) jump = std::fmax(jump, std::fabs(x - last));
+                biggest = std::fmax(biggest, std::fabs(x));
+                if (b > kSecond * 3 / 2) after = std::fmax(after, std::fabs(x));
+                last = x;
+            }
+        }
+        std::printf("Tilt moved at once: the side's largest step %.5f, of a swing of %.5f\n", jump, biggest);
+        check("a move of Tilt does not step the side", jump < biggest / 4);
+        check("a held note shuts again when Tilt returns to 0", after == 0);
     }
 
     if (!failures) std::puts("Sand: all sound checks pass");

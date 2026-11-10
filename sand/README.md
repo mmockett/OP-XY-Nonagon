@@ -47,7 +47,7 @@ sits under it, one alternate per encoder.
 | grain | .3mm | the grains' size, e.g. `.3mm` | From fine dust (0.06 mm) to stones (7.7 mm): the sound of a landing, from a soft tick of dust to the ringing knock of a stone. Heavier grains knock the plate harder and weigh more on it, so they darken the tone further. |
 | plate | metal | `metal`, `glass`, `wood` | What the plate is made of: how long it rings, how its upper modes fade, how fast it beats and how many harmonics the bow draws from it. |
 | settle | 0.35 | friction, e.g. `0.35` | How sticky the sand is. Slippery sand lands hard, bounces with a second click and wanders before it finds the narrow quiet lines; sticky sand needs more to lift it, lands dead and settles fast. |
-| tilt | 0% | the plate's slope as a grade, e.g. `9%` | Tips the plate on its column, its far edge down, up to 10 degrees (an 18% grade). While the plate sounds, its resting sand creeps downhill, more readily the steeper it is, and hops slide that way; sand that runs off the low edge comes back at the high edge by the bow, as an hourglass is turned, so the plate trickles as steadily as it is tipped. |
+| tilt | 0% | the plate's slope as a grade, e.g. `9%` | Tips the plate on its column, its far edge down, up to 10 degrees (an 18% grade). While the plate sounds, its resting sand creeps downhill, more readily the steeper it is, and hops slide that way; sand that runs off the low edge comes back at the high edge by the bow, as an hourglass is turned, so the plate trickles as steadily as it is tipped. It also opens the stereo: at 0 the plate is exactly mono, and it is fully open by 75. |
 | shake | 0.0g | the largest jolt, e.g. `1.8g` | Random jolts to every grain while the plate sounds, from 1.2 g, just enough to lift the lightest grain off a still line, to 2.4 g, more often as well as harder, and noise into every mode. The figure blurs and the sand never settles. |
 
 Measured on a held A3, each control at 0, 25, 50, 75 and 100 with the others
@@ -79,9 +79,12 @@ grains settle one by one and the rattle fades rather than stopping.
 note started while another is still sounding takes over its sand, so a bowed
 legato line or a chord added to a held note keeps its settled figure and
 stays clean; a note with nothing sounding pours fresh sand. A strike throws
-even settled sand, so struck notes (bow near 0) crackle every time. The plate
-is mono, as every Open-XY synth voice is; for width, send it to the OP-XY's
-chorus or reverb.
+even settled sand, so struck notes (bow near 0) crackle every time. The plate is
+mono until **tilt** tips it, and tilt opens the stereo as it tips, fully by 75.
+Opened, each landing clicks on the side its grain lies, a voice's upper modes
+lean to one side or the other, and the bowed mode's twin lies across the plate,
+so a held tone turns slowly from side to side as it beats. Left plus right is
+always twice the mono voice.
 
 ## Presets
 

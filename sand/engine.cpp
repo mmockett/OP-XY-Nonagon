@@ -24,6 +24,15 @@
 // Landing clicks are impulses at random points of the block through one
 // two-pole band-pass (Grain: from a bright tick of dust to a pebble's knock),
 // and each landing also knocks the plate's modes where it lands.
+//
+// In stereo the plate is level and mono until Tilt tips it, and Tilt opens it
+// as it tips: at Tilt 0 left and right are the same, word for word. Left plus
+// right is always twice the mono voice. Opened, a landing is heard on the side its
+// grain lies. The six upper modes are shared out between the two sides, the
+// voice saying which goes where so a chord's notes spread. The bowed mode and its
+// harmonics stay in the middle, while the twin, the same mode's other standing
+// wave, lies across the plate: as the two beat, the tone turns slowly from side
+// to side.
 namespace sand {
 namespace {
 using opxy::q31::multiply;
@@ -204,6 +213,17 @@ template <> inline i32 between<4>(const i32* x) {
 template <> inline i32 between<3>(const i32* x) {
     return multiply(x[0] + x[1], kTaps3[0]) + multiply(x[-1] + x[2], kTaps3[1]) + multiply(x[-2] + x[3], kTaps3[2]);
 }
+// x within [low, high], as clamp() but written as a minimum and a maximum,
+// which the Blackfin does without a branch.
+inline i32 bound(i32 x, i32 low, i32 high) {
+    x = x > high ? high : x;
+    return x < low ? low : x;
+}
+// The side lies under the whole, so its stages can be plainer at the same
+// delay: each value between is the mean of its two neighbours, no multiply at
+// all. Its images lie at most 34, 39 and 39 dB under the side, at the top of each
+// band; they are far lower for most modes, and the whole has none.
+const i32 kSideLimit = 45093749;   // the side's clamp: half the tone's (kToneLimit)
 template <u32 K, bool Clamp>
 __attribute__((noinline)) void twice(const i32* low, const i32* add, i32* out, u32 n) {
     const i32* x = low + K - 1;
@@ -220,6 +240,25 @@ __attribute__((noinline)) void twice(const i32* low, i32* out, u32 n) {
         const i32 odd = between<K>(x);
         out[0] = x[0];
         out[1] = Clamp ? clamp(odd, -kStageLimit, kStageLimit) : odd;
+    }
+}
+// The side's stages: from n inputs after their history, as twice. Means of
+// inputs within the clamp stay within it, so only the sums are clamped.
+template <u32 K>
+__attribute__((noinline)) void side_twice(const i32* low, const i32* add, i32* out, u32 n) {
+    const i32* x = low + K - 1;
+    const i32 limit = kSideLimit, under = -limit;
+    for (u32 j = 0; j < n; ++j, ++x, add += 2, out += 2) {
+        out[0] = bound(x[0] + add[0], under, limit);
+        out[1] = bound(((x[0] + x[1]) >> 1) + add[1], under, limit);
+    }
+}
+template <u32 K>
+__attribute__((noinline)) void side_twice(const i32* low, i32* out, u32 n) {
+    const i32* x = low + K - 1;
+    for (u32 j = 0; j < n; ++j, ++x, out += 2) {
+        out[0] = x[0];
+        out[1] = (x[0] + x[1]) >> 1;
     }
 }
 
@@ -245,6 +284,21 @@ const i32 kClickLevel = 2 << 21;
 const i32 kOutput = 1443000000;
 const i32 kRattleLimit = 3 << 26;
 const i32 kToneLimit = 90187499;  // the tone's clamp, (2^27 - 1) * kOutput
+// The side's tone is within half the tone's clamp (kSideLimit), then at the
+// tone's scale; with the rattle's clamp on its rattle, that leaves each channel
+// inside 0.44 of full scale.
+// Which side of the plate a voice's modes lean to, bit k for mode k (one bit:
+// right; the bowed mode's says which way its twin lies), by the voice, so a
+// chord's notes spread. Each pattern has three upper modes a side.
+const u32 kLeans[4] = {0x55u, 0x2au, 0x35u, 0x4au};
+// How far a landing leans, Q15 of its grain's place on the plate.
+const i32 kLandingWidth = 26000;
+// How far Tilt opens the plate, Q15: from none at 0, in proportion, to all of it
+// at three quarters of Tilt, where all the sand is moving anyway.
+inline i32 opening(i32 tilt) {
+    const i32 width = tilt * 43691 >> 15;
+    return width > 32767 ? 32767 : width;
+}
 inline i32 sounded(i32 amplitude) { return multiply(amplitude, kOutput); }
 const u32 kKnock = 6;
 const u32 kBounce = 29;  // samples from a landing to its bounce (0.7 ms)
@@ -290,9 +344,12 @@ inline void initialize(Voice& voice, Shared&, u32 owner) {
     for (u32 k = 0; k < kModes; ++k) voice.lost[k] = 0;
     for (u32 k = 0; k < kModes; ++k) voice.rate[k] = 3;
     voice.live = 0;
-    for (u32 i = 0; i < kHistory4 + kBlock / 8; ++i) voice.eighth[i] = 0;
-    for (u32 i = 0; i < kHistory3 + kBlock / 4; ++i) voice.quarter[i] = 0;
-    for (u32 i = 0; i < kHistory3 + kBlock / 2; ++i) voice.half[i] = 0;
+    voice.side_live = 0;
+    voice.side1 = voice.side2 = 0;
+    voice.width = 0;
+    for (u32 i = 0; i < kHistory4 + kBlock / 8; ++i) voice.tone.eighth[i] = voice.side.eighth[i] = 0;
+    for (u32 i = 0; i < kHistory3 + kBlock / 4; ++i) voice.tone.quarter[i] = voice.side.quarter[i] = 0;
+    for (u32 i = 0; i < kHistory3 + kBlock / 2; ++i) voice.tone.half[i] = voice.side.half[i] = 0;
 }
 
 namespace {
@@ -325,23 +382,16 @@ inline void destroy(Voice&, Shared& shared, u32 owner) {
     if (shared.latest == owner) shared.latest = 0;
 }
 
-// x within [low, high], as clamp() but written as a minimum and a maximum,
-// which the Blackfin does without a branch.
-inline i32 bound(i32 x, i32 low, i32 high) {
-    x = x > high ? high : x;
-    return x < low ? low : x;
-}
-
 // The rattle: each landing's impulse through the band-pass, a function of
 // its own so its loop is a hardware loop. False when there is none: no landing
 // in the block and the last click rung out.
 // limit is kHalf / 2, so c1 y1 cannot overflow; it is passed in, so that the
 // compiler keeps both clamps as a minimum and a maximum rather than folding
 // them into branches, which a Blackfin mispredicts at 8 cycles a sample.
-__attribute__((noinline)) bool rattle_of(Voice& voice, const i32* impulses, bool clicked, i32 c1, i32 c2, i32 limit, i32* rattle) {
-    i32 y1 = voice.click1, y2 = voice.click2;
+__attribute__((noinline)) bool rattle_of(i32& state1, i32& state2, const i32* impulses, bool clicked, i32 c1, i32 c2, i32 limit, i32* rattle) {
+    i32 y1 = state1, y2 = state2;
     if (!clicked && magnitude(y1) + magnitude(y2) < 4096) {
-        voice.click1 = voice.click2 = 0;
+        state1 = state2 = 0;
         return false;
     }
     const i32 low = -limit;
@@ -354,8 +404,8 @@ __attribute__((noinline)) bool rattle_of(Voice& voice, const i32* impulses, bool
         rattle[i] = bound(y2, -kRattleLimit, kRattleLimit);
         rattle[i + 1] = bound(y1, -kRattleLimit, kRattleLimit);
     }
-    voice.click1 = y1;
-    voice.click2 = y2;
+    state1 = y1;
+    state2 = y2;
     return true;
 }
 // The output: the tone, within its clamp and scaled, and the rattle.
@@ -364,23 +414,136 @@ inline i32 output_of(i32 tone, const i32* rattle, u32 i) {
     const i32 t = bound(tone, -kToneLimit, kToneLimit) << 2;
     return Rattle ? bound(t + rattle[i], -kHalf, kHalf) : t;
 }
+// One frame: the whole and the side, which gives way to the channels' half
+// scale, so that the whole is never touched.
+inline void place(i32* frame, i32 whole, i32 side) {
+    const i32 room = kHalf - (whole < 0 ? -whole : whole);
+    const i32 s = bound(side, -room, room);
+    frame[0] = whole + s;
+    frame[1] = whole - s;
+}
 // The last half-band stage, to the full rate, writing the output: the half
 // rate's sum doubled (K = 3), plus the full rate's (waiting as long), plus the rattle.
 // (output is not declared __restrict here: the compiler then reads each input
 // afresh rather than sliding them through registers, which costs it the
 // hardware loop.)
-template <bool Full, bool Rattle>
-__attribute__((noinline)) void last_twice(const i32* low, const i32* full, const i32* rattle, i32* output) {
+// (With no side, each channel is simply the mono voice.)
+template <bool Full, bool Rattle, bool Side>
+__attribute__((noinline)) void last_twice(const i32* low, const i32* full, const i32* rattle, const i32* side, i32* output) {
     const i32* x = low + 2;
     for (u32 j = 0; j < opxy::block_frames; j += 2, ++x) {
         const i32 even = Full ? x[0] + full[j] : x[0], odd = Full ? between<3>(x) + full[j + 1] : between<3>(x);
-        output[j] = output_of<Rattle>(even, rattle, j);
-        output[j + 1] = output_of<Rattle>(odd, rattle, j + 1);
+        const i32 first = output_of<Rattle>(even, rattle, j), second = output_of<Rattle>(odd, rattle, j + 1);
+        if (Side) {
+            place(output + 2 * j, first, side[j]);
+            place(output + 2 * j + 2, second, side[j + 1]);
+        } else {
+            output[2 * j] = output[2 * j + 1] = first;
+            output[2 * j + 2] = output[2 * j + 3] = second;
+        }
     }
 }
-template <bool Rattle>
-__attribute__((noinline)) void last_direct(const i32* tone, const i32* rattle, opxy::Output output) {
-    for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = output_of<Rattle>(tone[i], rattle, i);
+template <bool Rattle, bool Side>
+__attribute__((noinline)) void last_direct(const i32* tone, const i32* rattle, const i32* side, opxy::Output output) {
+    for (u32 i = 0; i < opxy::block_frames; ++i) {
+        const i32 m = output_of<Rattle>(tone[i], rattle, i);
+        if (Side) place(output + 2 * i, m, side[i]);
+        else output[2 * i] = output[2 * i + 1] = m;
+    }
+}
+// The side, opened from one width to the next across the block (Q15), so that
+// turning Tilt moves it smoothly. Its values are within 2^29.
+__attribute__((noinline)) void open_side(i32* side, i32 from, i32 to) {
+    i32 g = from << 16;
+    const i32 step = (to - from) << 10;
+    for (u32 i = 0; i < opxy::block_frames; ++i) {
+        side[i] = static_cast<opxy::i16>(side[i] >> 15) * static_cast<opxy::i16>(static_cast<u32>(g) >> 16);
+        g += step;
+    }
+}
+
+// Back from the slower rates, on one path, as far as the half rate's stage: its
+// input is left in chain.half, after its history. The eighth rate's sum, after
+// its history, doubles to the quarter rate and joins the quarter rate's (waiting
+// 8 of its samples, as late as the stage is); that doubles and joins the half
+// rate's (waiting 22). The full rate's sum waits 50, for the caller's last stage.
+// A path not written for a block is all zeros, and a stage whose input and
+// history are all zeros is skipped. Returns the path's live bits: 0-3 and 4, 5.
+template <bool Side>
+inline u32 rise(Chain& chain, Sums& sums, i32* full, i32* half, i32* quarter, u32 last) {
+    const u32 wrote = sums.written;
+    u32 live = wrote & 15u;
+    if (wrote & 4u) {
+        if (last & 4u) for (u32 i = 0; i < kQuarterWait; ++i) quarter[i] = chain.quarter_wait[i];
+        else for (u32 i = 0; i < kQuarterWait; ++i) quarter[i] = 0;
+        for (u32 i = 0; i < kQuarterWait; ++i) chain.quarter_wait[i] = sums.at[2][opxy::block_frames / 4 - kQuarterWait + i];
+    }
+    if (wrote & 2u) {
+        if (last & 2u) for (u32 i = 0; i < kHalfWait; ++i) half[i] = chain.half_wait[i];
+        else for (u32 i = 0; i < kHalfWait; ++i) half[i] = 0;
+        for (u32 i = 0; i < kHalfWait; ++i) chain.half_wait[i] = sums.at[1][opxy::block_frames / 2 - kHalfWait + i];
+    }
+    if (wrote & 1u) {
+        if (last & 1u) for (u32 i = 0; i < kFullWait; ++i) full[i] = chain.full_wait[i];
+        else for (u32 i = 0; i < kFullWait; ++i) full[i] = 0;
+        for (u32 i = 0; i < kFullWait; ++i) chain.full_wait[i] = sums.at[0][opxy::block_frames - kFullWait + i];
+    }
+    // A tail with nothing after it: the wait line alone, then zeros.
+    if ((last & 4u) && !(wrote & 4u)) {
+        for (u32 i = 0; i < kQuarterWait; ++i) quarter[i] = chain.quarter_wait[i];
+        for (u32 i = kQuarterWait; i < kQuarterWait + opxy::block_frames / 4; ++i) quarter[i] = 0;
+    }
+    if ((last & 2u) && !(wrote & 2u)) {
+        for (u32 i = 0; i < kHalfWait; ++i) half[i] = chain.half_wait[i];
+        for (u32 i = kHalfWait; i < kHalfWait + opxy::block_frames / 2; ++i) half[i] = 0;
+    }
+    if ((last & 1u) && !(wrote & 1u)) {
+        for (u32 i = 0; i < kFullWait; ++i) full[i] = chain.full_wait[i];
+        for (u32 i = kFullWait; i < kFullWait + opxy::block_frames; ++i) full[i] = 0;
+    }
+    const bool to_quarter = (wrote | last) & 4u, to_half = (wrote | last) & 2u;
+    // Eighth to quarter.
+    i32* const stage4 = chain.quarter + kHistory3;
+    const bool eighth_on = (wrote | last) & 8u;
+    if (eighth_on) {
+        if (!(wrote & 8u)) for (u32 i = 0; i < opxy::block_frames / 8; ++i) sums.at[3][i] = 0;
+        const i32 limit = Side ? kSideLimit : kStageLimit;
+        for (u32 i = 0; i < opxy::block_frames / 8; ++i) sums.at[3][i] = clamp(sums.at[3][i], -limit, limit);
+        if (Side) {
+            if (to_quarter) side_twice<4>(chain.eighth, quarter, stage4, opxy::block_frames / 8);
+            else side_twice<4>(chain.eighth, stage4, opxy::block_frames / 8);
+        } else {
+            if (to_quarter) twice<4, true>(chain.eighth, quarter, stage4, opxy::block_frames / 8);
+            else twice<4, true>(chain.eighth, stage4, opxy::block_frames / 8);
+        }
+        for (u32 i = 0; i < kHistory4; ++i) chain.eighth[i] = chain.eighth[opxy::block_frames / 8 + i];
+    } else if (to_quarter) {
+        const i32 limit = Side ? kSideLimit : kStageLimit;
+        for (u32 i = 0; i < opxy::block_frames / 4; ++i) stage4[i] = clamp(quarter[i], -limit, limit);
+    }
+    const bool quarter_in = eighth_on || to_quarter;
+    if (quarter_in) live |= 16u;
+    // Quarter to half.
+    i32* const stage3 = chain.half + kHistory3;
+    const bool quarter_on = quarter_in || (last & 16u);
+    if (quarter_on) {
+        if (!quarter_in) for (u32 i = 0; i < opxy::block_frames / 4; ++i) stage4[i] = 0;
+        if (Side) {
+            if (to_half) side_twice<3>(chain.quarter, half, stage3, opxy::block_frames / 4);
+            else side_twice<3>(chain.quarter, stage3, opxy::block_frames / 4);
+        } else {
+            if (to_half) twice<3, true>(chain.quarter, half, stage3, opxy::block_frames / 4);
+            else twice<3, true>(chain.quarter, stage3, opxy::block_frames / 4);
+        }
+        for (u32 i = 0; i < kHistory3; ++i) chain.quarter[i] = chain.quarter[opxy::block_frames / 4 + i];
+    } else if (to_half) {
+        const i32 limit = Side ? kSideLimit : kStageLimit;
+        for (u32 i = 0; i < opxy::block_frames / 2; ++i) stage3[i] = clamp(half[i], -limit, limit);
+    }
+    const bool half_in = quarter_on || to_half;
+    if (half_in) live |= 32u;
+    if (!half_in && (last & 32u)) for (u32 i = 0; i < opxy::block_frames / 2; ++i) stage3[i] = 0;
+    return live;
 }
 
 // Controls: Figure, Bow, Sand, Grain; Plate, Settle, Tilt, Shake.
@@ -396,6 +559,11 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     const i32 bow = voice.controls[1], sand = voice.controls[2], grain = voice.controls[3],
               plate = voice.controls[4], settle = voice.controls[5], tilt = voice.controls[6],
               shake = voice.controls[7];
+    // How far the plate is open: while it is shut all the work below stays on
+    // the mono path.
+    const i32 width = opening(tilt), width_was = voice.width;
+    const bool wide = width || width_was;
+    voice.width = width;
     // A new figure bows another mode at the same pitch: the amplitudes carry
     // on into the new modes, and the sand, lying on the old figure's nodal
     // lines, finds itself on moving ground.
@@ -454,6 +622,10 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     }
     i32* const impulses = waiting + kFullWait;
     for (u32 i = 0; i < opxy::block_frames; ++i) impulses[i] = 0;
+    // What the same landings add to the side, each by where its grain lies;
+    // left untouched until a landing writes to it, as most blocks have none.
+    i32 side_waiting[kFullWait + opxy::block_frames];
+    i32* const side_impulses = side_waiting + kFullWait;
     bool clicked = false;
     i32 knock_a[kModes], knock_b[kModes];
     for (u32 k = 0; k < kModes; ++k) knock_a[k] = knock_b[k] = 0;
@@ -492,6 +664,16 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
         // Slippery sand bounces: a second, softer click a moment later.
         i32& again = impulses[((seed >> 26) + kBounce) & (opxy::block_frames - 1)];
         again = clamp(again - (click >> 15) * bounce, -kHalf, kHalf);
+        // The same, on the side, by which way its grain lies across the plate.
+        if (wide) {
+            if (!clicked) for (u32 i = 0; i < opxy::block_frames; ++i) side_impulses[i] = 0;
+            const i32 across = ((static_cast<i32>(voice.grains[at].u) - 32768) * kLandingWidth) >> 15;
+            const i32 leaning = (click >> 15) * across;
+            i32& side_impulse = side_impulses[seed >> 26];
+            side_impulse = clamp(side_impulse + leaning, -kHalf, kHalf);
+            i32& side_again = side_impulses[((seed >> 26) + kBounce) & (opxy::block_frames - 1)];
+            side_again = clamp(side_again - (leaning >> 15) * bounce, -kHalf, kHalf);
+        }
         clicked = true;
         if (!placed) continue;
         const i32 hit = height * ring;  // at most 255 * 49152
@@ -515,8 +697,24 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     sums.at[0] = full + kFullWait;
     sums.at[1] = half + kHalfWait;
     sums.at[2] = quarter + kQuarterWait;
-    sums.at[3] = voice.eighth + kHistory4;
+    sums.at[3] = voice.tone.eighth + kHistory4;
     sums.written = 0;
+    // The upper modes go in two buses, sums (left) and side_sums (right), which
+    // become the whole and the difference once they have all sounded: so the
+    // bowed mode, which stays in the middle, waits until then.
+    i32 side_full[kFullWait + opxy::block_frames], side_half[kHalfWait + opxy::block_frames / 2],
+        side_quarter[kQuarterWait + opxy::block_frames / 4];
+    Sums side_sums;
+    side_sums.at[0] = side_full + kFullWait;
+    side_sums.at[1] = side_half + kHalfWait;
+    side_sums.at[2] = side_quarter + kQuarterWait;
+    side_sums.at[3] = voice.side.eighth + kHistory4;
+    side_sums.written = 0;
+    const u32 leans = kLeans[owner & 3u];
+    // The bowed mode's block, as worked out in its turn below.
+    bool bowed_fades = false;
+    i32 ca = 0, cb = 0, ha = 0, tsa = 0, tsb = 0;
+    u32 bowed_inc = 0;
     const i32 drive = bow_level(bow);
     const i32 rosin = drive * kRosin >> 15;
     const i32 shaken = (((shake * shake >> 15) + shake) >> 1) * kShakeAmplitude >> 15;  // halfway between Shake and its square
@@ -525,10 +723,14 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     for (u32 k = 0; k < kModes; ++k) {
         const PlateMode& pm = modes[k];
         Mode& m = voice.modes[k];
+        Sums& bus = wide && (leans >> k & 1u) ? side_sums : sums;
         if (octave + pm.log2_ratio > kTopLog2) {  // above the top: fade out, then rest
-            if (m.sa || m.sb) sound_at(sums, 0, m.phase, kTopIncrement, m.sa, m.sb, -(m.sa >> 6), -(m.sb >> 6));
+            if (!k) {
+                bowed_fades = true;
+                continue;
+            }
+            if (m.sa || m.sb) sound_at(bus, 0, m.phase, kTopIncrement, m.sa, m.sb, -(m.sa >> 6), -(m.sb >> 6));
             m.a = m.b = m.sa = m.sb = 0;
-            if (!k) voice.twin.a = voice.twin.b = voice.harmonic.a = voice.harmonic.sa = 0;
             continue;
         }
         const i32 weight = voice.load[k] * mass >> 8;  // 48 grains at a mode's antinodes: about 1.6M * mass
@@ -571,10 +773,10 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
             // fades in at the new, the two ramps summing to its own.
             const u32 was = voice.rate[k], r = rate_for(was, inc);
             if (r == was) {
-                m.phase = sound_at(sums, r, m.phase, inc, m.sa, m.sb, (sa - m.sa) >> 6, (sb - m.sb) >> 6);
+                m.phase = sound_at(bus, r, m.phase, inc, m.sa, m.sb, (sa - m.sa) >> 6, (sb - m.sb) >> 6);
             } else {
-                if (m.sa || m.sb) sound_at(sums, was, m.phase, inc, m.sa, m.sb, (-m.sa) >> 6, (-m.sb) >> 6);
-                m.phase = sound_at(sums, r, m.phase, inc, 0, 0, sa >> 6, sb >> 6);
+                if (m.sa || m.sb) sound_at(bus, was, m.phase, inc, m.sa, m.sb, (-m.sa) >> 6, (-m.sb) >> 6);
+                m.phase = sound_at(bus, r, m.phase, inc, 0, 0, sa >> 6, sb >> 6);
                 voice.rate[k] = static_cast<u8>(r);
             }
             m.sa = sa;
@@ -597,7 +799,16 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
         twin.phase += beat << 6;
         const opxy::i16* const turn = kSine + (twin.phase >> 22);
         const i32 ta = (twin.a >> 15) * turn[256] - (twin.b >> 15) * turn[0], tb = (twin.a >> 15) * turn[0] + (twin.b >> 15) * turn[256];
-        const i32 ca = sounded(clamp_amplitude(a1 + ta)), cb = sounded(clamp_amplitude(b1 + tb));
+        ca = sounded(clamp_amplitude(a1 + ta));
+        cb = sounded(clamp_amplitude(b1 + tb));
+        // The twin's other standing wave lies across the plate: on the side,
+        // it swings the tone from one side to the other as the pair beat.
+        tsa = sounded(clamp_amplitude(ta));
+        tsb = sounded(clamp_amplitude(tb));
+        if (leans & 1u) {
+            tsa = -tsa;
+            tsb = -tsb;
+        }
         // The bow's stick and slip: the note's 2nd to 4th harmonics, in tune
         // with it, rising with Bow (pressure brightens a bowed tone); faded
         // out where the 4th would pass the top.
@@ -606,108 +817,133 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
         const i32 harm_target = static_cast<i32>(times(static_cast<u32>(drive * (level * (mat.harmonic >> 3) >> 9) >> 15),
                                                        static_cast<u32>(kHarmonicPeak) << 4)) << 16;
         harm.a = clamp_amplitude(multiply(harm.a, decay) + multiply(harm_target - harm.a, held));
-        const i32 ha = sounded(harm.a);
-        // Its highest sound is the 4th harmonic while the harmonics sound.
-        const u32 top = !harm.sa && !ha ? inc : inc > 0x3fffffffu ? 0xffffffffu : inc << 2;
-        const u32 was = voice.rate[0], r = rate_for(was, top);
-        if (r == was) {
-            m.phase = sound_bowed_at(sums, r, m.phase, inc, m.sa, m.sb, (ca - m.sa) >> 6, (cb - m.sb) >> 6, harm.sa, (ha - harm.sa) >> 6);
-        } else {
-            if (m.sa || m.sb || harm.sa)
-                sound_bowed_at(sums, was, m.phase, inc, m.sa, m.sb, (-m.sa) >> 6, (-m.sb) >> 6, harm.sa, (-harm.sa) >> 6);
-            m.phase = sound_bowed_at(sums, r, m.phase, inc, 0, 0, ca >> 6, cb >> 6, 0, ha >> 6);
-            voice.rate[0] = static_cast<u8>(r);
+        ha = sounded(harm.a);
+        bowed_inc = inc;
+    }
+    // Left and right become the whole and the difference, at each rate.
+    if (wide) for (u32 r = 0; r < 4; ++r) {
+        if (!((sums.written | side_sums.written) & (1u << r))) continue;
+        clear_sum(sums, r);
+        clear_sum(side_sums, r);
+        i32* const whole = sums.at[r];
+        i32* const apart = side_sums.at[r];
+        for (u32 i = 0; i < (opxy::block_frames >> r); ++i) {
+            const i32 a = whole[i], b = apart[i];
+            whole[i] = a + b;
+            apart[i] = a - b;
         }
-        m.sa = ca;
-        m.sb = cb;
-        harm.sa = ha;
+    }
+    // The bowed mode, its harmonics and, on the side alone, its twin.
+    {
+        Mode& m = voice.modes[0];
+        Mode& harm = voice.harmonic;
+        Mode& twin = voice.twin;
+        if (!wide) tsa = tsb = 0;   // shut, the twin has nothing on the side, and starts from nothing
+        if (bowed_fades) {
+            if (m.sa || m.sb) sound_at(sums, 0, m.phase, kTopIncrement, m.sa, m.sb, -(m.sa >> 6), -(m.sb >> 6));
+            if (twin.sa || twin.sb) sound_at(side_sums, 0, m.phase, kTopIncrement, twin.sa, twin.sb, -(twin.sa >> 6), -(twin.sb >> 6));
+            m.a = m.b = m.sa = m.sb = 0;
+            twin.a = twin.b = twin.sa = twin.sb = harm.a = harm.sa = 0;
+        } else {
+            // Its highest sound is the 4th harmonic while the harmonics sound.
+            const u32 inc = bowed_inc;
+            const u32 top = !harm.sa && !ha ? inc : inc > 0x3fffffffu ? 0xffffffffu : inc << 2;
+            const u32 was = voice.rate[0], r = rate_for(was, top);
+            const u32 phase = m.phase;
+            if (r == was) {
+                m.phase = sound_bowed_at(sums, r, phase, inc, m.sa, m.sb, (ca - m.sa) >> 6, (cb - m.sb) >> 6, harm.sa, (ha - harm.sa) >> 6);
+                if (twin.sa || twin.sb || tsa || tsb) sound_at(side_sums, r, phase, inc, twin.sa, twin.sb, (tsa - twin.sa) >> 6, (tsb - twin.sb) >> 6);
+            } else {
+                if (m.sa || m.sb || harm.sa)
+                    sound_bowed_at(sums, was, phase, inc, m.sa, m.sb, (-m.sa) >> 6, (-m.sb) >> 6, harm.sa, (-harm.sa) >> 6);
+                if (twin.sa || twin.sb) sound_at(side_sums, was, phase, inc, twin.sa, twin.sb, (-twin.sa) >> 6, (-twin.sb) >> 6);
+                m.phase = sound_bowed_at(sums, r, phase, inc, 0, 0, ca >> 6, cb >> 6, 0, ha >> 6);
+                if (tsa || tsb) sound_at(side_sums, r, phase, inc, 0, 0, tsa >> 6, tsb >> 6);
+                voice.rate[0] = static_cast<u8>(r);
+            }
+            m.sa = ca;
+            m.sb = cb;
+            harm.sa = ha;
+            twin.sa = tsa;
+            twin.sb = tsb;
+        }
     }
     voice.struck = 0;
     voice.seed = seed;
 
-    // Back to the full rate. The eighth rate's sum, after its history,
-    // doubles to the quarter rate and joins the quarter rate's (waiting 8 of
-    // its samples, as late as the stage is); that doubles and joins the half
-    // rate's (waiting 22), and that the full rate's (waiting 50). A path not
-    // written for a block is all zeros, and a stage whose input and history
-    // are all zeros is skipped.
-    const u32 wrote = sums.written, last = voice.live;
-    u32 live = wrote & 15u;
-    if (wrote & 4u) {
-        if (last & 4u) for (u32 i = 0; i < kQuarterWait; ++i) quarter[i] = voice.quarter_wait[i];
-        else for (u32 i = 0; i < kQuarterWait; ++i) quarter[i] = 0;
-        for (u32 i = 0; i < kQuarterWait; ++i) voice.quarter_wait[i] = sums.at[2][opxy::block_frames / 4 - kQuarterWait + i];
-    }
-    if (wrote & 2u) {
-        if (last & 2u) for (u32 i = 0; i < kHalfWait; ++i) half[i] = voice.half_wait[i];
-        else for (u32 i = 0; i < kHalfWait; ++i) half[i] = 0;
-        for (u32 i = 0; i < kHalfWait; ++i) voice.half_wait[i] = sums.at[1][opxy::block_frames / 2 - kHalfWait + i];
-    }
-    if (wrote & 1u) {
-        if (last & 1u) for (u32 i = 0; i < kFullWait; ++i) full[i] = voice.full_wait[i];
-        else for (u32 i = 0; i < kFullWait; ++i) full[i] = 0;
-        for (u32 i = 0; i < kFullWait; ++i) voice.full_wait[i] = sums.at[0][opxy::block_frames - kFullWait + i];
-    }
-    // A tail with nothing after it: the wait line alone, then zeros.
-    if ((last & 4u) && !(wrote & 4u)) {
-        for (u32 i = 0; i < kQuarterWait; ++i) quarter[i] = voice.quarter_wait[i];
-        for (u32 i = kQuarterWait; i < kQuarterWait + opxy::block_frames / 4; ++i) quarter[i] = 0;
-    }
-    if ((last & 2u) && !(wrote & 2u)) {
-        for (u32 i = 0; i < kHalfWait; ++i) half[i] = voice.half_wait[i];
-        for (u32 i = kHalfWait; i < kHalfWait + opxy::block_frames / 2; ++i) half[i] = 0;
-    }
-    if ((last & 1u) && !(wrote & 1u)) {
-        for (u32 i = 0; i < kFullWait; ++i) full[i] = voice.full_wait[i];
-        for (u32 i = kFullWait; i < kFullWait + opxy::block_frames; ++i) full[i] = 0;
-    }
-    const bool to_quarter = (wrote | last) & 4u, to_half = (wrote | last) & 2u, to_full = (wrote | last) & 1u;
-    // Eighth to quarter.
-    i32* const stage4 = voice.quarter + kHistory3;
-    const bool eighth_on = (wrote | last) & 8u;
-    if (eighth_on) {
-        if (!(wrote & 8u)) for (u32 i = 0; i < opxy::block_frames / 8; ++i) sums.at[3][i] = 0;
-        for (u32 i = 0; i < opxy::block_frames / 8; ++i) sums.at[3][i] = clamp(sums.at[3][i], -kStageLimit, kStageLimit);
-        if (to_quarter) twice<4, true>(voice.eighth, quarter, stage4, opxy::block_frames / 8);
-        else twice<4, true>(voice.eighth, stage4, opxy::block_frames / 8);
-        for (u32 i = 0; i < kHistory4; ++i) voice.eighth[i] = voice.eighth[opxy::block_frames / 8 + i];
-    } else if (to_quarter) {
-        for (u32 i = 0; i < opxy::block_frames / 4; ++i) stage4[i] = clamp(quarter[i], -kStageLimit, kStageLimit);
-    }
-    const bool quarter_in = eighth_on || to_quarter;
-    if (quarter_in) live |= 16u;
-    // Quarter to half.
-    i32* const stage3 = voice.half + kHistory3;
-    const bool quarter_on = quarter_in || (last & 16u);
-    if (quarter_on) {
-        if (!quarter_in) for (u32 i = 0; i < opxy::block_frames / 4; ++i) stage4[i] = 0;
-        if (to_half) twice<3, true>(voice.quarter, half, stage3, opxy::block_frames / 4);
-        else twice<3, true>(voice.quarter, stage3, opxy::block_frames / 4);
-        for (u32 i = 0; i < kHistory3; ++i) voice.quarter[i] = voice.quarter[opxy::block_frames / 4 + i];
-    } else if (to_half) {
-        for (u32 i = 0; i < opxy::block_frames / 2; ++i) stage3[i] = clamp(half[i], -kStageLimit, kStageLimit);
-    }
-    const bool half_in = quarter_on || to_half;
-    if (half_in) live |= 32u;
+    // Back to the full rate, the whole and the side alike.
+    const u32 last = voice.live, side_last = voice.side_live;
+    u32 live = rise<false>(voice.tone, sums, full, half, quarter, last);
+    const bool to_full = (sums.written | last) & 1u;
+    // (Shut, the side only plays out what it held, which nothing will hear.)
+    const u32 side_up = wide || (side_last & 63u) ? rise<true>(voice.side, side_sums, side_full, side_half, side_quarter, side_last & 63u) : 0;
+    const bool side_to_full = (side_sums.written | side_last) & 1u;
+    const bool side_waited = side_last & 64u;
     // The rattle, and half to full: the output.
     const bool waited = last & 64u;
     for (u32 i = 0; i < kFullWait; ++i) voice.click_wait[i] = impulses[opxy::block_frames - kFullWait + i];
+    // A block with no landing has only the last block's waiting landings; with
+    // none of those either, the side's filter (if it still rings) reads zeros.
+    const bool side_filter = wide && (clicked || side_waited || voice.side1 || voice.side2);
+    if (side_filter) {
+        if (side_waited) for (u32 i = 0; i < kFullWait; ++i) side_waiting[i] = voice.side_wait[i];
+        else for (u32 i = 0; i < kFullWait; ++i) side_waiting[i] = 0;
+        if (!clicked) for (u32 i = 0; i < opxy::block_frames; ++i) side_impulses[i] = 0;
+    }
+    if (wide && clicked) for (u32 i = 0; i < kFullWait; ++i) voice.side_wait[i] = side_impulses[opxy::block_frames - kFullWait + i];
+    if (!wide) voice.side1 = voice.side2 = 0;
     i32 rattle[opxy::block_frames];
-    const bool rattling = rattle_of(voice, waiting, clicked || waited, c1, c2, kHalf >> 1, rattle);
-    const bool half_on = half_in || (last & 32u);
+    const bool rattling = rattle_of(voice.click1, voice.click2, waiting, clicked || waited, c1, c2, kHalf >> 1, rattle);
+    // The side: its tone, at the tone's scale, then its rattle, then opened.
+    i32 apart[opxy::block_frames];
+    const bool side_half_on = (side_up | side_last) & 32u;
+    if (side_half_on) {
+        if (wide) {
+            const i32* x = voice.side.half + kHistory3 - 1;
+            for (u32 j = 0; j < opxy::block_frames; j += 2, ++x) {
+                apart[j] = x[0] << 2;
+                apart[j + 1] = (x[0] + x[1]) << 1;
+            }
+            if (side_to_full)
+                for (u32 i = 0; i < opxy::block_frames; ++i) apart[i] += bound(side_full[i], -kSideLimit, kSideLimit) << 2;
+        }
+        for (u32 i = 0; i < kHistory3; ++i) voice.side.half[i] = voice.side.half[opxy::block_frames / 2 + i];
+    } else if (wide) {
+        if (side_to_full) for (u32 i = 0; i < opxy::block_frames; ++i) apart[i] = bound(side_full[i], -kSideLimit, kSideLimit) << 2;
+        else for (u32 i = 0; i < opxy::block_frames; ++i) apart[i] = 0;
+    }
+    if (side_filter) {
+        i32 side_rattle[opxy::block_frames];
+        if (rattle_of(voice.side1, voice.side2, side_waiting, clicked || side_waited, c1, c2, kHalf >> 1, side_rattle))
+            for (u32 i = 0; i < opxy::block_frames; ++i) apart[i] += side_rattle[i];
+    }
+    if (wide) open_side(apart, width_was, width);
+    const bool half_on = (live | last) & 32u;
     if (half_on) {
-        if (!half_in) for (u32 i = 0; i < opxy::block_frames / 2; ++i) stage3[i] = 0;
-        if (to_full && rattling) last_twice<true, true>(voice.half, full, rattle, output);
-        else if (to_full) last_twice<true, false>(voice.half, full, rattle, output);
-        else if (rattling) last_twice<false, true>(voice.half, full, rattle, output);
-        else last_twice<false, false>(voice.half, full, rattle, output);
-        for (u32 i = 0; i < kHistory3; ++i) voice.half[i] = voice.half[opxy::block_frames / 2 + i];
+        if (wide) {
+            if (to_full && rattling) last_twice<true, true, true>(voice.tone.half, full, rattle, apart, output);
+            else if (to_full) last_twice<true, false, true>(voice.tone.half, full, rattle, apart, output);
+            else if (rattling) last_twice<false, true, true>(voice.tone.half, full, rattle, apart, output);
+            else last_twice<false, false, true>(voice.tone.half, full, rattle, apart, output);
+        } else {
+            if (to_full && rattling) last_twice<true, true, false>(voice.tone.half, full, rattle, apart, output);
+            else if (to_full) last_twice<true, false, false>(voice.tone.half, full, rattle, apart, output);
+            else if (rattling) last_twice<false, true, false>(voice.tone.half, full, rattle, apart, output);
+            else last_twice<false, false, false>(voice.tone.half, full, rattle, apart, output);
+        }
+        for (u32 i = 0; i < kHistory3; ++i) voice.tone.half[i] = voice.tone.half[opxy::block_frames / 2 + i];
     } else {
         i32 tone[opxy::block_frames];
         for (u32 i = 0; i < opxy::block_frames; ++i) tone[i] = to_full ? full[i] : 0;
-        if (rattling) last_direct<true>(tone, rattle, output);
-        else last_direct<false>(tone, rattle, output);
+        if (wide) {
+            if (rattling) last_direct<true, true>(tone, rattle, apart, output);
+            else last_direct<false, true>(tone, rattle, apart, output);
+        } else {
+            if (rattling) last_direct<true, false>(tone, rattle, apart, output);
+            else last_direct<false, false>(tone, rattle, apart, output);
+        }
     }
+    voice.side_live = static_cast<u8>(side_up | (wide && clicked ? 64u : 0u));
     if (clicked) live |= 64u;
     voice.live = live;
 }
