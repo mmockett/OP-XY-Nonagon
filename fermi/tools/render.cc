@@ -1,9 +1,9 @@
 // Renders a scene to a WAV (44.1 kHz, 16-bit mono) through a machine's own
 // render(), eight voices mixed as the device mixes them before its amp
-// envelope; a stereo engine (-DCHANNELS=2) is mixed as its mono sum. A host
-// tool, not part of the machine. tools/phrases.py writes the scenes and builds
-// this for Fermi and for Hexagon's engines:
-//   c++ -std=c++11 -O2 -I <sdk>/sdk/include -DENGINE='"path/engine.cpp"' -DNS=name [-DCHANNELS=2] tools/render.cc -o render
+// envelope; a stereo engine (-DCHANNELS=2, else 1) is mixed as its mono sum.
+// A host tool, not part of the machine. tools/phrases.py writes the scenes and
+// builds this for Fermi and for Hexagon's engines:
+//   c++ -std=c++11 -O2 -I <sdk>/sdk/include -DENGINE='"path/engine.cpp"' -DNS=name -DCHANNELS=2 tools/render.cc -o render
 //   ./render scene.txt out.wav
 // A scene file: "seconds attack release" (seconds), then the eight control
 // values (0..1), then one note a line: "start length midi" (seconds). The
@@ -14,9 +14,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
-#ifndef CHANNELS
-#define CHANNELS 1
-#endif
 
 namespace {
 const double rate = 44100.0;
