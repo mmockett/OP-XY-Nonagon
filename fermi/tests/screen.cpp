@@ -369,7 +369,7 @@ void same_chain() {
     s.note();
     fermi::Voice voice;
     fermi::Shared shared;
-    opxy::i32 parameters[8], out[64];
+    opxy::i32 parameters[8], out[128];
     opxy::u32 pitch[64];
     for (int k = 0; k < 8; ++k) parameters[k] = q31(s.controls[k]);
     for (int i = 0; i < 64; ++i) pitch[i] = 21424179u;

@@ -126,7 +126,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     work = pathlib.Path(tempfile.mkdtemp(prefix="fermi-sweep-"))
     inc = f"-I{args.sdk}/sdk/include"
-    subprocess.run(["c++", "-std=c++11", "-O2", inc, f"-I{ROOT}", f'-DENGINE="{ROOT}/engine.cpp"', "-DNS=fermi",
+    subprocess.run(["c++", "-std=c++11", "-O2", inc, f"-I{ROOT}", f'-DENGINE="{ROOT}/engine.cpp"', "-DNS=fermi", "-DCHANNELS=2",
                     str(ROOT / "tools/render.cc"), "-o", str(work / "render")], check=True)
     subprocess.run(["c++", "-std=c++11", "-O2", inc, str(ROOT / "tests/screen.cpp"), "-o", str(work / "screen")], check=True)
     captions = {}

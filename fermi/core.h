@@ -18,6 +18,8 @@ struct Voice {
     i32 springs;
     u32 turn;                   // which third of the modes this block measures
     u32 fresh;                  // 1 until the note's first block loads the chain
+    i32 balance;                // how far the first side leans, Q16, at the end of the last block
+    i32 width;                  // how far energy had opened the width then, Q16
 };
 // State shared by every voice: the latest starting shape, made once for a
 // seed, masses and mode and copied by every note.

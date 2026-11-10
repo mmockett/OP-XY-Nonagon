@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "sdk": "1.10",
+  "sdk": "1.12",
   "kind": "synth",
   "description": "A Fermi-Pasta-Ulam-Tsingou chain per note: its modes' energies are the partials. Low energy is a pure tone, middle breathes and returns, high thermalizes.",
   "presetDefaults": {

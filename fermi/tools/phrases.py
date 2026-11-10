@@ -91,7 +91,10 @@ def main():
     def build(engine_dir, ns):
         exe = work / f"render-{ns}"
         if not exe.exists():
-            cmd = ["c++", "-std=c++11", "-O2", include, f"-I{engine_dir}", f'-DENGINE="{engine_dir}/engine.cpp"', f"-DNS={ns}"]
+            definition = json.loads((pathlib.Path(engine_dir) / "definition.json").read_text())
+            channels = 2 if definition["resources"].get("stereoOutput") else 1
+            cmd = ["c++", "-std=c++11", "-O2", include, f"-I{engine_dir}", f'-DENGINE="{engine_dir}/engine.cpp"', f"-DNS={ns}",
+                   f"-DCHANNELS={channels}"]
             subprocess.run(cmd + [str(ROOT / "tools/render.cc"), "-o", str(exe)], check=True)
         return exe
 

@@ -225,14 +225,18 @@ struct Player {
     fermi::Shared shared;
     opxy::i32 parameters[8];
     opxy::u32 pitch[64];
-    opxy::i32 out[64];
+    opxy::i32 out[64];         // the mono sum, which is the mono voice: what the sound tests read
+    opxy::i32 stereo[128];     // each frame's left and right
     Player(const Controls& c, double hz) {
         c.fill(parameters);
         for (int i = 0; i < 64; ++i) pitch[i] = increment(hz);
         fermi::initialize(voice, shared, 1);
         fermi::start(voice, shared, 1);
     }
-    void play() { fermi::render(voice, shared, 1, out, parameters, pitch); }
+    void play() {
+        fermi::render(voice, shared, 1, stereo, parameters, pitch);
+        for (int i = 0; i < 64; ++i) out[i] = (stereo[2 * i] >> 1) + (stereo[2 * i + 1] >> 1);
+    }
 };
 void render(const Controls& c, double hz, double* out, int count) {
     static Player* p;
@@ -478,7 +482,8 @@ void bounded() {
             for (int b = 0; b < 400; ++b) {
                 p.play();
                 for (int i = 0; i < 64; ++i) {
-                    ok = ok && p.out[i] >= -1073741824 && p.out[i] <= 1073741824;
+                    ok = ok && p.stereo[2 * i] >= -1073741824 && p.stereo[2 * i] <= 1073741824;
+                    ok = ok && p.stereo[2 * i + 1] >= -1073741824 && p.stereo[2 * i + 1] <= 1073741824;
                     any = any || p.out[i] != 0;
                 }
             }
@@ -487,6 +492,70 @@ void bounded() {
     }
     check(ok, "output beyond the declared peak");
     check(sounding, "a note is silent");
+}
+// Stereo: energy holds the width. Up to just past its middle the channels are
+// bit equal; above it the side grows, the channels stay level, and turning it
+// under a held note answers without a step.
+void stereo() {
+    bool alike = true;
+    const auto measure = [&alike](double energy, double& balance) {
+        Controls k;
+        k.energy = energy;
+        Player p(k, 220.0);
+        double mid = 0, side = 0, left = 0, right = 0;
+        alike = true;
+        for (int b = 0; b < 2000; ++b) {
+            p.play();
+            for (int i = 0; i < 64; ++i) {
+                const double l = p.stereo[2 * i] / 2147483648.0, r = p.stereo[2 * i + 1] / 2147483648.0;
+                mid += (l + r) * (l + r) / 4;
+                side += (l - r) * (l - r) / 4;
+                left += l * l;
+                right += r * r;
+                alike = alike && p.stereo[2 * i] == p.stereo[2 * i + 1];
+            }
+        }
+        balance = 10 * std::log10(left / right);
+        return 10 * std::log10((side + 1e-30) / (mid + 1e-30));
+    };
+    double even, hot;
+    measure(0.0, even);
+    check(alike, "energy 0 is one channel twice, bit for bit");
+    measure(0.5, even);
+    check(alike, "the default's energy is one channel twice, bit for bit");
+    const double low = measure(0.6, even), mid = measure(0.75, even), thermal = measure(1.0, hot);
+    std::printf("stereo: side at energy 60, 75, 100: %.1f, %.1f, %.1f dB under the note; left over right %.2f dB at 100\n", low, mid, thermal, hot);
+    check(low < mid && mid < thermal, "the width grows as energy rises");
+    check(thermal > -14 && thermal < -5, "a thermalized note's side is 5 to 14 dB under it");
+    check(hot > -1.5 && hot < 1.5, "a thermalized note's channels are level");
+    // A held note answers, and the side moves with no step.
+    const auto largest = [](bool turning, bool& opened, bool& closed) {
+        Controls k;
+        k.energy = 0.5;
+        Player p(k, 110.0);
+        double worst = 0, last = 0;
+        opened = false;
+        closed = true;
+        for (int b = 0; b < 1400; ++b) {
+            const double u = b < 200 || b > 1000 ? 0 : b < 600 ? (b - 200) / 400.0 : (1000 - b) / 400.0;
+            k.energy = turning ? 0.5 + 0.3 * u : 0.8;
+            k.fill(p.parameters);
+            p.play();
+            for (int i = 0; i < 64; ++i) {
+                const double side = (p.stereo[2 * i] / 2147483648.0 - p.stereo[2 * i + 1] / 2147483648.0) / 2;
+                if (b > 300 && std::fabs(side - last) > worst) worst = std::fabs(side - last);
+                last = side;
+                if (b > 1010) closed = closed && p.stereo[2 * i] == p.stereo[2 * i + 1];
+                if (b > 400 && b < 800) opened = opened || p.stereo[2 * i] != p.stereo[2 * i + 1];
+            }
+        }
+        return worst;
+    };
+    bool opened, closed;
+    const double held = largest(false, opened, closed), turned = largest(true, opened, closed);
+    std::printf("stereo: the side's largest step turning energy %.5f, held at 80 %.5f\n", turned, held);
+    check(opened && closed, "a held note opens with energy and closes to bit equal");
+    check(turned <= held * 1.5, "turning energy adds no step to the side");
 }
 }
 
@@ -501,6 +570,7 @@ int main() {
     dispersion();
     levels();
     bounded();
+    stereo();
     if (failures) std::printf("%d failures\n", failures);
     return failures ? 1 : 0;
 }

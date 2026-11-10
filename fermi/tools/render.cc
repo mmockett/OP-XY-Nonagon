@@ -1,8 +1,9 @@
 // Renders a scene to a WAV (44.1 kHz, 16-bit mono) through a machine's own
 // render(), eight voices mixed as the device mixes them before its amp
-// envelope. A host tool, not part of the machine. tools/phrases.py writes
-// the scenes and builds this for Fermi and for Hexagon's engines:
-//   c++ -std=c++11 -O2 -I <sdk>/sdk/include -DENGINE='"path/engine.cpp"' -DNS=name tools/render.cc -o render
+// envelope; a stereo engine (-DCHANNELS=2) is mixed as its mono sum. A host
+// tool, not part of the machine. tools/phrases.py writes the scenes and builds
+// this for Fermi and for Hexagon's engines:
+//   c++ -std=c++11 -O2 -I <sdk>/sdk/include -DENGINE='"path/engine.cpp"' -DNS=name [-DCHANNELS=2] tools/render.cc -o render
 //   ./render scene.txt out.wav
 // A scene file: "seconds attack release" (seconds), then the eight control
 // values (0..1), then one note a line: "start length midi" (seconds). The
@@ -13,6 +14,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+#ifndef CHANNELS
+#define CHANNELS 1
+#endif
 
 namespace {
 const double rate = 44100.0;
@@ -62,8 +66,10 @@ int main(int argc, char** argv) {
             opxy::u32 pitch[64];
             const double hz = 440.0 * std::pow(2.0, (note.midi - 69) / 12.0);
             for (int i = 0; i < 64; ++i) pitch[i] = static_cast<opxy::u32>(hz / rate * 4294967296.0);
-            opxy::i32 block[64];
-            NS::render(voices[v], shared, v + 1, block, parameters, pitch);
+            opxy::i32 frames[64 * CHANNELS], block[64];
+            NS::render(voices[v], shared, v + 1, frames, parameters, pitch);
+            for (int i = 0; i < 64; ++i)
+                block[i] = CHANNELS == 1 ? frames[i] : (frames[CHANNELS * i] >> 1) + (frames[CHANNELS * i + CHANNELS - 1] >> 1);
             for (int i = 0; i < 64; ++i) {
                 const double t = (b + i) / rate - note.start;
                 double gate = t <= 0 ? 0.0 : t < attack ? t / attack : 1.0;

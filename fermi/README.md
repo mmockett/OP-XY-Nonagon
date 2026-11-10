@@ -33,7 +33,7 @@ version 1.10 of the Open-XY SDK, on its `staging` branch.
 
 | Page | Encoder 1 | 2 | 3 | 4 |
 | --- | --- | --- | --- | --- |
-| 1 | **Energy**: the load on the springs. Still at 0, breathing from about 0.05, deeper to 0.5, chaos above about 0.85 | **Masses**: 8, 12, 16, 20, 24, 28 or 32 | **Springs**: from quadratic (the α chain) to cubic (the β chain), the even partials fading on the way | **Time**: the chain's clock, independent of pitch: a breath from 1.4 s to 32 s at 16 masses |
+| 1 | **Energy**: the load on the springs. Still at 0, breathing from about 0.05, deeper to 0.5, chaos above about 0.85. Past 0.52 it also opens the stereo width; at 0.52 and below the two channels are identical | **Masses**: 8, 12, 16, 20, 24, 28 or 32 | **Springs**: from quadratic (the α chain) to cubic (the β chain), the even partials fading on the way | **Time**: the chain's clock, independent of pitch: a breath from 1.4 s to 32 s at 16 masses |
 | 2 | **Dispersion**: partials from exact harmonics to the top one 500 cents flat, along the chain's own law | **Mode**: the mode the note strikes, 1 to 4, always tuned to the key | **Damping**: lossless, or the struck mode's T60, with the high modes faster | **Seed**: a nudge to the starting shape, from none to two thirds of the note's energy in the low modes |
 
 Measured on a 12 s A3 note through Fermi's own `render()`
@@ -370,7 +370,7 @@ masses or mode change). Ten voiced partials are what fit this budget.
 - `sdk.py test --firmware` compiles for the Blackfin: Fermi is 89.6 KiB of
   the 2040 KiB module region.
 - There is no division per sample, and one per block (the tilt's gain).
-- **Memory:** a voice is 556 bytes, the voices' shared starting shape and setup 288
+- **Memory:** a voice is 564 bytes, the voices' shared starting shape and setup 288
   and the screen state 804.
 
 ## Tests
