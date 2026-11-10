@@ -270,7 +270,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     // The partials in row[from, to) into one bus. A note's first block ramps
     // them two by two; after it, silent partials only keep time and the rest
     // sound two by two, whichever they are.
-    const auto sound = [&](i32* into, u32 from, u32 to) {
+    const auto ring = [&](i32* into, u32 from, u32 to) {
         if (load) {
             for (u32 slot = from; slot < to; slot += 2) {
                 const u32 k = row[slot], j = row[slot + 1];
@@ -303,15 +303,15 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
             power[slot < 6 ? 0 : 1] += a * a;
         }
     if (!spread) {
-        sound(bus[0], 0, chain::voiced);
+        ring(bus[0], 0, chain::voiced);
         voice.width = width;
         finish(bus[0], output, ceiling);
         return;
     }
     for (unsigned i = 0; i < opxy::block_frames; ++i) bus[1][i] = bus[2][i] = 0;
-    sound(bus[0], 0, 2);
-    sound(bus[1], 2, 6);
-    sound(bus[2], 6, chain::voiced);
+    ring(bus[0], 0, 2);
+    ring(bus[1], 2, 6);
+    ring(bus[2], 6, chain::voiced);
     // Each side leans in inverse proportion to its power, so the side stays
     // uncorrelated with the note and the channels level, but for a floor of an
     // eighth of the two sides' power: a lone side still leans a little. At full
