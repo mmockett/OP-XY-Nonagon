@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "sdk": "1.10",
+  "sdk": "1.12",
   "kind": "synth",
   "description": "A struck chain of sites in a magnetic field: its energies (Hofstadter's butterfly) ring as partials, in q clusters at flux p/q.",
   "presetDefaults": {

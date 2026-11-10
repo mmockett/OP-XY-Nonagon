@@ -107,11 +107,11 @@ void play(const std::string& folder, const Scene& scene) {
         double block[opxy::block_frames] = {};
         for (unsigned v = 0; v < 8; ++v) {
             if (!on[v]) continue;
-            opxy::i32 out[opxy::block_frames];
+            opxy::i32 out[2 * opxy::block_frames];
             render(voices[v], shared, v + 1, out, p, pitch[v]);
             for (unsigned i = 0; i < opxy::block_frames; ++i) {
                 if (t + i / static_cast<double>(rate) >= off[v]) amp[v] *= release;
-                block[i] += amp[v] * out[i] / 2147483648.0;
+                block[i] += amp[v] * ((out[2 * i] >> 1) + (out[2 * i + 1] >> 1)) / 2147483648.0;
             }
             if (amp[v] < 1e-5) on[v] = false;
         }

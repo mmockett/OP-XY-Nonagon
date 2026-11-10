@@ -11,12 +11,43 @@
 // and the struck site, so the clusters shimmer. The spectrum comes from
 // tables, so a note sounds in its first block. The OP-XY's amp envelope ends
 // the note.
+//
+// Stereo is the player's, on the wingbeat: at its resting 15 and below a note
+// is one channel twice, and past it the wings open. The width comes from the
+// chain's mirror. Its states alternate by rank between even under the mirror,
+// alike on both wings, and odd, opposite on the two and with a node at the
+// middle. So the even states, the lowest among them, stay in the middle, and the
+// odd ones lean out, every other one each way: struck at the middle site the
+// odd states all but vanish and the note stands centred however far the wings
+// are open. Which state is loud moves with every control, so each block weighs
+// the two ways against each other, the louder leaning less, and neither channel
+// takes the note's weight from the other. Left plus right is always the mono
+// note.
 namespace butterfly {
 const u32 ceiling_fade = 0x29cbc14eu, ceiling = 0x2e709de5u;   // 7.2 and 8 kHz: the half-rate bank's top
 const i32 silence = 1 << 10;        // Q25: below this a partial is skipped
 // The half-band filter's odd-phase taps, Q15 (a 27-tap Kaiser-windowed sinc,
 // beta 5.5): flat to 8 kHz, its image of the bank 58 dB down above 14 kHz.
 const i32 halfband[halfband_taps] = {20556, -6082, 2851, -1374, 597, -205, 38};
+// The side's shorter half-band (11 taps, beta 3): the side is quieter than the
+// note and its top states rarer, so it keeps its images 36 dB down at 14.9 kHz.
+const i32 side_band[3] = {19828, -4970, 1526};
+
+// v within -top..top, as the Blackfin's MIN and MAX.
+inline i32 limit(i32 v, i32 top) {
+    const i32 under = v < top ? v : top;
+    return under > -top ? under : -top;
+}
+
+// How far the wingbeat opens the width, Q16: none up to a little past its
+// default (0.16), then all of it at the top, quickly at first: 1 - (1 - u)^2.
+const i32 width_from = 5243;   // Q15 of the control
+inline i32 width_of(i32 control) {
+    const i32 k = q15(control);
+    if (k <= width_from) return 0;
+    const i32 closed = 65536 - clamp(((k - width_from) * 39012) >> 14, 0, 65536);   // 39012: 2^30 / (32767 - width_from)
+    return 65536 - (((closed >> 1) * (closed >> 1)) >> 14);
+}
 
 // The bank's and the half-band's sample loops, functions of their own so the
 // Blackfin compiler makes each a zero-overhead hardware loop (inlined into
@@ -60,6 +91,10 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
         voice.amplitude[k] = 0;
     }
     for (u32 i = 0; i < half_frames + 2 * halfband_taps; ++i) voice.low[i] = 0;
+    for (u32 i = 0; i < side_tail; ++i) voice.side[i] = 0;
+    voice.leaned = 0;
+    voice.balance = 1 << 15;
+    voice.width = 0;
     voice.gate = 0;
     voice.blocks = 0;
     voice.beat = voice.beat_site = 0;
@@ -120,6 +155,15 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     i32* low = voice.low;
     i32* acc = low + 2 * halfband_taps;
     for (u32 i = 0; i < half_frames; ++i) acc[i] = 0;
+    // With the wings open, or still closing, the odd states ring into two buses
+    // of their own (ranks 1, 5, 9, 13 and 3, 7, 11, 15). Closed, they join the note.
+    const i32 width = width_of(p[WINGBEAT]);
+    const bool opening = width || voice.width;
+    i32 lean[2][half_frames];
+    if (opening) for (u32 i = 0; i < half_frames; ++i) lean[0][i] = lean[1][i] = 0;
+    i32* const bus[3] = {acc, opening ? lean[0] : acc, opening ? lean[1] : acc};
+    u32 power[3] = {0, 0, 0};   // each bus's, this block: Q13 levels squared
+    bool leaning = false;
     for (u32 k = 0; k < partials; ++k) {
         const i32 a = voice.amplitude[k];
         const i32 level = notes.level[k];
@@ -148,20 +192,65 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
         }
         rendered = true;
         if (target >= silence) sounding = true;
+        const u32 way = k & 1 ? 1u + ((k >> 1) & 1) : 0u;
+        i32* const into = bus[way];
+        if (opening) {
+            if (k & 1) leaning = true;
+            power[way] += static_cast<u32>(target >> 12) * static_cast<u32>(target >> 12);
+        }
         // The bank: 32 samples at half rate, the amplitude ramped across them.
-        voice.phase[k] = bank(acc, ph, step_phase, a, (target - a) >> 5);
+        voice.phase[k] = bank(into, ph, step_phase, a, (target - a) >> 5);
     }
     voice.sounding = sounding ? 1 : 0;
     if (hushing) {
         voice.hush = 0;
         voice.sounding = 0;
     }
-    // Nothing played and no tail of the last block left: the filter would give zeros.
-    if (!rendered) {
+    // The note holds every state; the side is the odd buses' difference, in
+    // a lower precision that its short half-band sums without shifts. Each bus
+    // leans in inverse proportion to its power, so the side stays uncorrelated
+    // with the note and the channels level, but for a floor of an eighth of the
+    // note's power: a lone odd state still leans a little. The note's strike says
+    // which bus leans which way, so a chord spreads. With the wings fully open
+    // the leans add up to 1.25: 0.625 each when the buses balance.
+    i32 side[side_tail + half_frames];
+    if (leaning) {
+        const u32 flip = (voice.strikes * 0x9e3779b9u) >> 31;
+        const u32 floor = (power[0] + power[1] + power[2]) >> side_floor;
+        const u32 weigh = power[2 - flip] + floor, weigh_all = power[1] + power[2] + 2 * floor;
+        i32 balance = voice.balance;
+        if (weigh_all) {
+            const i32 up = static_cast<i32>(leading_zeros(weigh_all)) - 16;   // as a Q16 fraction, 1/2 to 1
+            const u32 fraction = up >= 0 ? weigh << up : weigh >> -up;
+            const u32 whole = up >= 0 ? weigh_all << up : weigh_all >> -up;
+            balance = static_cast<i32>(mul16u(fraction, static_cast<u32>(reciprocal(static_cast<i32>(whole)))));   // Q16
+        }
+        // Both leans ramp across the block, so turning the wingbeat never steps.
+        i32 first_lean = ((voice.balance >> 1) * (voice.width >> 1)) >> 14;
+        i32 second_lean = (((65536 - voice.balance) >> 1) * (voice.width >> 1)) >> 14;
+        const i32 first_slide = ((((balance >> 1) * (width >> 1)) >> 14) - first_lean) >> 5;
+        const i32 second_slide = ((((65536 - balance) >> 1) * (width >> 1) >> 14) - second_lean) >> 5;
+        voice.balance = balance;
+        const i32* a = lean[flip];
+        const i32* b = lean[flip ^ 1u];
+        i32* note = acc;
+        for (i32* y = side + side_tail; y != side + side_tail + half_frames; ++y) {
+            const i32 first = *a++, second = *b++;
+            *note++ += first + second;
+            first_lean += first_slide;
+            second_lean += second_slide;
+            const i32 d = (first >> 16) * first_lean - (second >> 16) * second_lean;
+            *y = (d + (d >> 2)) >> 15;
+        }
+    }
+    voice.width = width;
+    // Nothing played and no tail of the last block left, the side's included:
+    // the filter would give zeros.
+    if (!rendered && !voice.leaned) {
         u32 tail = 0;
         for (u32 i = 0; i < 2 * halfband_taps; ++i) tail |= static_cast<u32>(low[i]);
         if (!tail) {
-            for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = 0;
+            for (u32 i = 0; i < 2 * opxy::block_frames; ++i) output[i] = 0;
             return;
         }
     }
@@ -171,5 +260,31 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     // at half that.
     upsample(low, output);
     for (u32 i = 0; i < 2 * halfband_taps; ++i) low[i] = low[half_frames + i];
+    // The two channels, last frame first, as they share the output with the
+    // note. With no side in this block or the last (whose tail it would still
+    // be playing), both are simply the note.
+    if (!leaning && !voice.leaned) {
+        for (u32 i = opxy::block_frames; i-- > 0;) output[2 * i] = output[2 * i + 1] = output[i];
+        return;
+    }
+    if (!leaning) for (u32 i = 0; i < half_frames; ++i) side[side_tail + i] = 0;
+    voice.leaned = leaning ? 1 : 0;
+    for (u32 i = 0; i < side_tail; ++i) side[i] = voice.side[i];
+    // The side, in step with the note: the note's half-band reads 8 half-rate
+    // samples back, and so does this. A channel stops at half scale, as the note
+    // does; its peaks stay far from it, so left plus right stays the note.
+    const i32 top = 1 << 30;
+    for (u32 j = half_frames; j-- > 0;) {
+        const i32* y = side + j + side_tail - 8;
+        const i32 note0 = output[2 * j], note1 = output[2 * j + 1];
+        const i32 wide0 = y[0] << 15;
+        const i32 wide1 = (y[0] + y[1]) * side_band[0] + (y[-1] + y[2]) * side_band[1] + (y[-2] + y[3]) * side_band[2];
+        i32* out = output + 4 * j;
+        out[0] = limit(note0 + wide0, top);
+        out[1] = limit(note0 - wide0, top);
+        out[2] = limit(note1 + wide1, top);
+        out[3] = limit(note1 - wide1, top);
+    }
+    for (u32 i = 0; i < side_tail; ++i) voice.side[i] = side[half_frames + i];
 }
 }

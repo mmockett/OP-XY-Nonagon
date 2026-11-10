@@ -230,12 +230,13 @@ Render play(const double* hz, u32 voices, double seconds, Controls controls, con
         double sum[opxy::block_frames] = {};
         for (u32 j = 0; j < voices; ++j) {
             if (!on[j]) continue;
-            opxy::i32 o[opxy::block_frames];
+            opxy::i32 o[2 * opxy::block_frames];
             render(v[j], shared, j + 1, o, p, pitch[j]);
             for (u32 i = 0; i < opxy::block_frames; ++i) {
-                const double x = o[i] / 2147483648.0;
-                r.peak = std::max(r.peak, std::fabs(x));
-                sum[i] += x;
+                // The peak is each channel's; the sound tests read the mono sum, which is the mono voice.
+                const double left = o[2 * i] / 2147483648.0, right = o[2 * i + 1] / 2147483648.0;
+                r.peak = std::max(r.peak, std::max(std::fabs(left), std::fabs(right)));
+                sum[i] += ((o[2 * i] >> 1) + (o[2 * i + 1] >> 1)) / 2147483648.0;
             }
         }
         for (u32 i = 0; i < opxy::block_frames; ++i) r.out.push_back(sum[i]);
@@ -313,12 +314,12 @@ void envelope() {
         static Shared shared;
         initialize(v, shared, 1);
         start(v, shared, 1);
-        opxy::i32 p[8], o[opxy::block_frames];
+        opxy::i32 p[8], o[2 * opxy::block_frames];
         for (u32 i = 0; i < 8; ++i) p[i] = q31(presets[0].c[i]);
         opxy::u32 pitch[opxy::block_frames];
         for (u32 i = 0; i < opxy::block_frames; ++i) pitch[i] = increment(220);
         render(v, shared, 1, o, p, pitch);
-        for (u32 i = 0; i < opxy::block_frames; ++i) first = first || o[i];
+        for (u32 i = 0; i < 2 * opxy::block_frames; ++i) first = first || o[i];
     }
     const Render pad = play(a3, 1, 5, [](double, double* c) {
         for (u32 i = 0; i < 8; ++i) c[i] = presets[3].c[i];
@@ -416,7 +417,7 @@ void retrigger() {
     const double hz[1] = {220};
     static Voice v;
     static Shared shared;
-    opxy::i32 p[8], o[opxy::block_frames];
+    opxy::i32 p[8], o[2 * opxy::block_frames];
     for (u32 i = 0; i < 8; ++i) p[i] = q31(presets[3].c[i]);   // a pad: still loud when struck again
     opxy::u32 pitch[opxy::block_frames];
     for (u32 i = 0; i < opxy::block_frames; ++i) pitch[i] = increment(hz[0]);
@@ -427,7 +428,7 @@ void retrigger() {
         if (blk == 400) start(v, shared, 1);
         render(v, shared, 1, o, p, pitch);
         for (u32 i = 0; i < opxy::block_frames; ++i) {
-            const double x = o[i] / 2147483648.0, d = std::fabs(x - last);
+            const double x = ((o[2 * i] >> 1) + (o[2 * i + 1] >> 1)) / 2147483648.0, d = std::fabs(x - last);
             if (blk >= 399 && blk <= 403) worst = std::max(worst, d);
             else if (blk > 200) typical = std::max(typical, d);
             last = x;
@@ -435,6 +436,86 @@ void retrigger() {
     }
     std::printf("      retrigger: largest step %.4f around it, %.4f elsewhere\n", worst, typical);
     check(worst <= typical * 1.2, "striking a sounding voice again does not click");
+}
+
+// Stereo. The chain's mirror: odd ranks have a node at the middle site. And the
+// player's: the wingbeat holds the width, closed to bit equal channels at rest.
+void stereo() {
+    int worst = 0;
+    for (u32 c = 0; c < tables::fluxes * tables::couplings; ++c)
+        for (u32 k = 1; k < partials; k += 2)
+            worst = std::max(worst, static_cast<int>(tables::amplitude[(c * partials + k) * half_chain]));
+    std::printf("      stereo: an odd state's largest |psi| at the middle: %d of 255\n", worst);
+    check(worst <= 10, "the odd ranks are the states with a node at the middle");
+    static Voice v;
+    static Shared shared;
+    opxy::u32 pitch[opxy::block_frames];
+    for (u32 i = 0; i < opxy::block_frames; ++i) pitch[i] = increment(220);
+    opxy::i32 p[8], o[2 * opxy::block_frames];
+    // The wingbeat holds the width: its side, and whether the channels are bit equal.
+    bool alike;
+    const auto width = [&](double wingbeat) {
+        for (u32 i = 0; i < 8; ++i) p[i] = q31(i == WINGBEAT ? wingbeat : presets[0].c[i]);
+        initialize(v, shared, 1);
+        start(v, shared, 1);
+        double mid = 0, side = 0;
+        alike = true;
+        for (u32 b = 0; b < 400; ++b) {
+            render(v, shared, 1, o, p, pitch);
+            for (u32 i = 0; i < opxy::block_frames; ++i) {
+                const double l = o[2 * i] / 2147483648.0, r = o[2 * i + 1] / 2147483648.0;
+                mid += (l + r) * (l + r) / 4;
+                side += (l - r) * (l - r) / 4;
+                alike = alike && o[2 * i] == o[2 * i + 1];
+            }
+        }
+        return 10 * std::log10((side + 1e-30) / (mid + 1e-30));
+    };
+    width(0);
+    check(alike, "wingbeat 0 is one channel twice, bit for bit");
+    width(presets[0].c[WINGBEAT]);
+    check(alike, "the default's wingbeat is one channel twice, bit for bit");
+    const double low = width(0.3), middle = width(0.5), top = width(1);
+    std::printf("      stereo: side at wingbeat 30, 50, 100: %.1f, %.1f, %.1f dB under the note\n", low, middle, top);
+    check(low < middle && middle < top - 1, "the width grows as the wingbeat opens");
+    check(top > -15 && top < -6, "the wingbeat's top has a side 6 to 15 dB under the note");
+    // A held note answers: closed, turned up, and back to bit equal; no step on the way.
+    const double a110[1] = {110};
+    const auto pad = [](double, double* c) {
+        c[STRIKE] = 0;
+        c[SPREAD] = 0.75;
+        c[WINGBEAT] = 0;
+    };
+    for (u32 i = 0; i < opxy::block_frames; ++i) pitch[i] = increment(a110[0]);
+    double base[8];
+    for (u32 i = 0; i < 8; ++i) base[i] = presets[0].c[i];
+    pad(0, base);
+    const auto left = [&](bool turning, bool& closed_again, bool& opened) {
+        std::vector<double> x;
+        initialize(v, shared, 1);
+        start(v, shared, 1);
+        const u32 blocks = 1400;
+        closed_again = true;
+        opened = false;
+        for (u32 b = 0; b < blocks; ++b) {
+            // Rests, rises and falls over about 2 s in all, rests again.
+            const double u = b < 200 || b > 1000 ? 0 : b < 600 ? (b - 200) / 400.0 : (1000 - b) / 400.0;
+            base[WINGBEAT] = turning ? u : 0;
+            for (u32 i = 0; i < 8; ++i) p[i] = q31(base[i]);
+            render(v, shared, 1, o, p, pitch);
+            for (u32 i = 0; i < opxy::block_frames; ++i) {
+                x.push_back(o[2 * i] / 2147483648.0);
+                if (b > 1010) closed_again = closed_again && o[2 * i] == o[2 * i + 1];
+                if (b > 400 && b < 800) opened = opened || o[2 * i] != o[2 * i + 1];
+            }
+        }
+        return x;
+    };
+    bool closed, opened;
+    const double still = clickiness(left(false, closed, opened), 8820), turned = clickiness(left(true, closed, opened), 8820);
+    std::printf("      stereo: left channel's detector turning the wingbeat %.1f (held pad %.1f)\n", turned, still);
+    check(opened && closed, "a held note opens with the wingbeat and closes to bit equal");
+    check(turned <= std::max(2.0, still * 1.5), "turning the wingbeat adds no step to a channel");
 }
 
 // 9. Each control at 0, 25, 50, 75 and 100 on one note of 220 Hz, the others
@@ -694,6 +775,7 @@ int main() {
     tuning();
     levels();
     retrigger();
+    stereo();
     controls_table();
     std::printf(failures ? "%d check(s) failed\n" : "all checks passed\n", failures);
     return failures ? 1 : 0;

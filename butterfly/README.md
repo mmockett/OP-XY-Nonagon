@@ -57,7 +57,7 @@ wingbeat.
 | glow | 40 ms to 8 s, exponentially | 3.5 s | `40ms` to `99ms`, `.10s` to `.99s`, `1.0s` to `8.0s` | How long a struck gate takes to close from open to −60 dB. It closes three times faster while still bright, as a vactrol's cell does. A struck note's hum fades too, with a time constant of four glows over the strike squared: at short glows it dies with the ring, at long ones it sustains, and a pad never fades. An unstruck note swells in at a twentieth of glow. |
 | site | from the chain's middle (`mid`) to its end (`end`) | 2 | `mid`, `1` to `7`, `end` | Where the chain is struck. The middle excites only the even states of the mirror-symmetric chain, as a bar struck at its centre sounds only its symmetric modes. Off the middle every state sounds, and above λ = 1 each site has its own few partials. |
 | tilt | 0 to 3 | 1.2 | how far the top partial is darkened (`10dB`) | How dark the top of the spectrum is, and how much faster it follows the gate down. The upper three quarters of the span are darkened, to tilt × 8 dB at the top, and each partial takes the gate to the power 1 + tilt × place (its place being its height in the span), so the bell is darker from the strike and darkens further as it rings, as through a lowpass gate. |
-| wingbeat | 0 to 100 | 15 | `off`, the beats a second (`.26Hz`) | A slow beat, 0.2 to 0.6 a second, of the flux (up to 1/48 either way) and of the struck site (up to 1.5 sites), from each note's own strike and starting at rest. The bands drift and breathe. |
+| wingbeat | 0 to 100 | 15 | `off`, the beats a second (`.26Hz`) | A slow beat, 0.2 to 0.6 a second, of the flux (up to 1/48 either way) and of the struck site (up to 1.5 sites), from each note's own strike and starting at rest. The bands drift and breathe. Past 16 it also opens the stereo width, the wings parting; at 16 and below the two channels are identical. |
 
 Measured on one note of 220 Hz at 0, 25, 50, 75 and 100, the other controls
 at Specimen's and the wingbeat at 0 outside its own rows
@@ -353,7 +353,7 @@ The figures below are host estimates made during development.
 - Both are within 15,000; Moth reads 10,300 by the same count. Nothing is
   solved at run time.
 - **Memory.** Butterfly takes 144.5 KiB of the 2040 KiB module region, most
-  of it the tables, and needs no runtime helpers. Eight voices are 352 bytes
+  of it the tables, and needs no runtime helpers. Eight voices are 404 bytes
   each, with no shared state.
 
 ## Tests
