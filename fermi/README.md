@@ -26,8 +26,8 @@ settles toward its struck mode, as a string's does.
 
 **Status: experimental.** Fermi passes the SDK's tests and runs on an
 OP-XY, where its CPU is
-measured (below). Its screen follows the track's amp envelope, which needs
-version 1.10 of the Open-XY SDK, on its `staging` branch.
+measured (below). Its screen follows the track's amp envelope (SDK 1.10), and it plays in
+stereo, which needs version 1.12 of the Open-XY SDK, on its `staging` branch.
 
 ## Controls
 
@@ -336,6 +336,8 @@ velocity: stock applies both after `render`.
 
 ## CPU
 
+These figures are the mono voice's; the stereo voice is yet to be measured.
+
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, at `v0.6.0`,
 as one capture of its sweep: one voice playing middle C with the first four
 controls at their midpoint costs **2.98%** of the 580,352-cycle audio block, so
@@ -367,8 +369,8 @@ That is about 14,300, and 14,900 at most. A note's first block costs about
 for every note that shares it (about 1,400 instructions, when the seed,
 masses or mode change). Ten voiced partials are what fit this budget.
 
-- `sdk.py test --firmware` compiles for the Blackfin: Fermi is 89.6 KiB of
-  the 2040 KiB module region.
+- `sdk.py test --firmware` compiles for the Blackfin: Fermi is 95.9 KiB of
+  the 2032 KiB module region.
 - There is no division per sample, and one per block (the tilt's gain).
 - **Memory:** a voice is 564 bytes, the voices' shared starting shape and setup 288
   and the screen state 804.

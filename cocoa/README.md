@@ -23,8 +23,8 @@ the bubbles rise out, the note climbs back to the key.
 
 **Status: experimental.** Cocoa passes the SDK's tests and runs on an
 OP-XY, where its CPU is
-measured (below). Its screen follows the track's amp envelope, which needs
-version 1.10 of the Open-XY SDK, on its `staging` branch.
+measured (below). Its screen follows the track's amp envelope (SDK 1.10), and it plays in
+stereo, which needs version 1.12 of the Open-XY SDK, on its `staging` branch.
 
 ## Controls
 
@@ -357,6 +357,8 @@ falls back to the browser's face.
 
 ## CPU
 
+These figures are the mono voice's; the stereo voice is yet to be measured.
+
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, at `v0.6.0`,
 as one capture of its sweep: one voice playing middle C with the first four
 controls at their midpoint costs **3.45%** of the 580,352-cycle audio block, so
@@ -380,8 +382,8 @@ At the heaviest setting:
   strike and decay), that makes about 14,700 a block at most. A held note in
   the default, with the cup rung out, is about 9,700.
 
-**Memory.** A voice is 304 bytes, `Shared` 96 and the display state 236.
-`sdk.py test --firmware` compiles it for the Blackfin in 65.6 KiB of module
+**Memory.** A voice is 1,756 bytes.
+`sdk.py test --firmware` compiles it for the Blackfin in 93.2 KiB of module
 memory, 8 KiB of it the sine table.
 
 ## Prior art

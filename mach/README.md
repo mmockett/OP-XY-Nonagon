@@ -28,8 +28,8 @@ gone. Releasing fades it, as sound already in the air cannot be called back.
 
 **Status: experimental.** Mach passes the SDK's tests and runs on an
 OP-XY, where its CPU is
-measured (below). Its screen follows the track's amp envelope, which needs
-version 1.10 of the Open-XY SDK, on its `staging` branch.
+measured (below). Its screen follows the track's amp envelope (SDK 1.10), and it plays in
+stereo, which needs version 1.12 of the Open-XY SDK, on its `staging` branch.
 
 ## Controls
 
@@ -243,6 +243,8 @@ of the band or a pitch changes fast (at the fold) they ramp sample by sample,
 so nothing steps audibly.
 
 ## CPU
+
+These figures are the mono voice's; the stereo voice is yet to be measured.
 
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, as two
 captures of its sweep on a firmware holding v0.9.0's sound code (the screen

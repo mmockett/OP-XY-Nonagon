@@ -303,8 +303,28 @@ Cocoa's taps, Drop's beat and Recur's rate run in their own units rather than
 locking to the beat, and a note's own life (a spin, a flyby, a drop) runs its
 course after the key is released, under the OP-XY's amp envelope.
 
-Ghost is made for headphones: its pitches exist only between the ears. As a
-sample engine it plays in stereo, which the SDK's synth voices can't.
+Ghost is made for headphones: its pitches exist only between the ears.
+
+## Stereo
+
+Six of the synths play in stereo (SDK 1.12). Each opens its width on a control
+it already has and is exactly mono at that control's default, so a sound stays
+centred until you turn it; left plus right is always the mono voice.
+
+- **Sand:** tilt. Each landing clicks where its grain lies, and the plate's
+  upper modes and its twin spread out; fully open by tilt 75.
+- **Cocoa:** stir, past its default of 60. Pops, the cup's wall and the
+  column's upper modes lean either side of the pitch.
+- **Coin:** many. One disk is mono; with more, each disk takes its own place
+  over a base in the middle.
+- **Fermi:** energy, past 0.52. The struck mode stays in the middle and the
+  width grows as energy spreads into the other modes.
+- **Mach:** echo. The flight crosses from one side to the other, and above
+  Mach 1 its two roots part.
+- **Butterfly:** wingbeat, past its resting 15. The chain's odd states lean
+  out, so a note struck at the middle site stays centred.
+
+Ghost has always been stereo. Drop and Recur are mono.
 
 Ghost and Recur are sample engines, on the sampler page. With no sample
 loaded, both screens say so ("load a sample · shift + sample"). Recur opens
@@ -324,7 +344,7 @@ longer, but a larger release is shorter.
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`. Sand,
 Cocoa, Fermi, Mach, Butterfly, Drop and Ghost are from two captures of one
 firmware holding v0.9.0's sound code, Coin from one capture at `v0.6.0` and
-Recur from three at `v0.8.0`. For a synth, one voice plays middle C with the
+Recur from three at `v0.8.0`; the stereo voices are yet to be measured. For a synth, one voice plays middle C with the
 first four controls at their midpoint; for a sample engine, its sample
 callback plays the SDK's generated two-second test sample at its default
 settings. Each figure is a share of the OP-XY's 580,352-cycle audio block: the
@@ -357,8 +377,9 @@ sampler's own mixing, so they don't compare directly with the synths.
 
 ## Building
 
-The seven synths need SDK 1.10 (their screens read the track's amp
-envelope), on the `staging` branch of
+Sand, Cocoa, Coin, Fermi, Mach and Butterfly need SDK 1.12 (stereo output),
+and Drop SDK 1.10 (its screen reads the track's amp envelope), on the
+`staging` branch of
 [etcetc000/open-xy](https://github.com/etcetc000/open-xy). Ghost and Recur
 are sample engines with their own screens, Shift on the stock sampler's
 markers and gain, and screens that follow the amp envelope, also SDK 1.10 on

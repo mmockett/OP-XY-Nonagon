@@ -33,8 +33,8 @@ out after the key is let go.
 
 **Status: experimental.** Coin passes the SDK's tests and runs on an
 OP-XY, and its CPU is measured there
-(below). Its screen follows the track's amp envelope, which needs
-version 1.10 of the Open-XY SDK, on its `staging` branch.
+(below). Its screen follows the track's amp envelope (SDK 1.10), and it plays in
+stereo, which needs version 1.12 of the Open-XY SDK, on its `staging` branch.
 
 ## Controls
 
@@ -252,6 +252,8 @@ caption the screen can show.
 
 ## CPU
 
+These figures are the mono voice's; the stereo voice is yet to be measured.
+
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, at `v0.6.0`,
 as one capture of its sweep: one voice playing middle C with the first four
 controls at their midpoint costs **1.30%** of the 580,352-cycle audio block, so
@@ -281,7 +283,7 @@ The host estimate in `sdk.py test` reads higher (17,700 to 18,400 on a quiet
 host), because the host's portable Q31 multiply takes about ten instructions
 where the Blackfin takes one: the loops that are cheapest on the Blackfin
 are the ones the host times as dearest. The firmware compile
-(`sdk.py test --firmware`) passes, and Coin takes 47.8 KiB of module memory.
+(`sdk.py test --firmware`) passes, and Coin takes 53.1 KiB of module memory.
 
 ## Files
 

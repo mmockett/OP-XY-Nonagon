@@ -24,8 +24,8 @@ in 1680; Chladni made the figures a method and published them.
 
 **Status: experimental.** Sand passes the SDK's tests and runs on an
 OP-XY, where its CPU is
-measured (below). Its screen follows the track's amp envelope, which needs
-version 1.10 of the Open-XY SDK, on its `staging` branch.
+measured (below). Its screen follows the track's amp envelope (SDK 1.10), and it plays in
+stereo, which needs version 1.12 of the Open-XY SDK, on its `staging` branch.
 
 ## Controls
 
@@ -282,6 +282,8 @@ the plate.
 
 ## CPU
 
+These figures are the mono voice's; the stereo voice is yet to be measured.
+
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, at `v0.5.0`,
 as one capture of its sweep: one voice playing middle C with the first four
 controls at their midpoint costs **4.81%** of the 580,352-cycle audio block, so
@@ -303,5 +305,5 @@ still about 200, a throw and its landing about 420 more) and the modes' block
 maths about 1,300. A settled note at the defaults comes to about 10,500. In
 heavy rattle most looks find a grain in the air, which costs little, so a
 shaken plate comes to about 11,000. The SDK's host estimate (`sdk.py test`)
-is lower, about 6,600 to 6,900. Compiled for the device, Sand takes 81.2 KiB
+is lower, about 6,600 to 6,900. Compiled for the device, Sand takes 113.3 KiB
 of the shared module memory.

@@ -32,8 +32,8 @@ the bright partials trade places.
 
 **Status: experimental.** Butterfly passes the SDK's tests. It runs on an
 OP-XY, and its CPU is measured there
-(below). Its screen follows the track's amp envelope, which needs
-version 1.10 of the Open-XY SDK, on its `staging` branch.
+(below). Its screen follows the track's amp envelope (SDK 1.10), and it plays in
+stereo, which needs version 1.12 of the Open-XY SDK, on its `staging` branch.
 
 ## Controls
 
@@ -330,6 +330,8 @@ peaks at 0.93.
 
 ## CPU
 
+These figures are the mono voice's; the stereo voice is yet to be measured.
+
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`, as two
 captures of its sweep on a firmware holding v0.9.0's sound code (the screen
 runs outside the audio block and isn't measured): one voice playing middle C
@@ -352,7 +354,7 @@ The figures below are host estimates made during development.
   per voice block at the heaviest setting, on a heavily loaded host.
 - Both are within 15,000; Moth reads 10,300 by the same count. Nothing is
   solved at run time.
-- **Memory.** Butterfly takes 144.5 KiB of the 2040 KiB module region, most
+- **Memory.** Butterfly takes 155.7 KiB of the 2032 KiB module region, most
   of it the tables, and needs no runtime helpers. Eight voices are 404 bytes
   each, with no shared state.
 
