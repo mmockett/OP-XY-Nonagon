@@ -32,14 +32,18 @@ struct Player {
     coin::Shared shared;
     opxy::i32 parameters[8];
     opxy::u32 pitch[64];
-    opxy::i32 out[64];
+    opxy::i32 channels[128];   // left, right, left, ...
+    opxy::i32 out[64];         // the mono sum, which is the mono voice: what the sound tests read
     Player(const double (&c)[8], double hz) {
         for (int k = 0; k < 8; ++k) parameters[k] = q31(c[k]);
         for (int i = 0; i < 64; ++i) pitch[i] = increment(hz);
         coin::initialize(voice, shared, 1);
         coin::start(voice, shared, 1);
     }
-    void play() { coin::render(voice, shared, 1, out, parameters, pitch); }
+    void play() {
+        coin::render(voice, shared, 1, channels, parameters, pitch);
+        for (int i = 0; i < 64; ++i) out[i] = (channels[2 * i] >> 1) + (channels[2 * i + 1] >> 1);
+    }
     // Disk k's contact cycles so far: whole strikes plus the phase.
     double cycles(int k) const {
         const coin::Disk& d = voice.disk[k];
@@ -267,9 +271,9 @@ void bounded() {
             bool any = false;
             for (int b = 0; b < 400; ++b) {
                 p.play();
-                for (int i = 0; i < 64; ++i) {
-                    if (p.out[i] > 1073741824 || p.out[i] < -1073741824) ok = false;
-                    any = any || p.out[i] != 0;
+                for (int i = 0; i < 128; ++i) {
+                    if (p.channels[i] > 1073741824 || p.channels[i] < -1073741824) ok = false;
+                    any = any || p.channels[i] != 0;
                 }
             }
             sounded = sounded && any;
@@ -277,6 +281,56 @@ void bounded() {
     }
     check(ok, "the output exceeds the declared peak");
     check(sounded, "a setting is silent");
+}
+
+// In stereo: one disk is exactly mono; more disks are wider, more so the more of
+// them; and turning many on a held note moves the width with no step.
+void disks_have_sides() {
+    const auto width = [](double many, bool& exact) {
+        const double c[8] = {0.4, 0.3, 0.125, 0.1667, 0.25, 0, 0.57, many};
+        Player p(c, hz_of(60));
+        double middle = 0, side = 0;
+        exact = true;
+        for (int b = 0; b < 1400; ++b) {
+            p.play();
+            for (int i = 0; i < 64; ++i) {
+                exact = exact && p.channels[2 * i] == p.channels[2 * i + 1];
+                const double l = p.channels[2 * i] / 2147483648.0, r = p.channels[2 * i + 1] / 2147483648.0;
+                middle += (l + r) * (l + r) / 4;
+                side += (l - r) * (l - r) / 4;
+            }
+        }
+        return 10 * std::log10((side + 1e-30) / middle);
+    };
+    bool exact;
+    const double one = width(0.125, exact);
+    check(exact, "one disk is not exactly mono");
+    const double two = width(0.375, exact), three = width(0.625, exact), four = width(0.875, exact);
+    std::printf("      side: one disk %.1f dB, two %.1f dB, three %.1f dB, four %.1f dB\n", one, two, three, four);
+    check(two > -15 && two < -6, "two disks don't have a side each");
+    check(four > -11 && four < -5, "four disks don't have sides");
+    check(two < three && three < four, "width doesn't grow with many");
+    // Many turned down and up again on a held note.
+    const double c[8] = {0.4, 0.3, 0.125, 0.1667, 0.25, 0, 0.57, 0.875};
+    Player p(c, hz_of(60));
+    double last_side = 0, last_mono = 0, side_step = 0, mono_step = 0;
+    bool closed = true;
+    for (int b = 0; b < 700; ++b) {
+        if (b == 300) p.parameters[7] = q31(0.125);
+        if (b == 500) p.parameters[7] = q31(0.875);
+        p.play();
+        for (int i = 0; i < 64; ++i) {
+            const double l = p.channels[2 * i] / 2147483648.0, r = p.channels[2 * i + 1] / 2147483648.0;
+            const double s = (l - r) / 2, m = (l + r) / 2;
+            if ((b >= 300 && b < 303) || (b >= 500 && b < 503)) { side_step = std::fmax(side_step, std::fabs(s - last_side)); mono_step = std::fmax(mono_step, std::fabs(m - last_mono)); }
+            if (b > 301 && b < 500) closed = closed && l == r;
+            last_side = s;
+            last_mono = m;
+        }
+    }
+    std::printf("      many turned on a held note: side's largest step %.5f, the voice's %.5f\n", side_step, mono_step);
+    check(closed, "many at 1 doesn't close a held note to mono");
+    check(side_step <= mono_step, "turning many makes a step");
 }
 
 void screen_follows() {
@@ -544,6 +598,7 @@ int main() {
     ring_tracks_the_key();
     many_stop_apart();
     bounded();
+    disks_have_sides();
     screen_follows();
     if (std::getenv("COIN_REPORT")) report();
     if (failures) std::printf("%d checks failed\n", failures);

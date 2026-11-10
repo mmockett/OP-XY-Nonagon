@@ -109,10 +109,10 @@ unsigned play(const Phrase& phrase, float* out) {
             if (note_of[v] < 0) continue;
             opxy::u32 pitch[64];
             for (unsigned i = 0; i < 64; ++i) pitch[i] = increment(phrase.notes[note_of[v]].midi);
-            opxy::i32 o[64];
+            opxy::i32 o[128];
             coin::render(voices[v], shared, v + 1, o, parameters, pitch);
             if (t >= gate[v]) amp[v] *= fall;
-            for (unsigned i = 0; i < 64; ++i) mix[i] += o[i] / 2147483648.0 * amp[v];
+            for (unsigned i = 0; i < 64; ++i) mix[i] += ((o[2 * i] >> 1) + (o[2 * i + 1] >> 1)) / 2147483648.0 * amp[v];
         }
         for (unsigned i = 0; i < 64; ++i) out[b * 64 + i] = static_cast<float>(mix[i]);
     }
@@ -133,9 +133,9 @@ double chord_peak(const Preset& p) {
         for (unsigned v = 0; v < 4; ++v) {
             opxy::u32 pitch[64];
             for (unsigned i = 0; i < 64; ++i) pitch[i] = increment(chord[v]);
-            opxy::i32 o[64];
+            opxy::i32 o[128];
             coin::render(voices[v], shared, v + 1, o, parameters, pitch);
-            for (unsigned i = 0; i < 64; ++i) mix[i] += o[i] / 2147483648.0;
+            for (unsigned i = 0; i < 64; ++i) mix[i] += ((o[2 * i] >> 1) + (o[2 * i + 1] >> 1)) / 2147483648.0;
         }
         for (unsigned i = 0; i < 64; ++i) peak = std::fabs(mix[i]) > peak ? std::fabs(mix[i]) : peak;
     }

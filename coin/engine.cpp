@@ -20,6 +20,12 @@
 // disk slowly turns, its strikes move between the pair: they beat, slowly and
 // unevenly. (Several disks beat among themselves, so then it rests.) Once it lies flat, the disk rings on at its note for as long as
 // ring sets.
+//
+// One disk is mono, left and right the same. Many opens the stereo: with more
+// disks each takes its own place, the note's owner saying which goes where, so a
+// chord's notes spread, and the more of them the wider, live; the base, the upper
+// modes and the rolling noise stay in the middle, the table the disks spin on.
+// Three buses sum to the mono voice: left plus right is always twice it.
 namespace coin {
 namespace sound {
 using opxy::q31::multiply;
@@ -51,6 +57,13 @@ const i32 warble_most = 3932;          // wobble's swing of the contact rate, at
 const u32 eighth_most = 241591910u;    // 0.45 of the sample rate, as an eighth of an increment
 // 2^30 / (cut / 4), Q16, for a cut of 1 to 5 octaves.
 const u32 per_octaves[spin::sizes] = {65536, 32768, 21845, 16384, 13107};
+const i32 half_scale = 1073741824;     // what a channel may reach
+// Where each disk rings for the count: 0 the middle, 1 and 2 either side.
+const unsigned char side_of[spin::most][spin::most] = {{0, 0, 0, 0}, {1, 2, 0, 0}, {0, 1, 2, 0}, {1, 2, 2, 1}};
+// How far the sides lean for what many is set to, Q31 of 2/3 of the voice's
+// gain: a channel holds 1 + lean of its side, at leans of 0, 0.25, 0.5 and 0.45
+// (three disks have one in the middle, so lean further to sound wider than two).
+const i32 lean[spin::most] = {0, 805306368, 1610612736, 1449551462};
 
 // sin(pi x) for x = position / 2^31 in [0, 0.5], Q31.
 inline i32 sine_pi(u32 position) {
@@ -224,13 +237,20 @@ __attribute__((noinline)) void rub(Voice& voice, i32* sum, i32* struck, const i3
 // the quarter, with the knee from 0.375 to a ceiling of 0.5. The clamp's bound
 // and the knee are passed in, so the compiler keeps the clamp as a minimum and
 // a maximum, and the sign is put back without a branch (either would cost a
-// Blackfin a branch a sample). Returns the largest sample of the quarter mix.
-__attribute__((noinline)) i32 finish(Voice& voice, const i32* sum, opxy::Output output, i32 most, i32 knee) {
+// Blackfin a branch a sample). Wide, the two sides (each a quarter too) add to
+// the voice, and their difference, at a lean moving to `reach`, to one channel
+// and from the other, as far as half scale allows. Returns the largest sample
+// of the quarter mix.
+template <bool Wide>
+__attribute__((noinline)) i32 finish(Voice& voice, const i32* sum, const i32* one_side, const i32* other_side,
+                                     opxy::Output output, i32 most, i32 knee, i32 reach) {
     i32 dc_in = voice.dc_in, dc_out = voice.dc_out;
-    i32 loudest = 0;
+    i32 loudest = 0, width = voice.width;
+    const i32 width_step = (reach - width) >> 6;
     const i32 least = -most;
     for (unsigned i = 0; i < opxy::block_frames; ++i) {
-        const i32 mixed = sum[i];
+        i32 mixed = sum[i];
+        if (Wide) mixed += one_side[i] + other_side[i];
         dc_out = mixed - dc_in + dc_out - (dc_out >> 10);   // DC blocker, 7 Hz
         dc_in = mixed;
         i32 v = dc_out > most ? most : dc_out;
@@ -241,11 +261,22 @@ __attribute__((noinline)) i32 finish(Voice& voice, const i32* sum, opxy::Output 
             const i32 over = o - knee;
             o = over >= 536870912 ? 1073741824 : o - (multiply(over, over) << 1);
         }
-        output[i] = (o ^ sign) - sign;
+        const i32 mono = (o ^ sign) - sign;
+        if (Wide) {
+            const i32 room = (half_scale - o) >> 2;
+            const i32 side = clamp(multiply(one_side[i] - other_side[i], width), -room, room) * 4;
+            width += width_step;
+            output[2 * i] = mono + side;
+            output[2 * i + 1] = mono - side;
+        } else {
+            output[2 * i] = mono;
+            output[2 * i + 1] = mono;
+        }
         loudest = a > loudest ? a : loudest;
     }
     voice.dc_in = dc_in;
     voice.dc_out = dc_out;
+    voice.width = Wide ? reach : 0;
     return loudest;
 }
 }
@@ -271,6 +302,7 @@ inline void initialize(Voice& voice, Shared&, opxy::u32) {
     voice.quiet = 1;
     voice.hand = 0;
     voice.sway = 0;
+    voice.width = 0;
 }
 
 // Each note throws its disks down spinning, with all their life left. Their
@@ -282,12 +314,12 @@ inline void start(Voice& voice, Shared&, opxy::u32) {
 
 inline void destroy(Voice&, Shared&, opxy::u32) {}
 
-inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
+inline void render(Voice& voice, Shared&, opxy::u32 owner, opxy::Output output,
                    opxy::Parameters parameters, opxy::Pitch pitch) {
     using namespace sound;
     using opxy::block_frames;
     if (voice.quiet) {
-        for (unsigned i = 0; i < block_frames; ++i) output[i] = 0;
+        for (unsigned i = 0; i < 2 * block_frames; ++i) output[i] = 0;
         return;
     }
 
@@ -421,8 +453,14 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
                                                       // so four disks' strikes and carries fit
     }
 
-    i32 sum[block_frames], struck[block_frames];
+    // The middle's bus and the two sides', the note's owner saying which is which.
+    // With no lean to move to or from, or no disks to place, all of it is the middle.
+    const i32 reach = lean[spin::count(parameters[MANY]) - 1];
+    const bool wide = count > 1 && (reach || voice.width);
+    i32 sum[block_frames], struck[block_frames], sides[2][block_frames];
     for (unsigned i = 0; i < block_frames; ++i) sum[i] = struck[i] = 0;
+    if (wide) for (unsigned i = 0; i < block_frames; ++i) sides[0][i] = sides[1][i] = 0;
+    i32* const bus[3] = {sum, sides[(owner * 0x9e3779b9u) >> 31], sides[1 - ((owner * 0x9e3779b9u) >> 31)]};
     i32 rolling_noise = 0, slipping = 0, breath = 0;
     u32 sounding = 0, rolling = 0;
 
@@ -523,9 +561,11 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
     for (u32 l = 0; l < active; ++l) {
         const Lane& lane = lanes[l];
         Disk& d = *lane.disk;
-        if (!d.rolling) ring_alone(d.ring, sum);
-        else if (lane.slip) roll<true>(lane, sum, struck, noise);
-        else roll<false>(lane, sum, struck, noise);
+        const u32 k = static_cast<u32>(&d - voice.disk);
+        i32* const into = bus[wide && k < count ? side_of[count - 1][k] : 0];
+        if (!d.rolling) ring_alone(d.ring, into);
+        else if (lane.slip) roll<true>(lane, into, struck, noise);
+        else roll<false>(lane, into, struck, noise);
         if (d.rolling && lane.cut_at < block_frames) {
             d.rolling = 0;
             d.carry = 0;
@@ -555,7 +595,8 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output,
     const i32 pole = rough_pole[ground] + static_cast<i32>(((breath_pole - rough_pole[ground]) >> 16) * airy);
     rub(voice, sum, struck, noise, roll, pole, slipping);
     one<4>(voice.base, struck, sum);   // the base, at a quarter
-    const i32 loudest = finish(voice, sum, output, 5 << 25, 805306368);
+    const i32 loudest = wide ? finish<true>(voice, sum, sides[0], sides[1], output, 5 << 25, 805306368, reach)
+                             : finish<false>(voice, sum, sides[0], sides[1], output, 5 << 25, 805306368, 0);
     if (!sounding && loudest < rung_out) {   // rung out: clear what is left, under -84 dB
         voice.quiet = 1;
         for (u32 m = 0; m < 2; ++m) voice.upper[m].y1 = voice.upper[m].y2 = 0;

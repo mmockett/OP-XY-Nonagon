@@ -45,6 +45,7 @@ struct Voice {
     u32 material;      // and the disk material
     u32 ground;        // the base (material), to know when it changed
     u32 quiet;         // 1 once every disk and the base have rung out
+    i32 width;         // how far the disks' sides lean now, Q31 of 2/3 of the voice's gain
 };
 // State shared by every voice; empty when voices share nothing.
 struct Shared {};
