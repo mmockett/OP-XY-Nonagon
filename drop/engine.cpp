@@ -360,7 +360,7 @@ DROP_PASS i32 knee_pass(const i32* heard, opxy::Output output, i32 share) {
 
 // Tunes the pipe to a pitch increment: a delay of one period. The loop's
 // filter delays a sample and the allpass the fraction left, 0.5 to 1.5.
-inline void tune(Voice& voice, u32 key) {
+DROP_PASS void tune(Voice& voice, u32 key) {
     if (!key) key = 1;
     i32 period = static_cast<i32>(physics::exp2_q16(48 * physics::octave - physics::log2_q16(key)));   // Q16 samples
     while (period > 2040 * 65536) period >>= 1;   // an octave up
@@ -385,7 +385,7 @@ inline void delay(Voice& voice, i32 lost) {
 }
 // Works out what the key and the vapour set, which no block's life changes:
 // the pipe's ring, its filter, the delay and the gains in and out of it.
-inline void figure(Voice& voice, i32 vapour) {
+DROP_PASS void figure(Voice& voice, i32 vapour) {
     // The pipe's ring: 60 dB in 0.9 s under thin vapour, a glass's singing
     // fundamental, to 0.09 s under thick, a breathy pipe; at least 48 periods,
     // so a low note's jet need not drive it hard (which would pull it flat).
@@ -551,7 +551,10 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     const i32 base = (strength * beat_level >> 15) * harder >> 4;
     const i32 steady = base * sustain >> 15;   // the vapour's steady blowing under the pulses
     // Thin vapour blows a quarter of the noise thick vapour does: a purer tone.
-    const i32 hiss_of_jet = (jet_noise * (8192 + (p.vapour * 3 >> 2)) >> 15) * static_cast<i32>(lobes + 2) / 10;
+    // ... / 10, exactly, without the Blackfin's divide call: the product is
+    // 0 to 100,000, and x / 10 is (x / 2) / 5, which (y * 52429) >> 18 gives
+    // exactly for y under 2^18.
+    const i32 hiss_of_jet = static_cast<i32>((static_cast<u32>((jet_noise * (8192 + (p.vapour * 3 >> 2)) >> 15) * static_cast<i32>(lobes + 2)) >> 1) * 52429u >> 18);
 
     // Crackle: floating, sparse contacts, densest near the point (an octave
     // fewer every 12 degrees over it); boiling, thousands of bubbles a second.
