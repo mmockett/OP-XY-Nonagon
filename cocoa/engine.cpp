@@ -77,91 +77,70 @@ inline u32 next(u32& seed) {
     return seed;
 }
 
-// Adds a mode's block to sum (Q27), or its first `frames` samples: its
-// amplitude ramps by `slope` until sample `split`, then by `after`; its
-// increment by `glide` a sample. Two plain loops, so neither tests the split
-// each sample.
-__attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split, u32 frames) {
+// Adds a mode's block, or its first `frames` samples, to sum (Q27) at
+// 1 / 2^r of the sample rate: every 2^r-th sample of the full rate's, with
+// the same phases and amplitudes there. Over 2^r samples the phase moves 2^r
+// increments and the glide's 2^r (2^r - 1) / 2, and the increment 2^r
+// glides; the amplitude ramps by `slope` until sample `split`, then by
+// `after`. One function for every rate, so a block runs less code; each
+// sine's address is worked out a sample ahead, so its read never waits on
+// the address register.
+__attribute__((noinline)) void sing(i32* sum, Mode& m, u32 r, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split, u32 frames) {
+    const u32 steps = 1u << r;
     u32 p = m.phase;
     i32 a = amp;
-    if (!glide) {   // a steady pitch: the same sums without the glide's add
-        for (u32 i = 0; i < split; ++i) {
-            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
-            a += slope;
-            p += inc;
-        }
-        for (u32 i = split; i < frames; ++i) {
-            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
-            a += after;
-            p += inc;
-        }
-        m.phase = p;
-        return;
-    }
-    for (u32 i = 0; i < split; ++i) {
-        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
-        a += slope;
-        p += inc;
-        inc += static_cast<u32>(glide);
-    }
-    for (u32 i = split; i < frames; ++i) {
-        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
-        a += after;
-        p += inc;
-        inc += static_cast<u32>(glide);
-    }
-    m.phase = p;
-}
-// Sings a mode's block at 1 / 2^R of the sample rate: every 2^R-th sample of
-// the full rate's, with the same phases and amplitudes there. Over 2^R
-// samples the phase moves 2^R increments and the glide's 2^R (2^R - 1) / 2,
-// and the increment 2^R glides; the amplitude ramps by `slope` until sample
-// `split`, then by `after`, to sample `frames`.
-template <u32 R>
-__attribute__((noinline)) void sing_at(i32* sum, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split, u32 frames) {
-    const u32 steps = 1u << R;
-    u32 p = m.phase;
-    i32 a = amp;
-    const u32 ramped = (split + steps - 1) >> R;   // samples before the split
-    const i32 ramp = slope << R;
+    const u32 ramped = (split + steps - 1) >> r, n = frames >> r;   // samples before the split, and in all
+    const i32 ramp = slope << r, later = after << r;
+    const opxy::i16* at = tables::sine + (p >> 22);
     if (!glide) {
-        const u32 advance = inc << R;
+        const u32 advance = inc << r;
         for (u32 i = 0; i < ramped; ++i) {
-            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
-            a += ramp;
+            const opxy::i16 v = *at;
             p += advance;
+            at = tables::sine + (p >> 22);
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * v) >> 3;
+            a += ramp;
         }
-        a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << R) - split);
+        a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << r) - split);
         if (!after) {
             const opxy::i16 held = static_cast<opxy::i16>(static_cast<u32>(a) >> 16);
-            for (u32 i = ramped; i < (frames >> R); ++i) {
-                sum[i] += (held * tables::sine[p >> 22]) >> 3;
+            for (u32 i = ramped; i < n; ++i) {
+                const opxy::i16 v = *at;
                 p += advance;
+                at = tables::sine + (p >> 22);
+                sum[i] += (held * v) >> 3;
             }
         } else {
-            for (u32 i = ramped; i < (frames >> R); ++i) {
-                sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
-                a += after << R;
+            for (u32 i = ramped; i < n; ++i) {
+                const opxy::i16 v = *at;
                 p += advance;
+                at = tables::sine + (p >> 22);
+                sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * v) >> 3;
+                a += later;
             }
         }
         m.phase = p;
         return;
     }
-    const u32 bend = static_cast<u32>(glide) << R, curve = static_cast<u32>(glide) * ((steps * (steps - 1)) >> 1);
-    u32 advance = (inc << R) + curve;
+    const u32 bend = static_cast<u32>(glide) << r, curve = static_cast<u32>(glide) * ((steps * (steps - 1)) >> 1);
+    const u32 turn = bend << r;
+    u32 advance = (inc << r) + curve;
     for (u32 i = 0; i < ramped; ++i) {
-        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
+        const opxy::i16 v = *at;
+        p += advance;
+        at = tables::sine + (p >> 22);
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * v) >> 3;
         a += ramp;
-        p += advance;
-        advance += bend << R;
+        advance += turn;
     }
-    a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << R) - split);
-    for (u32 i = ramped; i < (frames >> R); ++i) {
-        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
-        a += after << R;
+    a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << r) - split);
+    for (u32 i = ramped; i < n; ++i) {
+        const opxy::i16 v = *at;
         p += advance;
-        advance += bend << R;
+        at = tables::sine + (p >> 22);
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * v) >> 3;
+        a += later;
+        advance += turn;
     }
     m.phase = p;
 }
@@ -182,10 +161,7 @@ inline void clear_sum(Sums& sums, u32 r) {
 inline void sing_rate(Sums& sums, u32 r, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split,
                       u32 frames = opxy::block_frames) {
     clear_sum(sums, r);
-    if (r == 3) sing_at<3>(sums.at[3], m, inc, glide, amp, slope, after, split, frames);
-    else if (r == 2) sing_at<2>(sums.at[2], m, inc, glide, amp, slope, after, split, frames);
-    else if (r == 1) sing_at<1>(sums.at[1], m, inc, glide, amp, slope, after, split, frames);
-    else sing(sums.at[0], m, inc, glide, amp, slope, after, split, frames);
+    sing(sums.at[r], m, r, inc, glide, amp, slope, after, split, frames);
 }
 
 // A mode's rate, from the highest increment it sings this block. The
@@ -794,10 +770,13 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         u32 ph = p.phase, inc = p.inc;
         i32 a = p.amp;
         const u32 shift = p.shift, chirp = inc >> 13;
+        const opxy::i16* at = tables::sine + (ph >> 22);   // a sample ahead, as in sing
         for (unsigned i = 0; i < block_frames; ++i) {
-            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[ph >> 22]) >> 3;
-            a -= a >> shift;
+            const opxy::i16 v = *at;
             ph += inc;
+            at = tables::sine + (ph >> 22);
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * v) >> 3;
+            a -= a >> shift;
             inc += chirp;
         }
         p.phase = ph;
