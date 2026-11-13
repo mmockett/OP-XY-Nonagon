@@ -77,10 +77,11 @@ inline u32 next(u32& seed) {
     return seed;
 }
 
-// Adds a mode's block to sum (Q27): its amplitude ramps by `slope` until
-// sample `split`, then by `after`; its increment by `glide` a sample. Two
-// plain loops, so neither tests the split each sample.
-__attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split) {
+// Adds a mode's block to sum (Q27), or its first `frames` samples: its
+// amplitude ramps by `slope` until sample `split`, then by `after`; its
+// increment by `glide` a sample. Two plain loops, so neither tests the split
+// each sample.
+__attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split, u32 frames) {
     u32 p = m.phase;
     i32 a = amp;
     if (!glide) {   // a steady pitch: the same sums without the glide's add
@@ -89,7 +90,7 @@ __attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 a
             a += slope;
             p += inc;
         }
-        for (u32 i = split; i < opxy::block_frames; ++i) {
+        for (u32 i = split; i < frames; ++i) {
             sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
             a += after;
             p += inc;
@@ -103,7 +104,7 @@ __attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 a
         p += inc;
         inc += static_cast<u32>(glide);
     }
-    for (u32 i = split; i < opxy::block_frames; ++i) {
+    for (u32 i = split; i < frames; ++i) {
         sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
         a += after;
         p += inc;
@@ -115,9 +116,9 @@ __attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 a
 // the full rate's, with the same phases and amplitudes there. Over 2^R
 // samples the phase moves 2^R increments and the glide's 2^R (2^R - 1) / 2,
 // and the increment 2^R glides; the amplitude ramps by `slope` until sample
-// `split`, then by `after`.
+// `split`, then by `after`, to sample `frames`.
 template <u32 R>
-__attribute__((noinline)) void sing_at(i32* sum, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split) {
+__attribute__((noinline)) void sing_at(i32* sum, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split, u32 frames) {
     const u32 steps = 1u << R;
     u32 p = m.phase;
     i32 a = amp;
@@ -133,12 +134,12 @@ __attribute__((noinline)) void sing_at(i32* sum, Mode& m, u32 inc, i32 glide, i3
         a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << R) - split);
         if (!after) {
             const opxy::i16 held = static_cast<opxy::i16>(static_cast<u32>(a) >> 16);
-            for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
+            for (u32 i = ramped; i < (frames >> R); ++i) {
                 sum[i] += (held * tables::sine[p >> 22]) >> 3;
                 p += advance;
             }
         } else {
-            for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
+            for (u32 i = ramped; i < (frames >> R); ++i) {
                 sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
                 a += after << R;
                 p += advance;
@@ -156,7 +157,7 @@ __attribute__((noinline)) void sing_at(i32* sum, Mode& m, u32 inc, i32 glide, i3
         advance += bend << R;
     }
     a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << R) - split);
-    for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
+    for (u32 i = ramped; i < (frames >> R); ++i) {
         sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
         a += after << R;
         p += advance;
@@ -178,12 +179,13 @@ inline void clear_sum(Sums& sums, u32 r) {
     for (u32 i = 0; i < (opxy::block_frames >> r); ++i) sum[i] = 0;
 }
 // Sings a mode at rate r.
-inline void sing_rate(Sums& sums, u32 r, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split) {
+inline void sing_rate(Sums& sums, u32 r, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split,
+                      u32 frames = opxy::block_frames) {
     clear_sum(sums, r);
-    if (r == 3) sing_at<3>(sums.at[3], m, inc, glide, amp, slope, after, split);
-    else if (r == 2) sing_at<2>(sums.at[2], m, inc, glide, amp, slope, after, split);
-    else if (r == 1) sing_at<1>(sums.at[1], m, inc, glide, amp, slope, after, split);
-    else sing(sums.at[0], m, inc, glide, amp, slope, after, split);
+    if (r == 3) sing_at<3>(sums.at[3], m, inc, glide, amp, slope, after, split, frames);
+    else if (r == 2) sing_at<2>(sums.at[2], m, inc, glide, amp, slope, after, split, frames);
+    else if (r == 1) sing_at<1>(sums.at[1], m, inc, glide, amp, slope, after, split, frames);
+    else sing(sums.at[0], m, inc, glide, amp, slope, after, split, frames);
 }
 
 // A mode's rate, from the highest increment it sings this block. The
@@ -258,10 +260,11 @@ __attribute__((noinline)) void twice(const i32* low, i32* out, u32 n) {
 // increment to `to`.
 // One path of a mode's block: from its phase now (keeping the phase it ends at
 // only when told to, so a mode on two paths moves on once).
-inline void path(Sums& sums, u32 r, Mode& m, u32 phase, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split, bool keep) {
+inline void path(Sums& sums, u32 r, Mode& m, u32 phase, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split, bool keep,
+                 u32 frames = opxy::block_frames) {
     const u32 was = m.phase;
     m.phase = phase;
-    sing_rate(sums, r, m, inc, glide, amp, slope, after, split);
+    sing_rate(sums, r, m, inc, glide, amp, slope, after, split, frames);
     if (!keep) m.phase = was;
 }
 // The share of what is left to move that a fade moves this block, 1 / left (Q31; left > 1).
@@ -306,6 +309,17 @@ inline void play(Sums& sums, Band& band, Mode& m, u32 to, i32 loss, bool tap, i3
         if (at == band.dst) {   // struck at the mode's own rate
             path(sums, at, m, p, from, glide, moving ? own : start, strike + handed, handed, split, true);
             band.left = 0;
+            return;
+        }
+        if (!band.left) {
+            // Not fading: the own rate takes the whole tap, ramping it in
+            // over 4 of its samples (reach), and the strike's rate sings only
+            // what that ramp leaves out, the contact's sharper corners, for
+            // as long: it starts and ends at 0, and the mode needs no fade.
+            const u32 reach = 1u << (band.dst + 2);
+            const i32 take = (m.out - start) >> (band.dst + 2);
+            path(sums, at, m, p, from, glide, 0, strike - take, -take, split, false, reach);
+            path(sums, band.dst, m, p, from, glide, start, take, 0, reach, true);
             return;
         }
         if (own) path(sums, band.dst, m, p, from, glide, own, 0, 0, block_frames, false);
