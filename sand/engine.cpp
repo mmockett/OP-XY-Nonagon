@@ -549,12 +549,18 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     t.bias = set.plan.bias;
     t.flight = set.plan.flight;
     t.creep = set.plan.creep;
-    // A strike jolts every grain on the plate for one round of looks.
+    // A strike jolts every grain on the plate for one round of looks, from
+    // the note's second block: its first, which also clears the voice, sets
+    // it up and looks at twelve fresh grains, is the heaviest a note has, and
+    // a struck plate's jolt throws nearly every grain it looks at. Those
+    // twelve are jolted at their next look, a round (5.8 ms) later.
     const i32 strike = set.strike;
-    if (voice.struck) voice.jolted = kGrains;
+    if (voice.struck) voice.jolted = kGrains + kLooks;
     if (voice.jolted) {
-        t.jitter += strike * kJolt >> 15;
-        t.jolts = 32767;
+        if (voice.jolted <= kGrains) {
+            t.jitter += strike * kJolt >> 15;
+            t.jolts = 32767;
+        }
         voice.jolted = voice.jolted > kLooks ? voice.jolted - kLooks : 0;
     }
 

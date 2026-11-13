@@ -54,7 +54,7 @@ struct Voice {
     u32 pour_seed, poured;
     u32 stale[2];         // bit i: grain i's kept shapes are forgotten (applied at its next look)
     u32 struck;           // the note has just started: strike the plate this block
-    u32 jolted;           // looks left of the strike's jolt
+    u32 jolted;           // looks left of the strike's jolt, and its first block's twelve before it starts
     u32 rounds;           // rounds of looks, for publishing the sand every fourth
     i32 click1, click2;   // the grain click filter's last two outputs
     i32 lost[kModes];     // each mode's log2 loss its kept and stirs were made for (0: none)
