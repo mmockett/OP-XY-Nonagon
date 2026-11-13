@@ -734,7 +734,10 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     if (half_in) live |= 32u;
     // The rattle, and half to full: the output.
     const bool waited = last & 64u;
-    for (u32 i = 0; i < kFullWait; ++i) voice.click_wait[i] = impulses[opxy::block_frames - kFullWait + i];
+    // The landings still to come wait in the voice only when there are any: a
+    // block without one leaves live's bit 6 clear, so the next reads zeros.
+    if (clicked)
+        for (u32 i = 0; i < kFullWait; ++i) voice.click_wait[i] = impulses[opxy::block_frames - kFullWait + i];
     i32 rattle[opxy::block_frames];
     const bool rattling = rattle_of(voice, waiting, clicked || waited, set.c1, set.c2, kHalf >> 1, rattle);
     const bool half_on = half_in || (last & 32u);
