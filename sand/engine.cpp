@@ -66,6 +66,21 @@ inline i32 swing(const Mode& m) {
 // eight samples at its ramp's value there, so the ramp costs nothing a sample.
 const u32 kStep = 8;
 
+// The sine and cosine at a phase (its top 10 bits, 1024 steps a cycle), Q15,
+// from the quarter cycle: within each half cycle the two read the table from
+// opposite ends, and the half and the quadrant set their signs. The same
+// values as a table of the whole cycle, in a fifth of the memory.
+struct SineCosine { opxy::i16 s, c; };
+inline SineCosine sine_cosine(u32 phase) {
+    const i32 t = magnitude(256 - static_cast<i32>((phase << 1) >> 23));   // the cosine's entry
+    const i32 sign_s = static_cast<i32>(phase) >> 31;                      // the second half
+    const i32 sign_c = (static_cast<i32>(phase << 1) >> 31) ^ sign_s;      // the second and third quadrants
+    SineCosine r;
+    r.s = static_cast<opxy::i16>((kQuarterSine[256 - t] ^ sign_s) - sign_s);
+    r.c = static_cast<opxy::i16>((kQuarterSine[t] ^ sign_c) - sign_c);
+    return r;
+}
+
 // Sounds a mode into acc over a block at 1 / 2^R of the sample rate, ramping
 // from (a, b) by (da, db) a full-rate sample, and returns its phase: one table
 // pointer, two 16 x 16 products. increment is the full rate's. A slower rate
@@ -80,8 +95,8 @@ __attribute__((noinline)) u32 sound(i32* acc, u32 phase, u32 increment, i32 a, i
     b += db >> 1;
     const i32 ra = da << R, rb = db << R;
     for (i32* out = acc; out != acc + (opxy::block_frames >> R); ++out) {
-        const opxy::i16* const at = kSine + (phase >> 22);
-        *out += at[0] * static_cast<opxy::i16>(static_cast<u32>(a) >> 16) + at[256] * static_cast<opxy::i16>(static_cast<u32>(b) >> 16);
+        const SineCosine at = sine_cosine(phase);
+        *out += at.s * static_cast<opxy::i16>(static_cast<u32>(a) >> 16) + at.c * static_cast<opxy::i16>(static_cast<u32>(b) >> 16);
         phase += increment;
         a += ra;
         b += rb;
@@ -95,8 +110,8 @@ __attribute__((noinline)) u32 sound<0>(i32* acc, u32 phase, u32 increment, i32 a
     for (i32* step = acc; step != acc + opxy::block_frames; step += kStep) {
         const opxy::i16 ah = static_cast<opxy::i16>(static_cast<u32>(a) >> 16), bh = static_cast<opxy::i16>(static_cast<u32>(b) >> 16);
         for (i32* out = step; out != step + kStep; ++out) {
-            const opxy::i16* const at = kSine + (phase >> 22);
-            *out += at[0] * ah + at[256] * bh;
+            const SineCosine at = sine_cosine(phase);
+            *out += at.s * ah + at.c * bh;
             phase += increment;
         }
         a += da * kStep;
@@ -115,8 +130,8 @@ __attribute__((noinline)) u32 sound_bowed(i32* acc, u32 phase, u32 increment, i3
     h += dh >> 1;
     const i32 ra = da << R, rb = db << R, rh = dh << R;
     for (i32* out = acc; out != acc + (opxy::block_frames >> R); ++out) {
-        const opxy::i16* const at = kSine + (phase >> 22);
-        *out += at[0] * static_cast<opxy::i16>(static_cast<u32>(a) >> 16) + at[256] * static_cast<opxy::i16>(static_cast<u32>(b) >> 16) +
+        const SineCosine at = sine_cosine(phase);
+        *out += at.s * static_cast<opxy::i16>(static_cast<u32>(a) >> 16) + at.c * static_cast<opxy::i16>(static_cast<u32>(b) >> 16) +
                 kHarmonicWave[phase >> 22] * static_cast<opxy::i16>(static_cast<u32>(h) >> 16);
         phase += increment;
         a += ra;
@@ -133,8 +148,8 @@ __attribute__((noinline)) u32 sound_bowed<0>(i32* acc, u32 phase, u32 increment,
     for (i32* step = acc; step != acc + opxy::block_frames; step += kStep) {
         const opxy::i16 ah = static_cast<opxy::i16>(static_cast<u32>(a) >> 16), bh = static_cast<opxy::i16>(static_cast<u32>(b) >> 16), hh = static_cast<opxy::i16>(static_cast<u32>(h) >> 16);
         for (i32* out = step; out != step + kStep; ++out) {
-            const opxy::i16* const at = kSine + (phase >> 22);
-            *out += at[0] * ah + at[256] * bh + kHarmonicWave[phase >> 22] * hh;
+            const SineCosine at = sine_cosine(phase);
+            *out += at.s * ah + at.c * bh + kHarmonicWave[phase >> 22] * hh;
             phase += increment;
         }
         a += da * kStep;
@@ -596,8 +611,8 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
         twin.a = clamp_amplitude(multiply(twin.a, decay) + multiply(twin_target - twin.a, held) + tn + ((hit * mat.twin >> 15) << 16));
         twin.b = clamp_amplitude(multiply(twin.b, decay) - multiply(twin.b, held));
         twin.phase += beat << 6;
-        const opxy::i16* const turn = kSine + (twin.phase >> 22);
-        const i32 ta = (twin.a >> 15) * turn[256] - (twin.b >> 15) * turn[0], tb = (twin.a >> 15) * turn[0] + (twin.b >> 15) * turn[256];
+        const SineCosine turn = sine_cosine(twin.phase);
+        const i32 ta = (twin.a >> 15) * turn.c - (twin.b >> 15) * turn.s, tb = (twin.a >> 15) * turn.s + (twin.b >> 15) * turn.c;
         const i32 ca = sounded(clamp_amplitude(a1 + ta)), cb = sounded(clamp_amplitude(b1 + tb));
         // The bow's stick and slip: the note's 2nd to 4th harmonics, in tune
         // with it, rising with Bow (pressure brightens a bowed tone); faded
