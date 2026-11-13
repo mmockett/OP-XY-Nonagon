@@ -391,6 +391,9 @@ int main() {
             }
         }
         std::printf("output fingerprint %016llx\n", hash);
+        char what[80];
+        std::snprintf(what, sizeof what, "the output as released (fingerprint %016llx)", hash);
+        check(what, hash == 0x0ull);
     }
 
     if (!failures) std::puts("Sand: all sound checks pass");
