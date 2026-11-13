@@ -143,7 +143,9 @@ column.
 
 **No division, no float in the audio.** Per sample, a mode costs a table
 read, a product and four adds. Logarithms and powers of two come from tables
-a few times a block. The stir divides once per class at a note's start.
+a few times a block. Only a note that restirs a settling drink divides,
+once per class, in its silent first block; a fresh stir and the rising
+bubbles never do.
 
 ### The release, and the OP-XY's amp envelope
 
