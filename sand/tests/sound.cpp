@@ -30,6 +30,7 @@ enum { kFigure, kBow, kSand, kGrain, kPlate, kSettle, kTilt, kShake };
 i32 word(double normalized) { return static_cast<i32>(std::lround(normalized * 2147483647.0)); }
 // The middle of figure f's (or another enum's) range.
 double pick(unsigned f, unsigned count) { return (f + 0.5) / count; }
+unsigned choice_of(i32 w) { return sand::choice(w, sand::kFigures); }
 
 void defaults(i32* p) {
     const double d[8] = {pick(2, 12), 0.6, 0.6, 0.3, 0, 0.5, 0, 0};
@@ -349,6 +350,47 @@ int main() {
         std::snprintf(what, sizeof what, "an eight-note chord of %s peaks between 0.66 and 1.33 (%.2f)", preset.name, peak);
         std::printf("%s chord peak %.2f\n", preset.name, peak);
         check(what, peak >= 0.66 && peak <= 1.33);
+    }
+
+    // The output's fingerprint: a hash of every sample over a set of scenes
+    // (a bowed note, a struck one, shaken and tilted sand, a figure change, a
+    // legato note, a fresh pour, and high notes whose modes sound at the
+    // faster rates). Work that only saves time leaves it unchanged.
+    {
+        struct Scene { double hz; double values[8]; };
+        const Scene scenes[] = {
+            {261.63, {pick(2, 12), 0.6, 0.6, 0.3, 0, 0.5, 0, 0}},
+            {261.63, {pick(4, 12), 0, 0.85, 0.45, 0.8333, 0.75, 0, 0}},
+            {110.0, {pick(0, 12), 0.6, 1, 0, 0.5, 0, 0, 0.375}},
+            {196.0, {pick(9, 12), 0.75, 0.8, 0.15, 0.1667, 0.4, 0.6, 0}},
+            {880.0, {pick(7, 12), 0.3, 0.6, 1, 0.1667, 1, 0, 0.1}},
+            {3000.0, {pick(11, 12), 0.9, 0.5, 0.5, 1, 0.5, 0.2, 0}},
+            {65.41, {pick(5, 12), 0.1, 0.7, 0.7, 1, 0.25, 0, 0}},
+        };
+        unsigned long long hash = 1469598103934665603ull;
+        for (const Scene& scene : scenes) {
+            for (unsigned c = 0; c < 8; ++c) p[c] = word(scene.values[c]);
+            Note n(scene.hz);
+            for (unsigned b = 0; b < kSecond * 2; ++b) {
+                if (b == kSecond) p[kFigure] = word(pick((choice_of(p[kFigure]) + 5) % 12, 12));
+                if (b == kSecond * 3 / 2) sand::start(n.voice, n.shared, 1);
+                n.block(p);
+                for (unsigned i = 0; i < opxy::block_frames; ++i) {
+                    hash ^= static_cast<u32>(n.out[i]);
+                    hash *= 1099511628211ull;
+                }
+            }
+            sand::destroy(n.voice, n.shared, 1);
+            sand::start(n.voice, n.shared, 1);
+            for (unsigned b = 0; b < kSecond / 2; ++b) {
+                n.block(p);
+                for (unsigned i = 0; i < opxy::block_frames; ++i) {
+                    hash ^= static_cast<u32>(n.out[i]);
+                    hash *= 1099511628211ull;
+                }
+            }
+        }
+        std::printf("output fingerprint %016llx\n", hash);
     }
 
     if (!failures) std::puts("Sand: all sound checks pass");
