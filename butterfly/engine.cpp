@@ -9,8 +9,8 @@
 // the top of the spectrum closes first (tilt). At strike 0 the gate simply
 // holds open while the note sounds: a pad. A slow wingbeat moves the flux
 // and the struck site, so the clusters shimmer. The spectrum comes from
-// tables, so a note sounds in its first block. The OP-XY's amp envelope ends
-// the note.
+// tables, read whole in a note's first block, so it sounds from its second.
+// The OP-XY's amp envelope ends the note.
 //
 // The chain moves only as fast as a hand on a knob or the wingbeat's 0.2-0.6
 // Hz, so a note solves its spectrum a stage a block, over eight blocks, and
@@ -258,6 +258,8 @@ __attribute__((noinline)) void solve_stage(Voice& voice, const i32* p, u32 stage
 inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::Parameters parameters, opxy::Pitch pitch) {
     const i32* p = parameters;
     const bool hushing = voice.hush != 0;
+    const u32 note = pitch[0];
+    bool reading = false;
     if (voice.struck && !hushing) {
         // Each partial starts at a phase of its own (golden-ratio steps from
         // the note's own): in phase, a clustered spectrum's partials revive
@@ -273,52 +275,64 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
         voice.blocks = 0;
         voice.beat = voice.beat_site = 0;
         voice.struck = 0;
-        voice.stale = 1;
-    }
-
-    if (!hushing) {
-        voice.gate = gate_step(voice.gate, voice.blocks, strike(p[STRIKE]), glow_log2(p[GLOW]));
-        if (voice.blocks < 0xffffu) ++voice.blocks;
-    }
-    const u32 light = hushing ? 0 : static_cast<u32>(voice.gate) >> 15;   // Q15; 0: every partial's target is
-    // A new pitch (a bend or a glide) moves every partial at once, to where it last landed.
-    const u32 note = pitch[0];
-    if (note != voice.note && !voice.stale) {
-        voice.note = note;
-        for (u32 k = 0; k < partials; ++k) {
-            voice.increment[k] = increment_of(note, voice.ratio[k]);
-            voice.increment_step[k] = 0;
-        }
-    }
-
-    // The solve: whole at the strike, then a stage a block. A dark gate
-    // silences every partial whatever the chain, so the solve waits, and
-    // runs whole again if the gate lights (a slower glow, a lighter strike).
-    if (!light) {
-        voice.stale = 1;
-    } else if (voice.stale) {
+        // The note's first block reads the spectrum whole and lands every
+        // partial, and sounds nothing new (only what the stages still hold):
+        // the reading and the bank never share a block. The note sounds from
+        // its second block, its gate and wingbeat starting there as they
+        // would have here.
         voice.note = note;
         for (u32 s = 0; s < solve_stages; ++s) solve_stage(voice, p, s, true);
         voice.stale = 0;
         voice.stage = 0;
         voice.still = 0;
-    } else {
-        bool run = true;
-        if (voice.stage == 0) {
-            // Solve again only while something moves: a control, or the wingbeat.
-            const bool moved = p[FLUX] != voice.sampled[0] || p[COUPLING] != voice.sampled[1] || p[SITE] != voice.sampled[2] ||
-                               p[SPREAD] != voice.sampled[3] || p[TILT] != voice.sampled[4] || q15(p[WINGBEAT]) != 0;
-            voice.still = moved ? 0 : voice.still < 2 ? voice.still + 1 : 2;
-            run = voice.still < 2;   // a solve after the last move lands its targets exactly; then rest
-        }
-        if (run) {
-            solve_stage(voice, p, voice.stage, false);
-            voice.stage = (voice.stage + 1) & (solve_stages - 1);
-        }
+        reading = true;
     }
-    const u32 rate = wingbeat_rate(p[WINGBEAT]);
-    voice.beat += rate;
-    voice.beat_site += wingbeat_site_rate(rate);
+
+    u32 light = 0;   // Q15; 0: every partial's target is
+    if (!reading) {
+        if (!hushing) {
+            voice.gate = gate_step(voice.gate, voice.blocks, strike(p[STRIKE]), glow_log2(p[GLOW]));
+            if (voice.blocks < 0xffffu) ++voice.blocks;
+        }
+        light = hushing ? 0 : static_cast<u32>(voice.gate) >> 15;
+        // A new pitch (a bend or a glide) moves every partial at once, to where it last landed.
+        if (note != voice.note && !voice.stale) {
+            voice.note = note;
+            for (u32 k = 0; k < partials; ++k) {
+                voice.increment[k] = increment_of(note, voice.ratio[k]);
+                voice.increment_step[k] = 0;
+            }
+        }
+
+        // The solve: a stage a block. A dark gate silences every partial
+        // whatever the chain, so the solve waits, and runs whole again if the
+        // gate lights (a slower glow, a lighter strike).
+        if (!light) {
+            voice.stale = 1;
+        } else if (voice.stale) {
+            voice.note = note;
+            for (u32 s = 0; s < solve_stages; ++s) solve_stage(voice, p, s, true);
+            voice.stale = 0;
+            voice.stage = 0;
+            voice.still = 0;
+        } else {
+            bool run = true;
+            if (voice.stage == 0) {
+                // Solve again only while something moves: a control, or the wingbeat.
+                const bool moved = p[FLUX] != voice.sampled[0] || p[COUPLING] != voice.sampled[1] || p[SITE] != voice.sampled[2] ||
+                                   p[SPREAD] != voice.sampled[3] || p[TILT] != voice.sampled[4] || q15(p[WINGBEAT]) != 0;
+                voice.still = moved ? 0 : voice.still < 2 ? voice.still + 1 : 2;
+                run = voice.still < 2;   // a solve after the last move lands its targets exactly; then rest
+            }
+            if (run) {
+                solve_stage(voice, p, voice.stage, false);
+                voice.stage = (voice.stage + 1) & (solve_stages - 1);
+            }
+        }
+        const u32 rate = wingbeat_rate(p[WINGBEAT]);
+        voice.beat += rate;
+        voice.beat_site += wingbeat_site_rate(rate);
+    }
 
     bool sounding = false, rendered = false;
     i32* low = voice.low;
@@ -328,7 +342,7 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     for (u32 i = 0; i < half_frames / 4; ++i) eighth[i] = 0;
     for (u32 i = 0; i < half_frames / 2; ++i) quarter_sum[i] = 0;
     for (u32 i = 0; i < half_frames; ++i) half_sum[i] = 0;
-    if (light || voice.sounding) {   // dark and every partial silent: no targets, no bank
+    if (!reading && (light || voice.sounding)) {   // dark and every partial silent: no targets, no bank
         // Each partial's target: its level through the gate at its power and
         // darkening, faded at the ceiling.
         const u32 e = light ? static_cast<u32>(-gate_log2(light)) >> 4 : 0;   // -log2 of the light, Q12
