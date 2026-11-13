@@ -62,6 +62,8 @@ struct Voice {
     u8 rate[kModes];      // each mode's rate, 1 / 2^rate
     u8 live;              // bits 0-3: rate 2^-r written last block; 4, 5: the quarter and
                           // half stages had input; 6: a landing waits
+    u8 quiet;             // a struck note has rung out on resting sand: render silence (engine.cpp)
+    u8 calm;              // blocks in a row with no grain thrown, moved, aloft or landing (at most 255)
     i32 eighth[kHistory4 + kBlock / 8];    // the eighth-rate sum, after the last block's tail
     i32 quarter[kHistory3 + kBlock / 4];   // the quarter-rate stage's input, after its tail
     i32 half[kHistory3 + kBlock / 2];      // the half-rate stage's input, after its tail

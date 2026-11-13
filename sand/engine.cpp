@@ -306,6 +306,7 @@ inline void initialize(Voice& voice, Shared&, u32 owner) {
     for (u32 k = 0; k < kModes; ++k) voice.lost[k] = 0;
     for (u32 k = 0; k < kModes; ++k) voice.rate[k] = 3;
     voice.live = 0;
+    voice.quiet = voice.calm = 0;
     for (u32 i = 0; i < kHistory4 + kBlock / 8; ++i) voice.eighth[i] = 0;
     for (u32 i = 0; i < kHistory3 + kBlock / 4; ++i) voice.quarter[i] = 0;
     for (u32 i = 0; i < kHistory3 + kBlock / 2; ++i) voice.half[i] = 0;
@@ -399,6 +400,37 @@ __attribute__((noinline)) void last_direct(const i32* tone, const i32* rattle, o
     for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = output_of<Rattle>(tone[i], rattle, i);
 }
 
+// A struck note ends. With Bow and Shake at 0 nothing feeds the plate, so
+// once its modes have rung out (each under 2 amplitude units, -72 dBFS) and a
+// whole round of looks has found every grain at rest, the voice goes quiet:
+// its states are cleared and it renders silence, skipping all its work, until
+// a control moves, the figure changes or a new note strikes. Without it, the
+// modes' last units (truncated toward minus infinity) hover a step below zero
+// and the voice computes a -78 dBFS tone and its sand for as long as stock
+// holds the note.
+const i32 kQuietAmplitude = 2 << 16;
+inline bool faint(const Mode& m) {
+    return magnitude(m.a) < kQuietAmplitude && magnitude(m.b) < kQuietAmplitude &&
+           magnitude(m.sa) < kQuietAmplitude && magnitude(m.sb) < kQuietAmplitude;
+}
+__attribute__((noinline)) bool rung_out(const Voice& voice) {
+    for (u32 k = 0; k < kModes; ++k)
+        if (!faint(voice.modes[k])) return false;
+    return faint(voice.twin) && magnitude(voice.harmonic.a) < kQuietAmplitude && magnitude(voice.harmonic.sa) < kQuietAmplitude;
+}
+__attribute__((noinline)) void fall_quiet(Voice& voice, Shared& shared, u32 owner) {
+    for (u32 k = 0; k < kModes; ++k) voice.modes[k].a = voice.modes[k].b = voice.modes[k].sa = voice.modes[k].sb = 0;
+    voice.twin.a = voice.twin.b = voice.twin.sa = voice.twin.sb = 0;
+    voice.harmonic.a = voice.harmonic.sa = 0;
+    for (u32 i = 0; i < kHistory4 + kBlock / 8; ++i) voice.eighth[i] = 0;
+    for (u32 i = 0; i < kHistory3 + kBlock / 4; ++i) voice.quarter[i] = 0;
+    for (u32 i = 0; i < kHistory3 + kBlock / 2; ++i) voice.half[i] = 0;
+    voice.live = 0;
+    voice.quiet = voice.calm = 0;
+    voice.quiet = 1;
+    if (shared.latest == owner) publish(shared, voice);  // the sand as it came to rest, for the next note
+}
+
 // What the smoothed controls (Figure aside) make of the sound. Out of line, so
 // a block whose controls stand still neither runs nor fetches its code.
 __attribute__((noinline)) void settings_for(Settings& s, const i32* controls) {
@@ -452,10 +484,18 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     // on into the new modes, and the sand, lying on the old figure's nodal
     // lines, finds itself on moving ground.
     const u32 figure = choice(parameters[0], kFigures);
-    if (figure != voice.figure) forget_shapes(voice);
-    voice.figure = figure;
     ++shared.clock;
     if (shared.latest == owner) shared.fresh = shared.clock;
+    if (voice.quiet) {
+        if (!moved && figure == voice.figure && !voice.struck) {
+            for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = 0;
+            return;
+        }
+        voice.quiet = 0;
+        voice.calm = 0;
+    }
+    if (figure != voice.figure) forget_shapes(voice);
+    voice.figure = figure;
     const PlateMode* const modes = kFigureModes[voice.figure];
     const u32 increment = pitch[0] < kLowestIncrement ? kLowestIncrement : pitch[0];
     const i32 octave = log2_q16(increment);
@@ -505,7 +545,7 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     }
     i32* const impulses = waiting + kFullWait;
     for (u32 i = 0; i < opxy::block_frames; ++i) impulses[i] = 0;
-    bool clicked = false;
+    bool clicked = false, stirred = false;
     i32 knock_a[kModes], knock_b[kModes];
     for (u32 k = 0; k < kModes; ++k) knock_a[k] = knock_b[k] = 0;
     u32 seed = voice.seed;
@@ -524,8 +564,10 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
         if (at >= grains) continue;
         const i16* const shapes = voice.shapes[at];
         const u32 seen = look(voice.grains[at], t, modes, seed, voice.shapes[at]);
+        stirred = stirred || voice.grains[at].air;  // thrown, or still aloft
         if (!(seen & on_plate)) continue;
         const bool placed = shapes[0] != kMoved;  // not run off the plate this look
+        stirred = stirred || !placed;               // crept or ran off
         if (placed)
             gather_shapes(voice.gather, shapes);
         const i32 height = static_cast<i32>(seen & 255u);
@@ -756,5 +798,10 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     }
     if (clicked) live |= 64u;
     voice.live = live;
+    // Quiet once a struck note has rung out on resting sand (see fall_quiet()).
+    const bool still = !stirred && !clicked && !rattling && !voice.jolted;
+    voice.calm = static_cast<u8>(!still ? 0 : voice.calm < 255 ? voice.calm + 1 : 255);
+    if (voice.calm >= kGrains / kLooks && !set.drive && !set.shaken && !set.plan.jitter && rung_out(voice))
+        fall_quiet(voice, shared, owner);
 }
 }

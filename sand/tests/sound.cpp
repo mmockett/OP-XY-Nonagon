@@ -256,6 +256,37 @@ int main() {
         check("a struck legato note throws the settled sand", again > quiet * 5);
     }
 
+    // A struck wooden plate rings out and its sand comes to rest: the voice
+    // goes quiet, rendering exact silence, until a new strike or a control
+    // wakes it, and it sounds again as before.
+    {
+        defaults(p);
+        p[kBow] = 0;
+        p[kPlate] = word(pick(2, 3));
+        Note n(220);
+        Meter m;
+        double early = 0;
+        m.rattle(n, p, kSecond / 4, &early);
+        m.rattle(n, p, kSecond * 4);
+        bool silent = true;
+        for (unsigned b = 0; b < kSecond / 2; ++b) {
+            n.block(p);
+            for (unsigned i = 0; i < opxy::block_frames; ++i) silent = silent && n.out[i] == 0;
+        }
+        check("a struck wooden plate rings out to silence and goes quiet", silent && n.voice.quiet);
+        sand::start(n.voice, n.shared, 1);
+        double again = 0;
+        m.rattle(n, p, kSecond / 4, &again);
+        char what[96];
+        std::snprintf(what, sizeof what, "a strike after the quiet sounds as the first did (%.4f, %.4f)", early, again);
+        check(what, again > early * 0.5 && again < early * 2);
+        m.rattle(n, p, kSecond * 4);
+        p[kBow] = word(0.6);
+        double bowed = 0;
+        m.rattle(n, p, kSecond, &bowed);
+        check("raising Bow wakes a quiet plate", !n.voice.quiet && bowed > 0.02 && n.bounded);
+    }
+
     // Pitch: the bowed mode sounds the note. The strongest component within
     // 3% of the note, by a fine sweep of single-bin DFTs over three seconds of
     // the settled, sand-free tone (long enough to part the bowed mode from its twin), lies within 3 cents of it.
