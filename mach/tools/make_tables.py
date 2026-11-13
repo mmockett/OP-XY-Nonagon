@@ -93,8 +93,8 @@ for name, amplitude, seed in (("organ", organ, 0), ("pad", pad, 7), ("siren", si
     out.append(f"// {name}: {LEVELS} levels of {WAVE} + 1 samples")
     out.append(array(name, "opxy::i16", rows))
 
-SINE = 4096
-out.append(f"const opxy::u32 sine_bits = 12;   // {SINE} samples a cycle")
+SINE = 1024
+out.append(f"const opxy::u32 sine_bits = {SINE.bit_length() - 1};   // {SINE} samples a cycle")
 out.append(array("sine", "opxy::i16", q15([math.sin(2 * math.pi * i / SINE) for i in range(SINE)])))
 
 # The bell: one strike period, 1024 steps. The hum and prime ring long, the

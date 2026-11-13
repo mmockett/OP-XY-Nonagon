@@ -672,10 +672,10 @@ MACH_LOOP void rung(Root& root, i32* out, i32 step0, i32 step2, const i32* amp) 
     i32 wave[n];
     for (i32 i = 0; i < n; ++i) {
         hum += static_cast<u32>(step0);
-        i32 x = tables::sine[hum >> 20] * a0 + tables::sine[(hum << 1) >> 20] * a1;
+        i32 x = tables::sine[hum >> 22] * a0 + tables::sine[(hum << 1) >> 22] * a1;
         if (!image) {
             tierce += static_cast<u32>(step2);
-            x += tables::sine[tierce >> 20] * a2 + tables::sine[(hum << 2) >> 20] * a3;
+            x += tables::sine[tierce >> 22] * a2 + tables::sine[(hum << 2) >> 22] * a3;
         }
         x >>= 14;
         wave[i] = x;
@@ -710,9 +710,9 @@ MACH_LOOP void sung(Root& root, i32* out, u32 rise, const i32* inc, const i32* a
             if (formants > 2) f2 += i2;
         }
         const i32 w = tables::pulse[ph >> 22];
-        i32 sum = tables::sine[f0 >> 20] * a0;
-        if (formants > 1) sum += tables::sine[f1 >> 20] * a1;
-        if (formants > 2) sum += tables::sine[f2 >> 20] * a2;
+        i32 sum = tables::sine[f0 >> 22] * a0;
+        if (formants > 1) sum += tables::sine[f1 >> 22] * a1;
+        if (formants > 2) sum += tables::sine[f2 >> 22] * a2;
         const i32 x = ((sum >> 15) * w) >> 15;
         wave[i] = x;
     }
@@ -770,10 +770,10 @@ MACH_LOOP void rung_swept(Root& root, i32* out, i32 s0, i32 d0, i32 s2, i32 d2, 
     i32 wave[substep];
     for (i32 i = 0; i < substep; ++i) {
         hum += static_cast<u32>(st0);
-        i32 x = tables::sine[hum >> 20] * (v0 >> 1) + tables::sine[(hum << 1) >> 20] * (v1 >> 1);
+        i32 x = tables::sine[hum >> 22] * (v0 >> 1) + tables::sine[(hum << 1) >> 22] * (v1 >> 1);
         if (!image) {
             tierce += static_cast<u32>(st2);
-            x += tables::sine[tierce >> 20] * (v2 >> 1) + tables::sine[(hum << 2) >> 20] * (v3 >> 1);
+            x += tables::sine[tierce >> 22] * (v2 >> 1) + tables::sine[(hum << 2) >> 22] * (v3 >> 1);
         }
         x >>= 14;
         wave[i] = x;
@@ -805,9 +805,9 @@ MACH_LOOP void sung_swept(Root& root, i32* out, u32 rise, const i32* inc, const 
             if (formants > 2) f2 += i2;
         }
         const i32 w = tables::pulse[ph >> 22];
-        i32 sum = tables::sine[f0 >> 20] * a0;
-        if (formants > 1) sum += tables::sine[f1 >> 20] * a1;
-        if (formants > 2) sum += tables::sine[f2 >> 20] * a2;
+        i32 sum = tables::sine[f0 >> 22] * a0;
+        if (formants > 1) sum += tables::sine[f1 >> 22] * a1;
+        if (formants > 2) sum += tables::sine[f2 >> 22] * a2;
         const i32 x = ((sum >> 15) * w) >> 15;
         wave[i] = x;
         a0 += e0; a1 += e1; a2 += e2;
