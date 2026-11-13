@@ -183,6 +183,13 @@ inline bool still(const chain::Chain& c) {
     return widest < 4096;
 }
 
+// The controls' figures, made when they change. Out of line: it runs once a
+// change, and inline it sat in the middle of every block's code.
+static __attribute__((noinline)) void configure(Shared& shared, const i32* parameters) {
+    chain::configure_sound(shared.setup, parameters);
+    for (u32 k = 0; k < 8; ++k) shared.controls[k] = parameters[k];
+    shared.configured = 1;
+}
 // A new starting shape (a new seed, masses or mode), made once for every note
 // that shares it, with its modes' levels: the chain at rest in it, so dt does
 // not enter them. Out of line: it runs once a shape, not once a block.
@@ -204,11 +211,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     chain::Setup& s = shared.setup;
     u32 changed = !shared.configured;
     for (u32 k = 0; k < 8; ++k) changed |= static_cast<u32>(parameters[k] ^ shared.controls[k]);
-    if (changed) {
-        chain::configure_sound(s, parameters);
-        for (u32 k = 0; k < 8; ++k) shared.controls[k] = parameters[k];
-        shared.configured = 1;
-    }
+    if (changed) configure(shared, parameters);
     chain::Chain& c = voice.chain;
 
     // A new note, or a new chain: masses and the struck mode restart it.

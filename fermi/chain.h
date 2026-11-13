@@ -336,6 +336,9 @@ inline void init(Chain& c, const Setup& s) {
     shape(start, s);
     init(c, s, start);
 }
+// The guard's rare restrike, out of line (and static, so each unit keeps its
+// own copy): inline, its shape sat in the middle of the voice's block.
+static inline __attribute__((noinline)) void restrike(Chain& c, const Setup& s) { init(c, s); }
 
 // The spring's force on a stretch d (Q20): d + d^2 (alpha + beta d). Every
 // shift rounds to nearest, written ((a >> (k - 1)) + 1) >> 1 so it needs no
@@ -417,7 +420,7 @@ inline bool guard(Chain& c, const Setup& s) {
         widest = a > widest ? a : widest;
     }
     if (widest < (1 << 27)) return false;
-    init(c, s);
+    restrike(c, s);
     return true;
 }
 // A block: its steps, then the damping. Returns the steps.
