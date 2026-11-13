@@ -409,19 +409,24 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
         voice.hush = 0;
         voice.sounding = 0;
     }
-    // What the stages still hold from the last blocks.
+    // What the stages still hold from the last blocks: wanted only when no
+    // partial sounded at the slower rates (or none at all) this block.
     u32 slow_tail = 0, tail = 0;
-    for (u32 i = 0; i < eighth_history; ++i) slow_tail |= static_cast<u32>(voice.eighth[i]);
-    for (u32 i = 0; i < quarter_history; ++i) slow_tail |= static_cast<u32>(voice.quarter[i]);
-    if (quarter_waits)
-        for (u32 i = 0; i < quarter_wait; ++i) slow_tail |= static_cast<u32>(voice.quarter_late[i]);
-    for (u32 i = 0; i < 2 * halfband_taps; ++i) tail |= static_cast<u32>(low[i]);
-    if (half_waits)
-        for (u32 i = 0; i < half_wait; ++i) tail |= static_cast<u32>(voice.half_late[i]);
-    // Nothing played and nothing left in the stages: they would give zeros.
-    if (!rendered && !slow_tail && !tail) {
-        for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = 0;
-        return;
+    if (!slow) {
+        for (u32 i = 0; i < eighth_history; ++i) slow_tail |= static_cast<u32>(voice.eighth[i]);
+        for (u32 i = 0; i < quarter_history; ++i) slow_tail |= static_cast<u32>(voice.quarter[i]);
+        if (quarter_waits)
+            for (u32 i = 0; i < quarter_wait; ++i) slow_tail |= static_cast<u32>(voice.quarter_late[i]);
+    }
+    if (!rendered) {
+        for (u32 i = 0; i < 2 * halfband_taps; ++i) tail |= static_cast<u32>(low[i]);
+        if (half_waits)
+            for (u32 i = 0; i < half_wait; ++i) tail |= static_cast<u32>(voice.half_late[i]);
+        // Nothing played and nothing left in the stages: they would give zeros.
+        if (!slow_tail && !tail) {
+            for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = 0;
+            return;
+        }
     }
     // The slower rates up to the half rate, each faster sum joining when the
     // slower ones have caught up with it, into the half-band to the full rate.
