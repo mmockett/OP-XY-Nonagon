@@ -375,6 +375,9 @@ void same_chain() {
     for (int i = 0; i < 64; ++i) pitch[i] = 21424179u;
     fermi::initialize(voice, shared, 1);
     fermi::start(voice, shared, 1);
+    // A new starting shape takes a block of its own (hold() in engine.cpp):
+    // the voice's chain loads on the block after, in step with the screen's.
+    fermi::render(voice, shared, 1, out, parameters, pitch);
     // A frame of exactly 64/44100 x 16 s, so the screen owes whole blocks.
     unsigned blocks = 0;
     s.input.elapsed = 0;

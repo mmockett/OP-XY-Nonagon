@@ -113,7 +113,7 @@ struct Setup {
     i32 down;               // the final shift of t r to Q20
     u32 shift;              // dt = 2^-shift chain time units
     u32 dt_ticks;           // ticks a step
-    u32 most_steps;         // steps a block at most
+    u32 most_steps;         // steps a block at most: the CPU's cap (step_cap)
     u32 per_block;          // ticks a block, Q16
     u32 loss;               // damping: the share of every mode's swing lost a block, Q24
     u32 smooth;             // and the Laplacian's share, which grows as w^2: high modes die first, Q24
@@ -192,11 +192,12 @@ static inline void configure_sound(Setup& s, const i32* controls) {
     const u32 stiff = (1u << 24) + 5 * s.alpha + (s.beta >> 2) * 75;
     s.shift = stiff <= (9u << 22) ? 1 : stiff <= (9u << 24) ? 2 : 3;
     s.dt_ticks = ticks_per_unit >> s.shift;
-    // Time: the fastest the CPU allows (most_steps of dt 1/2 a block), slowed
-    // by 2^(-4.5 time).
-    s.most_steps = tables::most_steps[s.size];
+    // Time: the clock's law runs 96/N steps of dt 1/2 a block at its fastest,
+    // slowed by 2^(-4.5 time); the CPU runs at most two thirds of that, so the
+    // top of the knob (and stiff springs) meet the cap sooner.
+    s.most_steps = tables::step_cap[s.size];
     const i32 time = slowing(amount(controls[TIME]));
-    s.per_block = (exp2_q24(-time) >> 8) * (s.most_steps * 4);   // Q16 ticks; -time in octaves, Q12
+    s.per_block = (exp2_q24(-time) >> 8) * (tables::most_steps[s.size] * 4);   // Q16 ticks; -time in octaves, Q12
     // Damping: 0 is lossless, then the struck mode's T60 from 30 s down to
     // 1 s. Mode k loses more as w_k^2 grows, as a string's modes do: the top
     // voiced partial dies four times as fast as the struck mode, so a note
@@ -234,11 +235,12 @@ inline i32 period_log2(const Setup& s) {
     return lo + (((hi - lo) * sf) >> 15);
 }
 // Chain time ticks the clock runs a block, log2 Q12: time slows it by
-// 2^(-4.5 time) from the CPU's limit, most_steps steps of dt 1/2; at the
-// limit a smaller dt (stiff springs) slows it too.
+// 2^(-4.5 time) from the law's fastest, 96/N steps of dt 1/2, and the CPU's
+// cap holds it at step_cap steps of dt (a smaller dt with stiff springs).
 inline i32 clock_log2(const Setup& s, i32 time) {
-    const i32 asked = 2 * 4096 - slowing(time), most = static_cast<i32>(3 - s.shift) * 4096;
-    return tables::log2_most_steps[s.size] + (asked < most ? asked : most);
+    const i32 asked = tables::log2_most_steps[s.size] + 2 * 4096 - slowing(time);
+    const i32 most = tables::log2_step_cap[s.size] + static_cast<i32>(3 - s.shift) * 4096;
+    return asked < most ? asked : most;
 }
 // The breathing period in seconds, log2 Q12.
 inline i32 period_seconds_log2(const Setup& s, i32 time) {
@@ -334,6 +336,9 @@ inline void init(Chain& c, const Setup& s) {
     shape(start, s);
     init(c, s, start);
 }
+// The guard's rare restrike, out of line (and static, so each unit keeps its
+// own copy): inline, its shape sat in the middle of the voice's block.
+static inline __attribute__((noinline)) void restrike(Chain& c, const Setup& s) { init(c, s); }
 
 // The spring's force on a stretch d (Q20): d + d^2 (alpha + beta d). Every
 // shift rounds to nearest, written ((a >> (k - 1)) + 1) >> 1 so it needs no
@@ -371,8 +376,8 @@ inline void step(Chain& c, const Setup& s) {
         xs[j] += ((v >> sh1) + 1) >> 1;
     }
 }
-// A block of the clock: the steps it owes, at most most_steps (the backlog
-// beyond is dropped, so the chain slows rather than the CPU).
+// A block of the clock: the steps it owes, at most most_steps, the cap (the
+// backlog beyond is dropped, so the chain slows rather than the CPU).
 inline u32 owed(Chain& c, const Setup& s) {
     c.clock += s.per_block;
     const u32 need = s.dt_ticks << 16;
@@ -415,7 +420,7 @@ inline bool guard(Chain& c, const Setup& s) {
         widest = a > widest ? a : widest;
     }
     if (widest < (1 << 27)) return false;
-    init(c, s);
+    restrike(c, s);
     return true;
 }
 // A block: its steps, then the damping. Returns the steps.
