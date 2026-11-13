@@ -171,14 +171,17 @@ inline void clear_sum(Sums& sums, u32 r) {
     i32* const sum = sums.at[r];
     for (u32 i = 0; i < (opxy::block_frames >> r); ++i) sum[i] = 0;
 }
-inline u32 sound_at(Sums& sums, u32 r, u32 phase, u32 increment, i32 a, i32 b, i32 da, i32 db) {
+// Out of line: render() calls these from six places, and inline each call
+// carried its own copy of the clear and the four-way choice of rate (1.7 KB
+// of render's code); one copy is fetched once a block.
+__attribute__((noinline)) u32 sound_at(Sums& sums, u32 r, u32 phase, u32 increment, i32 a, i32 b, i32 da, i32 db) {
     clear_sum(sums, r);
     if (r == 3) return sound<3>(sums.at[3], phase, increment, a, b, da, db);
     if (r == 2) return sound<2>(sums.at[2], phase, increment, a, b, da, db);
     if (r == 1) return sound<1>(sums.at[1], phase, increment, a, b, da, db);
     return sound<0>(sums.at[0], phase, increment, a, b, da, db);
 }
-inline u32 sound_bowed_at(Sums& sums, u32 r, u32 phase, u32 increment, i32 a, i32 b, i32 da, i32 db, i32 h, i32 dh) {
+__attribute__((noinline)) u32 sound_bowed_at(Sums& sums, u32 r, u32 phase, u32 increment, i32 a, i32 b, i32 da, i32 db, i32 h, i32 dh) {
     clear_sum(sums, r);
     if (r == 3) return sound_bowed<3>(sums.at[3], phase, increment, a, b, da, db, h, dh);
     if (r == 2) return sound_bowed<2>(sums.at[2], phase, increment, a, b, da, db, h, dh);
