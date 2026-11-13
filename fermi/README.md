@@ -299,7 +299,8 @@ integers only.
   - Each oscillator reads the body wave (sine, plus 0.32 of the second
     harmonic and 0.12 of the third) while its third harmonic fits under 0.45
     of the sample rate, else a plain sine. It changes wave only once it has
-    faded to silence. The body's amount is fixed.
+    faded to silence. The body's amount is fixed. Both waves are 1,024
+    points (2 KB each), read without interpolation.
 - **Damping.**
   - It runs in audio time, four blocks' worth at a time (the displacements one
     block, the velocities two blocks later), so it holds at any clock.

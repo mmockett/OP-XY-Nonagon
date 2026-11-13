@@ -146,8 +146,9 @@ for m in MS:
     for k in range(VOICED + 1):
         tilt.append(32767 if k <= m else round(32767 * math.sqrt(m / k)))
 B2, B3 = 0.32, 0.12
-body = [math.sin(2 * math.pi * i / 4096) + B2 * math.sin(4 * math.pi * i / 4096) + B3 * math.sin(6 * math.pi * i / 4096)
-        for i in range(4096)]
+WAVE = 1024           # points a cycle of the body and the sine: the partials read phase >> 22
+body = [math.sin(2 * math.pi * i / WAVE) + B2 * math.sin(4 * math.pi * i / WAVE) + B3 * math.sin(6 * math.pi * i / WAVE)
+        for i in range(WAVE)]
 peak = max(abs(v) for v in body)
 body_gain = round(32767 * peak / math.sqrt(1 + B2 * B2 + B3 * B3))
 out += ["// 1 / w_m^2, Q4: inverse_square[n * 4 + m - 1].",
@@ -158,9 +159,9 @@ out += ["// 1 / w_m^2, Q4: inverse_square[n * 4 + m - 1].",
         f"const u32 body_gain = {body_gain};",
         arr("body", "i16", [round(32767 * v / peak) for v in body], 16), ""]
 
-# One cycle of sine, 4096 points, Q15.
-out += ["// sin(2 pi i / 4096), Q15.",
-        arr("sine", "i16", [round(32767 * math.sin(2 * math.pi * i / 4096)) for i in range(4096)], 16), ""]
+# One cycle of sine, WAVE points, Q15.
+out += [f"// sin(2 pi i / {WAVE}), Q15.",
+        arr("sine", "i16", [round(32767 * math.sin(2 * math.pi * i / WAVE)) for i in range(WAVE)], 16), ""]
 
 out += ["}", "}", ""]
 (ROOT / "tables.h").write_text("\n".join(out))

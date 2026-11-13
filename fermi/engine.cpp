@@ -64,7 +64,7 @@ inline void pair(i32* out, const i16* w1, u32& p1, u32 i1, const i32* g1, const 
         const i32 a1 = g1[quarter], a2 = g2[quarter];
         i32* o = out + 16 * quarter;
         for (unsigned i = 0; i < 16; ++i) {
-            o[i] += w1[q1 >> 20] * a1 + w2[q2 >> 20] * a2;
+            o[i] += w1[q1 >> 22] * a1 + w2[q2 >> 22] * a2;
             q1 += i1;
             q2 += i2;
         }
@@ -79,7 +79,7 @@ inline void single(i32* out, const i16* w, u32& p, u32 inc, const i32* g) {
         const i32 a = g[quarter];
         i32* o = out + 16 * quarter;
         for (unsigned i = 0; i < 16; ++i) {
-            o[i] += w[q >> 20] * a;
+            o[i] += w[q >> 22] * a;
             q += inc;
         }
     }
@@ -93,7 +93,7 @@ inline void pair_ramped(i32* out, const i16* w1, u32& p1, u32 i1, i32 from1, i32
     i32 a1 = from1 << 15, a2 = from2 << 15;
     const i32 d1 = ((to1 - from1) << 15) >> 6, d2 = ((to2 - from2) << 15) >> 6;
     for (unsigned i = 0; i < opxy::block_frames; ++i) {
-        out[i] += w1[q1 >> 20] * (a1 >> 15) + w2[q2 >> 20] * (a2 >> 15);
+        out[i] += w1[q1 >> 22] * (a1 >> 15) + w2[q2 >> 22] * (a2 >> 15);
         q1 += i1;
         q2 += i2;
         a1 += d1;
