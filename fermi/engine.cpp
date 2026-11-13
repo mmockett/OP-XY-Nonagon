@@ -60,66 +60,59 @@ inline void start(Voice& voice, Shared&, opxy::u32) { voice.fresh = 1; }
 
 inline void destroy(Voice&, Shared&, opxy::u32) {}
 
-// Two partials side by side, so their loads and sums share one pass. Each
-// reads its own wave: the body, or a plain sine once the body's third
-// harmonic would pass Nyquist. Levels step four times a block (every 16
-// samples) toward their targets: a ramp a sample cost the loop four
-// registers it could not spare on the Blackfin.
-inline void pair(i32* out, const i16* w1, u32& p1, u32 i1, const i32* g1, const i16* w2, u32& p2, u32 i2, const i32* g2) {
-    u32 q1 = p1, q2 = p2;
-    for (unsigned quarter = 0; quarter < 4; ++quarter) {
-        const i32 a1 = g1[quarter], a2 = g2[quarter];
-        i32* o = out + 16 * quarter;
-        for (unsigned i = 0; i < 16; ++i) {
-            o[i] += w1[q1 >> 22] * a1 + w2[q2 >> 22] * a2;
-            q1 += i1;
-            q2 += i2;
-        }
-    }
-    p1 = q1;
-    p2 = q2;
-}
-// One partial alone, the last of an odd number.
-inline void single(i32* out, const i16* w, u32& p, u32 inc, const i32* g) {
+// One partial over the block, added into out. Levels step four times a
+// block (every 16 samples) toward their targets: a ramp a sample costs
+// registers the Blackfin cannot spare. Two samples a pass, each read through
+// an address made a sample earlier, so the address register is ready when
+// the load needs it (an address made just before costs 4 cycles a read).
+// Partials run one at a time: two to a pass needed four such addresses and
+// spilled. The phase ends 64 increments on, as two were made past the block.
+inline void partial(i32* out, const i16* w, u32& p, u32 inc, const i32* g) {
     u32 q = p;
+    const i16* even = w + (q >> 22);
+    q += inc;
+    const i16* odd = w + (q >> 22);
+    q += inc;
     for (unsigned quarter = 0; quarter < 4; ++quarter) {
         const i32 a = g[quarter];
         i32* o = out + 16 * quarter;
-        for (unsigned i = 0; i < 16; ++i) {
-            o[i] += w[q >> 22] * a;
+        for (unsigned i = 0; i < 16; i += 2) {
+            const i32 x = *even;
+            even = w + (q >> 22);
             q += inc;
+            o[i] += x * a;
+            const i32 y = *odd;
+            odd = w + (q >> 22);
+            q += inc;
+            o[i + 1] += y * a;
         }
     }
-    p = q;
+    p = q - 2 * inc;
 }
-// The same pair with levels ramped every sample, for a note's first block,
-// where a level rises from silence and quartered steps would click.
-inline void pair_ramped(i32* out, const i16* w1, u32& p1, u32 i1, i32 from1, i32 to1,
-                        const i16* w2, u32& p2, u32 i2, i32 from2, i32 to2) {
-    u32 q1 = p1, q2 = p2;
-    i32 a1 = from1 << 15, a2 = from2 << 15;
-    const i32 d1 = ((to1 - from1) << 15) >> 6, d2 = ((to2 - from2) << 15) >> 6;
-    for (unsigned i = 0; i < opxy::block_frames; ++i) {
-        out[i] += w1[q1 >> 22] * (a1 >> 15) + w2[q2 >> 22] * (a2 >> 15);
-        q1 += i1;
-        q2 += i2;
-        a1 += d1;
-        a2 += d2;
-    }
-    p1 = q1;
-    p2 = q2;
-}
-// One ramped partial alone, the last of an odd number.
-inline void single_ramped(i32* out, const i16* w, u32& p, u32 inc, i32 from, i32 to) {
+// The same with its level ramped every sample, for a note's first block,
+// where a level rises from silence (or a retriggered note's falls) and
+// quartered steps would click.
+inline void partial_ramped(i32* out, const i16* w, u32& p, u32 inc, i32 from, i32 to) {
     u32 q = p;
     i32 a = from << 15;
     const i32 d = ((to - from) << 15) >> 6;
-    for (unsigned i = 0; i < opxy::block_frames; ++i) {
-        out[i] += w[q >> 22] * (a >> 15);
+    const i16* even = w + (q >> 22);
+    q += inc;
+    const i16* odd = w + (q >> 22);
+    q += inc;
+    for (unsigned i = 0; i < opxy::block_frames; i += 2) {
+        const i32 x = *even;
+        even = w + (q >> 22);
         q += inc;
+        out[i] += x * (a >> 15);
+        a += d;
+        const i32 y = *odd;
+        odd = w + (q >> 22);
+        q += inc;
+        out[i + 1] += y * (a >> 15);
         a += d;
     }
-    p = q;
+    p = q - 2 * inc;
 }
 
 // The output, held within half scale: a function of its own so its loop is a
@@ -299,35 +292,13 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
 
     i32 sum[opxy::block_frames];
     for (unsigned i = 0; i < opxy::block_frames; ++i) sum[i] = 0;
-    // Silent partials only keep time; the rest sound two by two, whichever
-    // they are. On a note's first block a partial is silent when it was
-    // silent in the last note and stays so in this one.
-    u32 waiting = chain::voiced;
-    if (load) {
-        for (u32 k = 0; k < chain::voiced; ++k) {
-            if (!gains[k][3] && !moving[k]) {
-                voice.phase[k] += voice.inc[k] << 6;
-            } else if (waiting == chain::voiced) {
-                waiting = k;
-            } else {
-                pair_ramped(sum, wave[waiting], voice.phase[waiting], voice.inc[waiting], was[waiting], gains[waiting][3],
-                            wave[k], voice.phase[k], voice.inc[k], was[k], gains[k][3]);
-                waiting = chain::voiced;
-            }
-        }
-        if (waiting != chain::voiced) single_ramped(sum, wave[waiting], voice.phase[waiting], voice.inc[waiting], was[waiting], gains[waiting][3]);
-    } else {
-        for (u32 k = 0; k < chain::voiced; ++k) {
-            if (!gains[k][3] && !moving[k]) {
-                voice.phase[k] += voice.inc[k] << 6;
-            } else if (waiting == chain::voiced) {
-                waiting = k;
-            } else {
-                pair(sum, wave[waiting], voice.phase[waiting], voice.inc[waiting], gains[waiting], wave[k], voice.phase[k], voice.inc[k], gains[k]);
-                waiting = chain::voiced;
-            }
-        }
-        if (waiting != chain::voiced) single(sum, wave[waiting], voice.phase[waiting], voice.inc[waiting], gains[waiting]);
+    // Silent partials (silent all block: on a note's first block, silent in
+    // the last note and in this one) only keep time; the rest sound, ramped
+    // on a note's first block.
+    for (u32 k = 0; k < chain::voiced; ++k) {
+        if (!gains[k][3] && !moving[k]) voice.phase[k] += voice.inc[k] << 6;
+        else if (load) partial_ramped(sum, wave[k], voice.phase[k], voice.inc[k], was[k], gains[k][3]);
+        else partial(sum, wave[k], voice.phase[k], voice.inc[k], gains[k]);
     }
     // Silent, with every mode's level at zero and damping holding the chain
     // there: from the next block, the note stops.

@@ -298,7 +298,8 @@ integers only.
   energy and the struck mode the rest. Voices share the shape, made once for
   a seed, masses and mode.
 - **Synthesis.**
-  - Ten table oscillators run two to a pass, with levels stepped every 16
+  - Ten table oscillators run one at a time, two samples a pass, each read
+    through an address made a sample ahead, with levels stepped every 16
     samples. A note's first block ramps every sample, so the attack never
     clicks. Silent partials only keep time, the first block's too.
   - A partial under −80 dBFS, or more than 40 dB under the note's loudest,
@@ -366,7 +367,7 @@ a voice block runs about:
 
 - 3,000 instructions in the chain: 2 steps × (33 bonds × 28 + 32 masses ×
   18);
-- 5,900 in synthesis: 5 pairs × 64 samples × 16, plus overhead;
+- 6,100 in synthesis: 10 partials × 64 samples × 9.5, plus overhead;
 - 1,300 in projections: 4 modes × 16 × 13, plus overhead;
 - 700 in levels and targets;
 - 450 in output clamping;
