@@ -1,4 +1,5 @@
 #pragma once
+#include <opxy/q15.hpp>
 #include <opxy/types.hpp>
 #include "plate.h"
 
@@ -80,11 +81,19 @@ inline i32 noise15(u32& seed) {
 // ---------------------------------------------------------------------------
 // The plate.
 
+// cos(m pi i / 256), Q15, for m up to 9 and i up to 256: m i taken round the
+// period (512) and folded onto the half period the table holds: the same
+// values as a row per m, in 514 bytes instead of 5,140, so a grain on the
+// move touches at most 17 cache lines of it, not up to 160.
+inline i16 cosine(u32 m, u32 i) {
+    const i32 f = opxy::q15::product(static_cast<i32>(m), static_cast<i32>(i)) & 511;  // 16 x 16
+    return kCos[256 - magnitude(256 - f)];
+}
 // A mode's shape at (u, v), Q15: +-32767 at its loudest. Four table reads and
 // two 16 x 16 products.
 inline i32 shape(const PlateMode& mode, u32 u, u32 v) {
     const u32 i = u >> 8, j = v >> 8;
-    const i32 a = kCos[mode.m][i] * kCos[mode.n][j], b = kCos[mode.n][i] * kCos[mode.m][j];
+    const i32 a = cosine(mode.m, i) * cosine(mode.n, j), b = cosine(mode.n, i) * cosine(mode.m, j);
     return (mode.s ? a + b : a - b) >> 16;
 }
 
@@ -230,7 +239,9 @@ inline i32 acceleration(const Throw& t, const PlateMode* modes, u32 u, u32 v) {
 // Every mode's shape at (u, v), kept with a grain while it lies there; kMoved
 // marks a grain that has moved since.
 const i16 kMoved = -32768;
-inline void shapes_at(const PlateMode* modes, u32 u, u32 v, i16* shapes) {
+// Out of line and file-local (a copy each for the sound and the screen): the
+// sound calls it from two places in look(), only for a grain that has moved.
+static inline __attribute__((noinline)) void shapes_at(const PlateMode* modes, u32 u, u32 v, i16* shapes) {
     for (u32 k = 0; k < kModes; ++k) shapes[k] = static_cast<i16>(shape(modes[k], u, v));
 }
 inline i32 acceleration(const Throw& t, const i16* shapes) {

@@ -503,11 +503,13 @@ def build_header():
              "namespace sand {",
              f"const opxy::u32 kModes = {MODES}, kFigures = {len(FIGURES)}, kPaths = {PATHS}, kPoints = {POINTS};",
              "",
-             f"// cos(m pi i / 256) for m = 0..{HIGHEST}, i = 0..256, Q15.",
-             f"const opxy::i16 kCos[{HIGHEST + 1}][257] = {{"]
-    for m in range(HIGHEST + 1):
-        vals = [max(-32767, min(32767, q(math.cos(m * math.pi * i / 256), 15))) for i in range(257)]
-        lines.append("    {" + ", ".join(map(str, vals)) + "},")
+             "// cos(pi i / 256), i = 0..256, Q15: half a period. cos(m pi i / 256) for any",
+             "// m is entry 256 - |256 - (m i mod 512)| (sand.h's cosine()), the same",
+             "// values a row per m held, in a tenth of the memory.",
+             "const opxy::i16 kCos[257] = {"]
+    vals = [max(-32767, min(32767, q(math.cos(math.pi * i / 256), 15))) for i in range(257)]
+    for at in range(0, 257, 16):
+        lines.append("    " + ", ".join(map(str, vals[at:at + 16])) + ",")
     lines.append("};")
     lines.append("")
     lines.append("// A sounding mode: its shape (m, n, s), its frequency over the bowed mode's")

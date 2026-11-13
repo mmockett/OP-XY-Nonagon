@@ -16,6 +16,24 @@ struct Mode { u32 phase; i32 a, b, sa, sb; };
 // rate's 22 and the full rate's, and the rattle, 50.
 const u32 kBlock = 64, kHistory4 = 7, kHistory3 = 5, kQuarterWait = 8, kHalfWait = 22, kFullWait = 50;
 
+// What the smoothed controls make of the sound, worked out again only when
+// one of them moves (engine.cpp's settings_for()): most blocks of a held note
+// skip that work, and its code and tables stay out of the cache.
+struct Settings {
+    Material mat;         // the plate's material, by Plate
+    Throw plan;           // plan_throw()'s part of the throw (its weights are each block's)
+    u32 grains;           // grains on the plate, by Sand
+    i32 mass, loud;       // Q8: a grain's weight on the modes and its click's loudness, by Grain
+    i32 g, c1, c2;        // the rattle's band-pass, by Grain
+    i32 ring;             // how hard a landing knocks the modes
+    i32 dead, bounce;     // Q8, Q15: a landing's thud and its bounce, by Settle
+    i32 strike;           // Q15: the strike's share, by Bow
+    i32 drive, rosin;     // the bow's level and its rosin hiss (amplitude units)
+    i32 shaken;           // the shake's stationary amplitude
+    i32 held;             // Q31: the bow's pull each block
+    i32 level;            // Q15: the bow's harmonics, of the bowed level
+};
+
 struct Voice {
     Mode modes[kModes];   // the figure's mode and six of the plate's modes above it
     Mode twin;            // the bowed mode's near-degenerate twin: its amplitude, and the beat's phase
@@ -26,11 +44,17 @@ struct Voice {
     i32 gather[kModes];   // the same, gathered over the round of looks in progress
     i32 controls[8];      // smoothed controls, 0..32767
     u32 primed;           // controls hold real values; the first block snaps them
+    Settings set;         // what the controls make of the sound
     u32 figure;           // the figure the modes were last bowed in
     u32 cursor;           // the next grain to look at
     u32 seed;
+    // A note's sand is poured a grain at a time, as the looks first reach each
+    // (engine.cpp's pour_next()), so the note's first block need not pour all 48:
+    // grains from poured on are still to come, from pour_seed's draws.
+    u32 pour_seed, poured;
+    u32 stale[2];         // bit i: grain i's kept shapes are forgotten (applied at its next look)
     u32 struck;           // the note has just started: strike the plate this block
-    u32 jolted;           // looks left of the strike's jolt
+    u32 jolted;           // looks left of the strike's jolt, and its first block's twelve before it starts
     u32 rounds;           // rounds of looks, for publishing the sand every fourth
     i32 click1, click2;   // the grain click filter's last two outputs
     i32 lost[kModes];     // each mode's log2 loss its kept and stirs were made for (0: none)
@@ -43,6 +67,8 @@ struct Voice {
     u8 rate[kModes];      // each mode's rate, 1 / 2^rate
     u8 live;              // bits 0-3: rate 2^-r written last block; 4, 5: the quarter and
                           // half stages had input; 6: a landing waits
+    u8 quiet;             // a struck note has rung out on resting sand: render silence (engine.cpp)
+    u8 calm;              // blocks in a row with no grain thrown, moved, aloft or landing (at most 255)
     i32 eighth[kHistory4 + kBlock / 8];    // the eighth-rate sum, after the last block's tail
     i32 quarter[kHistory3 + kBlock / 4];   // the quarter-rate stage's input, after its tail
     i32 half[kHistory3 + kBlock / 2];      // the half-rate stage's input, after its tail
@@ -60,5 +86,6 @@ struct Shared {
     u32 latest;   // the owner whose sand this is, 0 when none sounds
     u32 clock;    // renders by every voice
     u32 fresh;    // the clock when latest last rendered
+    u32 pour_seed, poured;   // as the voice's: sand from poured on is still to be poured from pour_seed
 };
 }
