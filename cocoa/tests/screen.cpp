@@ -169,7 +169,7 @@ void captions_fit() {
                 screen::captions(slots, values);
                 const double w = text_width(values[k], 20);
                 ++seen;
-                if (w > widest) { widest = w; std::snprintf(worst, sizeof worst, "%s", values[k]); }
+                if (w > widest) { widest = w; std::snprintf(worst, sizeof worst, "%.15s", values[k]); }
                 if (w > 53) { std::printf("FAIL the caption %s is %.1f px wide, over 53\n", values[k], w); ++failures; return; }
             }
     std::printf("captions: %u, the widest %s at %.1f px of 53; titles at most %.1f px of 56\n", seen, worst, widest, widest_title);
