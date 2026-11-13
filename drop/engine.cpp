@@ -219,14 +219,13 @@ struct Pipe {
     i32 ap_in, f1, f2, lowest, jet_lp, hold, held;   // the allpass's last output is f1
     i32 eta, b, c, loop, under8, jet_k;
 };
-DROP_PASS void pipe_pass(Pipe& s, const i32* input, const i32* gain, i16* y_out) {
-    i16* const line = s.line;
-    const u32 mask = pipe_length - 1, whole = s.whole;
-    u32 w = s.write;
+// One stretch of the block over which neither the delay's read nor its write
+// wraps round the line: both walk it.
+DROP_PASS void pipe_run(Pipe& s, const i16* from, i16* into, unsigned count, const i32* input, const i32* gain, i16* y_out) {
     i32 ap_in = s.ap_in, f1 = s.f1, f2 = s.f2, lowest = s.lowest, jet_lp = s.jet_lp, hold = s.hold, held = s.held;
     const i32 eta = s.eta, b = s.b, c = s.c, loop = s.loop, under8 = s.under8, jet_k = s.jet_k;
-    for (unsigned i = 0; i < frames; ++i) {
-        const i32 delayed = line[(w - whole) & mask];
+    for (unsigned i = 0; i < count; ++i) {
+        const i32 delayed = *from++;
         const i32 ap = ((eta * (delayed - f1) + 16384) >> 15) + ap_in;   // f1 is the allpass's last output
         ap_in = delayed;
         const i32 filtered = (b * (ap + f2) + c * f1 + 16384) >> 15;
@@ -246,11 +245,9 @@ DROP_PASS void pipe_pass(Pipe& s, const i32* input, const i32* gain, i16* y_out)
         // and, blown, latch there.
         hold += (y - held) * 1024 - (hold >> 13);
         held = y;
-        line[w & mask] = static_cast<i16>(clamp(hold >> 10, -ceiling, ceiling));
-        ++w;
+        *into++ = static_cast<i16>(clamp(hold >> 10, -ceiling, ceiling));
         y_out[i] = static_cast<i16>(y);
     }
-    s.write = w;
     s.ap_in = ap_in;
     s.f1 = f1;
     s.f2 = f2;
@@ -258,6 +255,18 @@ DROP_PASS void pipe_pass(Pipe& s, const i32* input, const i32* gain, i16* y_out)
     s.jet_lp = jet_lp;
     s.hold = hold;
     s.held = held;
+}
+inline void pipe_pass(Pipe& s, const i32* input, const i32* gain, i16* y_out) {
+    const u32 mask = pipe_length - 1;
+    for (unsigned done = 0; done < frames;) {
+        const u32 from = (s.write - s.whole) & mask, into = s.write & mask;
+        unsigned count = frames - done;
+        if (count > pipe_length - from) count = pipe_length - from;
+        if (count > pipe_length - into) count = pipe_length - into;
+        pipe_run(s, s.line + from, s.line + into, count, input + done, gain + done, y_out + done);
+        done += count;
+        s.write += count;
+    }
 }
 
 // The crackle as heard: its clicks through a difference (they are bright),
