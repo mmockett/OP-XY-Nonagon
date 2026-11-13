@@ -279,7 +279,9 @@ integers only.
   - A third of the modes are projected each block, in turn. Each one's energy
     is the leapfrog's own invariant, exact for the linear chain.
     A note's first block sounds the starting shape's levels, measured once
-    for every note that shares the shape.
+    for every note that shares the shape. A note whose shape is new (a new
+    seed, masses or mode) waits one block (1.5 ms) while the shape is made,
+    holding what the voice was sounding.
   - Each partial's level is the square root of its mode's share (a table
     square root), eased an eighth of the way each time.
   - The lowest min(N, 10) modes are voiced. Partial k sits at the key times

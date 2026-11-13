@@ -203,6 +203,24 @@ static __attribute__((noinline)) void make_start(Shared& shared, const chain::Se
         shared.level[k] = k < count ? chain::root(chain::energy(c, f, k + 1, s.shift)) << 4 : 0;   // Q16
 }
 
+// The block a new starting shape is made in, the voice only holds what it
+// was sounding: its partials at their levels, or silence. Out of line, with
+// the shape: once a shape, not once a block.
+static __attribute__((noinline)) void hold(Voice& voice, opxy::Output output) {
+    i32 sum[opxy::block_frames];
+    for (unsigned i = 0; i < opxy::block_frames; ++i) sum[i] = 0;
+    for (u32 k = 0; k < chain::voiced; ++k) {
+        const i32 a = voice.amp[k] >> 15;
+        if (!a) {
+            voice.phase[k] += voice.inc[k] << 6;
+            continue;
+        }
+        const i32 g[4] = {a, a, a, a};
+        partial(sum, voice.plain[k] ? tables::sine : tables::body, voice.phase[k], voice.inc[k], g);
+    }
+    finish(sum, output, sound::ceiling);
+}
+
 inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
                    opxy::Parameters parameters, opxy::Pitch pitch) {
     using namespace sound;
@@ -221,8 +239,13 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         // the seed's nudge costs about 1,400 instructions at 32 masses.
         const u32 key = ((s.seed << 8) | (s.size << 4) | s.m) + 1;
         if (shared.key != key) {
+            // A new shape waits a block: this one makes it and holds what
+            // the voice was sounding, and the note starts on the next.
             make_start(shared, s, c);
             shared.key = key;
+            voice.fresh = 1;
+            hold(voice, output);
+            return;
         }
         chain::init(c, s, shared.start);
         // The first block sounds the starting shape's levels; the modes are
