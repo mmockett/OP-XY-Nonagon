@@ -156,7 +156,8 @@ integer and 32-bit only, with no division.
   - The engine reads the spectrum trilinearly, across flux, coupling and the
     struck site, matching states by rank.
   - It reads it a stage a block, over eight blocks (a strike reads it whole
-    in its first block), and each partial ramps to where a reading puts it
+    in its first block, which sounds nothing new: the note sounds from its
+    second, 1.45 ms on), and each partial ramps to where a reading puts it
     across the next eight (11.6 ms). The gate and the pitch follow every
     block. With the wingbeat at 0 and the controls still, the reading rests.
   - The tables come to about 100 KB: 17 KB of energies, 77 KB of amplitudes,
@@ -364,14 +365,14 @@ The figures below are host estimates made during development.
   stages about 940; the last half-band 41 instructions an output pair,
   about 1,300; each partial's target from the gate about 1,100; and an
   eighth of the spectrum's reading, a few hundred. A strike's first block
-  reads it whole, some 3,500 to 4,000 more.
+  reads it whole (about 3,900 instructions) and runs no bank.
 - The SDK's host estimate (`sdk.py test`) reads 4,600 Blackfin instructions
   per voice block at the heaviest setting (11,300 before the CPU pass).
 - Both are within 15,000; Moth reads 10,300 by the same count. Nothing is
   solved at run time.
 - **Memory.** Butterfly takes about 162 KiB of the 2040 KiB module region in
   a build of its own, most of it the tables, and needs no runtime helpers.
-  Eight voices are 1,608 bytes each (the ramps, the reading in progress and
+  Eight voices are 1,372 bytes each (the ramps, the reading in progress and
   the slower rates' stages), with no shared state.
 
 ## Tests
@@ -391,7 +392,7 @@ the screen and outline tests under ASan too.
     at 2.
   - **No clicks** from any control swept under a held pad: 1.5 to 1.8 on a
     detector that reads 38 for a 0.003 step.
-  - **Every note sounds in its first block.**
+  - **A note reads its spectrum in its first block and sounds in its second.**
   - **The pad holds** within 0.5 dB over 4 s.
   - **In tune.** The lowest band's middle is within 16 cents of the key from
     C2 to C6, and within 7.2 cents from C3.
