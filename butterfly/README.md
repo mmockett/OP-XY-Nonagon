@@ -155,8 +155,8 @@ integer and 32-bit only, with no division.
     pitch: one carries both weights and the other is silent.
   - The engine reads the spectrum trilinearly, across flux, coupling and the
     struck site, matching states by rank, every block.
-  - The tables come to about 106 KB: 17 KB of energies, 77 KB of amplitudes,
-    the 8 KB sine and small ones. They are defined once (`tables_data.h`,
+  - The tables come to about 100 KB: 17 KB of energies, 77 KB of amplitudes,
+    the 2 KB sine and small ones. They are defined once (`tables_data.h`,
     included by `engine.cpp`), so the engine's object and the display's share
     them.
 - **The key** is the lowest band's middle, weighted as the strike excites it.
