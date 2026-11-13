@@ -455,7 +455,7 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     voice.noise = 0x2545f491u + owner * 0x9e3779b9u;
     voice.dice = 0x6c8e9cf5u ^ owner * 0x85ebca6bu;
     voice.write = 0;
-    voice.ap_in = voice.ap_out = voice.f1 = voice.f2 = voice.e1 = voice.e2 = voice.e3 = 0;
+    voice.ap_in = voice.stale = voice.f1 = voice.f2 = voice.e1 = voice.e2 = voice.e3 = 0;
     voice.tuned = 0;
     voice.figured = -1;
     voice.crack_last = voice.hiss_last = 0;
@@ -466,6 +466,12 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
 // Each note drops a new drop, which lands on the next block. A pipe still
 // ringing rings on.
 inline void start(Voice& voice, Shared& shared, opxy::u32) {
+    // A drop dropped into a voice whose last drop is gone and rung out: its
+    // pipe is cleared now, not in the block it went quiet.
+    if (voice.stale) {
+        sound::clear(voice.pipe);
+        voice.stale = 0;
+    }
     voice.fresh = 1;
     voice.quiet = 0;
     if (!voice.counted) { voice.counted = 1; ++shared.sounding; }
@@ -613,7 +619,6 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     pipe_pass(pipe_state, x, gain, y);
     voice.write = pipe_state.write;
     voice.ap_in = pipe_state.ap_in;
-    voice.ap_out = pipe_state.f1;
     voice.f1 = pipe_state.f1;
     voice.f2 = pipe_state.f2;
     voice.lowest = pipe_state.lowest;
@@ -640,14 +645,16 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     voice.dc_out = heard_state.dc_out;
     const i32 loudest = knee_pass(side, output, share);
     const i32 spark = voice.spark;
-    // Gone and rung out (under -66 dBFS as heard): clear the pipe and stop.
-    // (The pipe may hold an offset of a unit or two, which the DC blocker hides.)
+    // Gone and rung out (under -66 dBFS as heard): stop. The pipe may hold an
+    // offset of a unit or two, which the DC blocker hides; it is cleared only
+    // if a note starts in this voice again (start), since a voice given to a
+    // new note starts zeroed.
     if (!alive && loudest < 32 && spark < (32 << 15)) {
         voice.quiet = 1;
         if (voice.counted && shared.sounding) --shared.sounding;
         voice.counted = 0;
-        clear(voice.pipe);
-        voice.ap_in = voice.ap_out = voice.f1 = voice.f2 = voice.e1 = voice.e2 = voice.e3 = 0;
+        voice.stale = 1;
+        voice.ap_in = voice.f1 = voice.f2 = voice.e1 = voice.e2 = voice.e3 = 0;
         voice.jet = voice.spark = voice.pulse = voice.soft_crack = voice.softer_crack = voice.settled = voice.hold = voice.held = voice.lowest = voice.jet_lp = 0;
         voice.dc_in = voice.dc_out = voice.crack_last = voice.hiss_last = 0;
     }
