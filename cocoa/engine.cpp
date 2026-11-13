@@ -24,6 +24,7 @@ using drink::octave;
 const i32 strike = 480000000;       // the fundamental's tap in a clear drink, Q31 (0.22)
 const i32 most = 1 << 30;           // a mode's amplitude, at most 0.5
 const i32 knee = 429496730;         // 0.2: the soft clip starts here, and stops at 0.325
+const i32 lift = 464255901;          // Q31: 0.216, so the knee's output sounds at 1.216 x (+1.7 dB), to 0.395
 const i32 silent = 1 << 16;         // under this a mode is not rendered (audit: was 1 << 14)
 const u32 ceiling = 0x80000000u;    // an increment at the Nyquist rate
 const u32 fade_from = 1717986918u;  // 0.40 of the sample rate: modes fade out from here
@@ -403,7 +404,8 @@ inline i32 finish_one(i32 x, i32& dc_in, i32& dc_out, i32 hi, i32 reach) {
     const i32 over = bound(o - knee, 0, reach);
     const i32 top = knee + reach;
     const i32 r = (o < top ? o : top) - (multiply(over, over) << 1);
-    return (r ^ sign) - sign;
+    const i32 lifted = r + multiply(r, lift);   // the level after the knee, so its shape is kept
+    return (lifted ^ sign) - sign;
 }
 __attribute__((noinline)) void finish(Voice& voice, const i32* sum, opxy::Output output, i32 hi, i32 reach, u32 count) {
     i32 dc_in = voice.dc_in, dc_out = voice.dc_out;
@@ -771,7 +773,8 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     // A DC blocker at 7 Hz (a decaying low ring has a little), then sixteen
     // times the eighth, with a soft knee from 0.2 to a ceiling of 0.325: it
     // rounds off only a tap's first peaks, where every mode starts at once,
-    // so the ring can sit louder (README.md, Level).
+    // so the ring can sit louder (README.md, Level). The knee's output is then
+    // lifted 1.7 dB, to a ceiling of 0.395, the suites' shared loudness.
     back_to_full_rate(voice, sums, full, half, quarter, output);
     if (!step && !ringing && (!popping || (!bubbly && !voice.foam))) voice.quiet = 1;   // a single tap, rung out
 }

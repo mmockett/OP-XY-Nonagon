@@ -237,14 +237,15 @@ const i32 kHarmonicShare = 23000;
 // A landing's click (Q31 per unit of height at unit loudness, >> 8) and how hard
 // it knocks the modes (a right shift of height * shape * ring).
 const i32 kClickLevel = 2 << 21;
-// The output gain (Q31): a held note sits about as loud as Hexagon's Hollow,
-// and an eight-note chord peaks between 0.4 and 0.8 of full scale, as the
-// set's synths do. It is applied to each mode's amplitude as it is sounded
-// (sa and sb hold the sounded amplitude, gain applied), so the output needs
-// no multiply a sample; the rattle is mixed at its own level.
-const i32 kOutput = 1443000000;
+// The output gain (Q31, then x 8 at the output): a held note sits at the
+// suites' shared loudness (about -21 LUFS, 4.4 dB above Hexagon's Hollow of
+// old). It is applied to each mode's amplitude as it is sounded (sa and sb
+// hold the sounded amplitude, gain applied), so the output needs no multiply
+// a sample; the rattle is mixed at its own level, raised by the same 4.4 dB.
+const i32 kOutput = 1197391954;
 const i32 kRattleLimit = 3 << 26;
-const i32 kToneLimit = 90187499;  // the tone's clamp, (2^27 - 1) * kOutput
+const i32 kRattleLift = 1416452098;  // Q31: 0.66, so the rattle sounds at 1.66 x (+4.4 dB)
+const i32 kToneLimit = 74836996;  // the tone's clamp, (2^27 - 1) * kOutput: 0.28 of full scale out
 inline i32 sounded(i32 amplitude) { return multiply(amplitude, kOutput); }
 const u32 kKnock = 6;
 const u32 kBounce = 29;  // samples from a landing to its bounce (0.7 ms)
@@ -349,7 +350,7 @@ __attribute__((noinline)) bool rattle_of(Voice& voice, const i32* impulses, bool
     for (u32 i = 0; i < opxy::block_frames; i += 2) {
         y2 = bound(impulses[i] + 2 * multiply(y1, c1) - multiply(y2, c2), low, limit);
         y1 = bound(impulses[i + 1] + 2 * multiply(y2, c1) - multiply(y1, c2), low, limit);
-        // Each voice's rattle is clamped at a tenth of full scale, so coincident
+        // Each voice's rattle is clamped at a tenth of full scale (0.16 once lifted at the output), so coincident
         // heavy landings across a chord keep the set's headroom.
         rattle[i] = bound(y2, -kRattleLimit, kRattleLimit);
         rattle[i + 1] = bound(y1, -kRattleLimit, kRattleLimit);
@@ -358,11 +359,11 @@ __attribute__((noinline)) bool rattle_of(Voice& voice, const i32* impulses, bool
     voice.click2 = y2;
     return true;
 }
-// The output: the tone, within its clamp and scaled, and the rattle.
+// The output: the tone, within its clamp and scaled, and the rattle, lifted.
 template <bool Rattle>
 inline i32 output_of(i32 tone, const i32* rattle, u32 i) {
-    const i32 t = bound(tone, -kToneLimit, kToneLimit) << 2;
-    return Rattle ? bound(t + rattle[i], -kHalf, kHalf) : t;
+    const i32 t = bound(tone, -kToneLimit, kToneLimit) << 3;
+    return Rattle ? bound(t + rattle[i] + multiply(rattle[i], kRattleLift), -kHalf, kHalf) : t;
 }
 // The last half-band stage, to the full rate, writing the output: the half
 // rate's sum doubled (K = 3), plus the full rate's (waiting as long), plus the rattle.

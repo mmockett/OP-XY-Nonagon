@@ -22,7 +22,9 @@ OP-XY, their screens are checked against how it draws, and their CPU is
 measured on it (below). In v0.9.0 the seven synths' screens follow the
 track's amp envelope, which needs version 1.10 of the Open-XY SDK; Mach's
 flyby leaves the glass plate whole; and Mach, Butterfly and Ghost cost less
-at their peaks, with the same sound. Expect rough edges.
+at their peaks, with the same sound. In v0.9.2 Sand, Cocoa, Coin, Fermi,
+Mach, Butterfly and Drop play at the one loudness the Hexagon Suite shares.
+Expect rough edges.
 
 All nine are live in the [open-xy.com](https://open-xy.com) builder:
 [Sand](https://open-xy.com/#preview/machines/sand),
@@ -35,10 +37,9 @@ All nine are live in the [open-xy.com](https://open-xy.com) builder:
 [Butterfly](https://open-xy.com/#preview/machines/butterfly) and
 [Drop](https://open-xy.com/#preview/machines/drop). The builder installs the
 version the Open-XY catalog pins for each, which can be older than this
-repository's latest tag (`v0.9.0`): Sand `v0.5.0`; Cocoa, Coin, Fermi,
-Butterfly and Drop `v0.6.0`; Ghost and Recur `v0.7.0`; Mach `v0.7.2`. Sand,
-Cocoa, Coin, Fermi, Drop, Ghost and Recur are moving to v0.9.0, which needs
-SDK 1.10; until the builder has it, build v0.9.0 from source (below). The builder plays Recur's presets with
+repository's latest tag (`v0.9.2`). Sand, Cocoa, Coin, Fermi, Mach, Butterfly
+and Drop are moving to v0.9.2, and Ghost and Recur stay at v0.9.0; until the
+builder has a version, build it from source (below). The builder plays Recur's presets with
 no sample loaded, as it doesn't install a machine's own samples; a build from
 source opens them on its break.
 
@@ -294,9 +295,9 @@ Choose a synth on an instrument track, or Ghost or Recur on the sampler page.
 Press any encoder to switch between the two pages; Shift + turn makes fine
 steps. Each machine's presets show what it does; start there.
 
-Levels are matched to the Hexagon Suite: an eight-note chord on any preset
-peaks between about 0.4 and 0.8 of full scale, leaving room for the OP-XY's
-own filter and effects.
+The synths share one loudness with the Hexagon Suite and the Monomachine
+engines: a single held note at default volume sits about as loud on each,
+and every voice peaks at least 2 dB under the SDK's half-scale ceiling.
 
 Synths in the Open-XY SDK get no tempo, no note-off and no velocity, so
 Cocoa's taps, Drop's beat and Recur's rate run in their own units rather than

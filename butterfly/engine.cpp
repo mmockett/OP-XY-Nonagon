@@ -13,6 +13,7 @@
 // the note.
 namespace butterfly {
 const u32 ceiling_fade = 0x29cbc14eu, ceiling = 0x2e709de5u;   // 7.2 and 8 kHz: the half-rate bank's top
+const i32 lift = 51339;   // Q15: 1.567, the partials lifted 3.9 dB to the suites' shared loudness
 const i32 silence = 1 << 10;        // Q25: below this a partial is skipped
 // The half-band filter's odd-phase taps, Q15 (a 27-tap Kaiser-windowed sinc,
 // beta 5.5): flat to 8 kHz, its image of the bank 58 dB down above 14 kHz.
@@ -47,7 +48,7 @@ __attribute__((noinline)) void upsample(const i32* low, opxy::Output output) {
     for (u32 j = 0; j < half_frames; ++j) {
         const i32* x = low + j + halfband_taps - 1;
         const i32 between_samples = tap(x, 0) + tap(x, 1) + tap(x, 2) + tap(x, 3) + tap(x, 4) + tap(x, 5) + tap(x, 6);
-        output[2 * j] = x[0];
+        output[2 * j] = clamp(x[0], -(1 << 30), (1 << 30) - 1);
         output[2 * j + 1] = clamp(between_samples, -(1 << 29), (1 << 29) - 1) * 2;
     }
 }
@@ -137,8 +138,12 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
             gain = increment <= ceiling_fade ? 32768 : static_cast<i32>((((ceiling - increment) >> 16) * 112978u) >> 12);   // 32768 / 1188
         }
         i32 target = 0;
-        if (light && level > 0 && gain > 0)
-            target = ((((level * partial_share(gate_log, makeup, slope, place)) >> 15) * gain) >> 15) << 10;   // Q25
+        if (light && level > 0 && gain > 0) {
+            const i32 plain = (((level * partial_share(gate_log, makeup, slope, place)) >> 15) * gain) >> 15;   // Q15
+            // Lifted 3.9 dB to the suites' shared loudness; silence is judged
+            // before the lift, so the same partials sound as before.
+            target = plain << 10 < silence ? 0 : ((plain * lift) >> 15) << 10;   // Q25
+        }
         voice.amplitude[k] = target < silence ? 0 : target;
         const u32 step_phase = increment << 1;   // a half-rate sample
         u32 ph = voice.phase[k];
@@ -167,8 +172,9 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     }
     // Back to the full rate: each half-rate sample, then the half-band's
     // value between it and the next. The levels sum to at most 32767 (Q15),
-    // so the bank stays within half scale (Q30 here); the filter's sums run
-    // at half that.
+    // 1.567 x that once lifted, so the bank stays within 0.78 of full scale
+    // (Q30 here) and is held within half scale; the filter's sums run at half
+    // that. Spread phases keep a played note's peaks near 0.4.
     upsample(low, output);
     for (u32 i = 0; i < 2 * halfband_taps; ++i) low[i] = low[half_frames + i];
 }

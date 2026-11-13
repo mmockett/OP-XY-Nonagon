@@ -10,7 +10,7 @@
 //     modes, and leaves the note's energy as it was.
 //   - The partials sit at the chain's dispersion relation, stretched, or at
 //     harmonics with dispersion at 0.
-//   - Level, bounds and chords.
+//   - Level (the suites' shared loudness), bounds and chords.
 #include "../engine.cpp"
 #include <cmath>
 #include <cstdio>
@@ -441,7 +441,7 @@ void levels() {
         double ss = 0, top = 0, dc = 0;
         for (int i = 0; i < n; ++i) { ss += x[i] * x[i]; top = std::fabs(x[i]) > top ? std::fabs(x[i]) : top; dc += x[i]; }
         std::printf("level: A3 at energy %.1f, %.1f dBFS RMS, peak %.3f, DC %.1e\n", e, 10 * std::log10(ss / n), top, dc / n);
-        check(10 * std::log10(ss / n) > -27 && 10 * std::log10(ss / n) < -22, "a single A3 is not near -25 dBFS RMS");
+        check(10 * std::log10(ss / n) > -22 && 10 * std::log10(ss / n) < -17, "a single A3 is not near -20 dBFS RMS");
     }
     // An eight-note chord at energy 1, worst case for peaks.
     const double chord[8] = {48, 52, 55, 59, 60, 64, 67, 71};
@@ -455,7 +455,7 @@ void levels() {
     double top = 0;
     for (int i = 0; i < 44100 * 2; ++i) top = std::fabs(sum[i]) > top ? std::fabs(sum[i]) : top;
     std::printf("level: an eight-note chord at energy 0.5 peaks at %.2f of full scale\n", top);
-    check(top > 0.3 && top < 0.9, "an eight-note chord's peak is outside 0.3..0.9");
+    check(top > 0.54 && top < 1.62, "an eight-note chord's peak is outside 0.54..1.62 (0.3..0.9, lifted 5.1 dB)");
 }
 
 void bounded() {

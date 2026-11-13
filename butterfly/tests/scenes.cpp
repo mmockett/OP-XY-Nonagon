@@ -125,7 +125,9 @@ void play(const std::string& folder, const Scene& scene) {
     }
     const double n = static_cast<double>(mix.size());
     const double rms = std::sqrt(sum2 / n), dc = sum / n;
-    const bool ok = peak <= 0.9 && std::fabs(dc) < 1e-3;
+    // Under full scale, so the 16-bit WAVs never clip (the voices sit 3.9 dB
+    // higher than when this allowed 0.9).
+    const bool ok = peak <= 0.99 && std::fabs(dc) < 1e-3;
     std::printf("%s  %-14s %5.1f s: RMS %6.1f dBFS, peak %.2f, DC %+.5f\n", ok ? "ok  " : "FAIL", scene.name, scene.seconds,
                 20 * std::log10(rms + 1e-12), peak, dc);
     if (!ok) ++failures;

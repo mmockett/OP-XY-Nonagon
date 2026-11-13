@@ -6,7 +6,7 @@
 //  - sweeps of every control, and the wingbeat, have no clicks;
 //  - a note sounds in its first block, a pad holds, a struck note dies;
 //  - the lowest band sits on the key across the keyboard;
-//  - levels beside Moth's, and chords within full scale.
+//  - levels at the suites' shared loudness, and chords within bounds.
 #include "../engine.cpp"
 #include <algorithm>
 #include <cmath>
@@ -394,9 +394,9 @@ void levels() {
         for (u32 i = 0; i < 8; ++i) c[i] = presets[3].c[i];
     });
     const double struck = rms_db(bell.out, 0, 44100), held = rms_db(pad.out, 44100, 88200);
-    std::printf("      A3: Specimen %.1f dBFS RMS over its first second (Moth's Bell -27.8), Shimmer %.1f held (Lantern -23.3)\n",
-                struck, held);
-    check(struck > -30.5 && struck < -25 && held > -26 && held < -21, "single notes sit beside Moth's Bell and Lantern");
+    // The suites' shared loudness: 3.9 dB above Moth's Bell and Lantern of old.
+    std::printf("      A3: Specimen %.1f dBFS RMS over its first second, Shimmer %.1f held\n", struck, held);
+    check(struck > -26.6 && struck < -21.1 && held > -22.1 && held < -17.1, "single notes sit at the shared loudness");
     const double chord[8] = {130.8, 164.8, 196.0, 246.9, 261.6, 329.6, 392.0, 493.9};
     bool ok = true;
     for (const Preset& pr : presets) {
@@ -406,9 +406,9 @@ void levels() {
         double peak = 0;
         for (double x : r.out) peak = std::max(peak, std::fabs(x));
         std::printf("      chord of 8, %s: peak %.2f of full scale, a voice at most %.2f\n", pr.name, peak, r.peak);
-        if (peak > 0.85 || peak < 0.3 || r.peak > 0.5) ok = false;
+        if (peak > 1.33 || peak < 0.47 || r.peak > 0.5) ok = false;
     }
-    check(ok, "eight-note chords on every preset peak within 0.3-0.85 of full scale, each voice under half");
+    check(ok, "eight-note chords on every preset peak within 0.47-1.33 of full scale (0.3-0.85, lifted 3.9 dB), each voice under half");
 }
 
 // A ringing voice struck again fades out in one block first: no click.
