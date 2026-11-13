@@ -36,21 +36,21 @@ struct Scene {
     u32 expected;
 };
 const Scene scenes[] = {
-    {"defaults, C4", {0.5, 0.85, 0, 0.181, 0, 0.35, 0.55, 0.25}, 60, 8, 1, still, 0},
-    {"floating fast beats, A4", {0.5, 1.0, 0, 1.0, 0, 0.4, 0.55, 0.3}, 69, 6, 1, still, 0},
-    {"boiling, C3", {0.2, 1.0, 0, 1.0, 0, 0.4, 0.55, 0.3}, 48, 2, 1, still, 0},
-    {"at the point, full crackle", {0.36, 0.6, 0, 0.5, 0, 0.6, 0.4, 1.0}, 55, 4, 1, still, 0},
-    {"ratchet hops, slow beats", {0.7, 1.0, 0, 0.3, 1.0, 0.3, 0.7, 0.6}, 52, 8, 1, still, 0},
-    {"ethanol, thick vapour", {0.6, 0.7, 0.5, 0.6, 0.4, 1.0, 0.5, 0.5}, 72, 4, 1, still, 0},
-    {"nitrogen, high key", {0.9, 0.4, 1.0, 0.8, 0.2, 0.8, 0.4, 0.8}, 96, 3, 1, still, 0},
-    {"sphere, low key", {0.8, 0.0, 0, 0.5, 0, 0.1, 0.3, 0.2}, 24, 4, 1, still, 0},
-    {"hot, no crackle, no vapour", {1.0, 0.5, 0, 0.7, 0, 0.0, 0.2, 0.0}, 64, 3, 1, still, 0},
-    {"cold plate, bubbles", {0.0, 1.0, 0, 0.2, 0, 0.5, 1.0, 1.0}, 40, 2, 1, still, 0},
-    {"chord of five", {0.5, 0.85, 0, 0.4, 0.3, 0.4, 0.4, 0.4}, 50, 4, 5, still, 0},
-    {"vapour swept each block", {0.55, 0.9, 0.2, 0.5, 0, 0.5, 0.6, 0.3}, 57, 4, 1, vapour_sweep, 0},
-    {"key gliding", {0.5, 0.85, 0, 0.6, 0, 0.35, 0.6, 0.25}, 45, 4, 2, glide, 0},
-    {"re-dropped while ringing", {0.5, 0.9, 0, 0.7, 0.5, 0.45, 0.25, 0.5}, 62, 5, 2, redrop, 0},
-    {"every control wandering", {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}, 67, 6, 3, wander, 0},
+    {"defaults, C4", {0.5, 0.85, 0, 0.181, 0, 0.35, 0.55, 0.25}, 60, 8, 1, still, 0xa10a44fcu},
+    {"floating fast beats, A4", {0.5, 1.0, 0, 1.0, 0, 0.4, 0.55, 0.3}, 69, 6, 1, still, 0xdd23ee1cu},
+    {"boiling, C3", {0.2, 1.0, 0, 1.0, 0, 0.4, 0.55, 0.3}, 48, 2, 1, still, 0x86dcb744u},
+    {"at the point, full crackle", {0.36, 0.6, 0, 0.5, 0, 0.6, 0.4, 1.0}, 55, 4, 1, still, 0xa071cf33u},
+    {"ratchet hops, slow beats", {0.7, 1.0, 0, 0.3, 1.0, 0.3, 0.7, 0.6}, 52, 8, 1, still, 0x581834d0u},
+    {"ethanol, thick vapour", {0.6, 0.7, 0.5, 0.6, 0.4, 1.0, 0.5, 0.5}, 72, 4, 1, still, 0x81a90b0du},
+    {"nitrogen, high key", {0.9, 0.4, 1.0, 0.8, 0.2, 0.8, 0.4, 0.8}, 96, 3, 1, still, 0xd50cf281u},
+    {"sphere, low key", {0.8, 0.0, 0, 0.5, 0, 0.1, 0.3, 0.2}, 24, 4, 1, still, 0x52861d06u},
+    {"hot, no crackle, no vapour", {1.0, 0.5, 0, 0.7, 0, 0.0, 0.2, 0.0}, 64, 3, 1, still, 0xae89a6a2u},
+    {"cold plate, bubbles", {0.0, 1.0, 0, 0.2, 0, 0.5, 1.0, 1.0}, 40, 2, 1, still, 0x0d6fb7abu},
+    {"chord of five", {0.5, 0.85, 0, 0.4, 0.3, 0.4, 0.4, 0.4}, 50, 4, 5, still, 0x0cdbb182u},
+    {"vapour swept each block", {0.55, 0.9, 0.2, 0.5, 0, 0.5, 0.6, 0.3}, 57, 4, 1, vapour_sweep, 0x2a027c62u},
+    {"key gliding", {0.5, 0.85, 0, 0.6, 0, 0.35, 0.6, 0.25}, 45, 4, 2, glide, 0x923315b9u},
+    {"re-dropped while ringing", {0.5, 0.9, 0, 0.7, 0.5, 0.45, 0.25, 0.5}, 62, 5, 2, redrop, 0xab66b75fu},
+    {"every control wandering", {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}, 67, 6, 3, wander, 0x7766af38u},
 };
 }
 
@@ -93,9 +93,9 @@ int main() {
                 h = fnv(h, static_cast<i32>(voices[v].quiet));
             }
         }
-        const bool ok = s.expected == 0 || h == s.expected;
+        const bool ok = h == s.expected;
         std::printf("%s %-30s 0x%08xu (expected 0x%08xu)\n", ok ? "ok  " : "FAIL", s.name, h, s.expected);
         if (!ok) ++failures;
     }
-    return failures ? 1 : 1;   // LEARNING RUN: print the hashes
+    return failures ? 1 : 0;
 }
