@@ -183,6 +183,19 @@ inline bool still(const chain::Chain& c) {
     return widest < 4096;
 }
 
+// A new starting shape (a new seed, masses or mode), made once for every note
+// that shares it, with its modes' levels: the chain at rest in it, so dt does
+// not enter them. Out of line: it runs once a shape, not once a block.
+static __attribute__((noinline)) void make_start(Shared& shared, const chain::Setup& s, chain::Chain& c) {
+    chain::shape(shared.start, s);
+    chain::init(c, s, shared.start);
+    chain::Folded f;
+    chain::fold(c, f);
+    const u32 count = c.n < chain::voiced ? c.n : chain::voiced;
+    for (u32 k = 0; k < chain::voiced; ++k)
+        shared.level[k] = k < count ? chain::root(chain::energy(c, f, k + 1, s.shift)) << 4 : 0;   // Q16
+}
+
 inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
                    opxy::Parameters parameters, opxy::Pitch pitch) {
     using namespace sound;
@@ -205,10 +218,14 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         // the seed's nudge costs about 1,400 instructions at 32 masses.
         const u32 key = ((s.seed << 8) | (s.size << 4) | s.m) + 1;
         if (shared.key != key) {
-            chain::shape(shared.start, s);
+            make_start(shared, s, c);
             shared.key = key;
         }
         chain::init(c, s, shared.start);
+        // The first block sounds the starting shape's levels; the modes are
+        // measured from the next block, a third a block, as always.
+        for (u32 k = 0; k < chain::voiced; ++k) voice.level[k] = shared.level[k];
+        voice.turn = 0;
         voice.fresh = 0;
         voice.quiet = 0;
     }
@@ -225,17 +242,17 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     }
     const u32 steps = chain::advance(c, s);
     const u32 count = c.n < chain::voiced ? c.n : chain::voiced;
-    if (steps || load || s.loss) {
+    if (!load && (steps || s.loss)) {
         chain::Folded f;
         chain::fold(c, f);
         // Each level eases an eighth of the way (a 35 ms lag): at a fast clock
         // a mode's energy flickers within a block, and taking it raw would
         // roughen the partial; eased, chaos shimmers instead. A third of the
         // modes are measured a block, in turn.
-        voice.turn = load ? 0 : voice.turn == 2 ? 0 : voice.turn + 1;
-        for (u32 k = load ? 0 : voice.turn; k < chain::voiced; k += load ? 1 : 3) {
+        voice.turn = voice.turn == 2 ? 0 : voice.turn + 1;
+        for (u32 k = voice.turn; k < chain::voiced; k += 3) {
             const u32 now = k < count ? chain::root(chain::energy(c, f, k + 1, s.shift)) << 4 : 0;   // Q16
-            voice.level[k] = load ? now : voice.level[k] + ((static_cast<i32>(now - voice.level[k])) >> 3);
+            voice.level[k] = voice.level[k] + ((static_cast<i32>(now - voice.level[k])) >> 3);
         }
     }
 

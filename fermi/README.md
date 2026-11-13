@@ -278,6 +278,8 @@ integers only.
 - **Voicing.**
   - A third of the modes are projected each block, in turn. Each one's energy
     is the leapfrog's own invariant, exact for the linear chain.
+    A note's first block sounds the starting shape's levels, measured once
+    for every note that shares the shape.
   - Each partial's level is the square root of its mode's share (a table
     square root), eased an eighth of the way each time.
   - The lowest min(N, 10) modes are voiced. Partial k sits at the key times
@@ -383,7 +385,7 @@ masses or mode change). Ten voiced partials are what fit this budget.
   the 2040 KiB module region.
 - There is no division per sample, and none per block: the tilt's gain is a
   14-step long division, without the runtime's divide.
-- **Memory:** a voice is 560 bytes, the voices' shared starting shape and setup 288
+- **Memory:** a voice is 560 bytes, the voices' shared starting shape, its levels and the setup 328
   and the screen state 804.
 
 ## Tests
