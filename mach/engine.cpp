@@ -760,28 +760,81 @@ MACH_LOOP void bowed(Root& root, i32* out, const opxy::i16* t0, i32 inc, i32 sha
 
 // While a root sweeps, its steps and amplitudes move sample by sample: the
 // same values sound() gave 64 one-sample pieces (held() at c = 1..64, an
-// arithmetic progression), stepped here in one loop instead of 64 calls.
-template <bool image>
-MACH_LOOP void rung_swept(Root& root, i32* out, i32 s0, i32 d0, i32 s2, i32 d2, const i32* from, const i32* step) {
-    u32 hum = root.part[0], tierce = root.part[2];
-    i32 v0 = from[0] + 2 * step[0], v1 = from[1] + 2 * step[1], v2 = from[2] + 2 * step[2], v3 = from[3] + 2 * step[3];
-    const i32 e0 = 2 * step[0], e1 = 2 * step[1], e2 = 2 * step[2], e3 = 2 * step[3];
-    i32 st0 = s0 + d0, st2 = s2 + d2;
+// arithmetic progression), stepped here instead of 64 calls. A bell
+// partial's amplitude is from + 2 step (i + 1) at sample i, which it reads
+// halved: (from >> 1) + step (i + 1), within 16 bits (-63 .. 13107, half a
+// strength at most), so its product with the sine is 16 x 16.
+//
+// The ground's reflection, the hum and prime on one phase: one loop.
+MACH_LOOP void rung_swept_image(Root& root, i32* out, i32 s0, i32 d0, const i32* from, const i32* step) {
+    u32 hum = root.part[0];
+    i32 h0 = (from[0] >> 1) + step[0], h1 = (from[1] >> 1) + step[1];
+    const i32 e0 = step[0], e1 = step[1];
+    i32 st0 = s0 + d0;
+    const i32 dd = 2 * d0;
     i32 wave[substep];
     for (i32 i = 0; i < substep; ++i) {
         hum += static_cast<u32>(st0);
-        i32 x = tables::sine[hum >> 22] * (v0 >> 1) + tables::sine[(hum << 1) >> 22] * (v1 >> 1);
-        if (!image) {
-            tierce += static_cast<u32>(st2);
-            x += tables::sine[tierce >> 22] * (v2 >> 1) + tables::sine[(hum << 2) >> 22] * (v3 >> 1);
-        }
+        i32 x = tables::sine[hum >> 22] * static_cast<opxy::i16>(h0) + tables::sine[(hum << 1) >> 22] * static_cast<opxy::i16>(h1);
         x >>= 14;
         wave[i] = x;
-        st0 += 2 * d0; st2 += 2 * d2;
-        v0 += e0; v1 += e1; v2 += e2; v3 += e3;
+        st0 += dd;
+        h0 += e0; h1 += e1;
     }
     root.part[0] = hum;
-    root.part[2] = tierce;
+    air<substep>(root, out, wave);
+}
+
+// The straight bell, one partial a pass, so each pass's state fits the
+// Blackfin's registers: its phase (the hum's, shifted up an octave or two
+// for the prime and nominal, or the tierce's own) along its step's ramp,
+// and its amplitude along its own. The first pass writes the wave, the
+// others add to it, the last takes the sum's >> 14: the one loop's sum, as
+// no partial sum overflows (4 x 32767 x 13107 < 2^31). A partial silent
+// over the whole sub-step takes no pass.
+enum PassKind { FIRST = 1, LAST = 2 };
+template <int kind>
+MACH_LOOP void partial_swept(i32* wave, u32 phase, u32 st, u32 dd, i32 h, i32 e) {
+    for (i32 i = 0; i < substep; ++i) {
+        phase += st;
+        st += dd;
+        i32 x = tables::sine[phase >> 22] * static_cast<opxy::i16>(h);
+        h += e;
+        if (!(kind & FIRST)) x += *wave;
+        if (kind & LAST) x >>= 14;
+        *wave++ = x;
+    }
+}
+
+MACH_LOOP void rung_swept(Root& root, i32* out, i32 s0, i32 d0, i32 s2, i32 d2, const i32* from, const i32* step) {
+    // The partials in the order their passes run: hum, prime, nominal (the
+    // hum's phase up 0, 1, 2 octaves), then the tierce on its own phase.
+    const u32 order[4] = {0, 1, 3, 2};
+    u32 live[4];
+    u32 count = 0;
+    for (u32 j = 0; j < 4; ++j)
+        if (from[order[j]] || step[order[j]]) live[count++] = order[j];
+    i32 wave[substep];
+    if (!count) for (i32 i = 0; i < substep; ++i) wave[i] = 0;
+    for (u32 j = 0; j < count; ++j) {
+        const u32 k = live[j];
+        const bool tierce = k == 2;
+        const i32 s = tierce ? s2 : s0, d = tierce ? d2 : d0;
+        // Up an octave or two: the phase, its step and the step's change
+        // shifted alike (mod 2^32, (a + b) << n is (a << n) + (b << n)).
+        const u32 octaves = k == 3 ? 2 : k == 1 ? 1 : 0;
+        const u32 at = (tierce ? root.part[2] : root.part[0]) << octaves;
+        const u32 st = static_cast<u32>(s + d) << octaves, dd = static_cast<u32>(2 * d) << octaves;
+        const i32 h = (from[k] >> 1) + step[k], e = step[k];
+        const int kind = (j == 0 ? FIRST : 0) | (j + 1 == count ? LAST : 0);
+        if (kind == FIRST) partial_swept<FIRST>(wave, at, st, dd, h, e);
+        else if (kind == LAST) partial_swept<LAST>(wave, at, st, dd, h, e);
+        else if (kind) partial_swept<FIRST | LAST>(wave, at, st, dd, h, e);
+        else partial_swept<0>(wave, at, st, dd, h, e);
+    }
+    // Each phase where the ramp leaves it: 64 s + 4096 d.
+    root.part[0] += static_cast<u32>(s0) * static_cast<u32>(substep) + static_cast<u32>(d0) * static_cast<u32>(substep * substep);
+    root.part[2] += static_cast<u32>(s2) * static_cast<u32>(substep) + static_cast<u32>(d2) * static_cast<u32>(substep * substep);
     air<substep>(root, out, wave);
 }
 template <int formants, bool forward>
@@ -940,8 +993,8 @@ inline void sound(Voice& v, Root& root, i32* out) {
             i32 step[4];
             for (u32 j = 0; j < 4; ++j) step[j] = piece(root.amp_was[j], root.part_amp[j], bits);
             const i32 d0 = piece(root.part_inc[0], root.part_to[0], bits), d2 = piece(root.part_inc[2], root.part_to[2], bits);
-            if (root.image) rung_swept<true>(root, out, root.part_inc[0], d0, root.part_inc[2], d2, root.amp_was, step);
-            else rung_swept<false>(root, out, root.part_inc[0], d0, root.part_inc[2], d2, root.amp_was, step);
+            if (root.image) rung_swept_image(root, out, root.part_inc[0], d0, root.amp_was, step);
+            else rung_swept(root, out, root.part_inc[0], d0, root.part_inc[2], d2, root.amp_was, step);
         } else for (u32 c = 1; c <= pieces; ++c, out += n) {
             const i32 step0 = held(root.part_inc[0], root.part_to[0], c, bits, true);
             const i32 step2 = held(root.part_inc[2], root.part_to[2], c, bits, true);
