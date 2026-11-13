@@ -518,7 +518,7 @@ inline void flush(Voice& voice, opxy::Output output) {
 
 // What the fill and the cup alone set, worked out when they change: each
 // liquid mode's ratio and clear loss, and the wall's pitches and losses.
-inline void fill_cup(Voice& voice, i32 fill, u32 cup) {
+__attribute__((noinline)) void fill_cup(Voice& voice, i32 fill, u32 cup) {
     using namespace sound;
     if (voice.filled && fill == voice.filled_fill && cup == voice.filled_cup) return;
     const i32 depth = drink::along(tables::liquid_depth, fill);          // shallow drinks ring shorter
