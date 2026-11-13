@@ -28,15 +28,17 @@ const u32 cull_shift = 6;
 // beta 5.5): flat to 8 kHz, its image of the bank 58 dB down above 14 kHz.
 const i32 halfband[halfband_taps] = {20556, -6082, 2851, -1374, 597, -205, 38};
 
-// The bank's and the half-band's sample loops, functions of their own so the
+// The bank's and the half-bands' sample loops, functions of their own so the
 // Blackfin compiler makes each a zero-overhead hardware loop (inlined into
 // render's partial loop, the bank branched every sample).
 // Each sample reads the sine the sample before addressed, so the Blackfin
-// moves the index to an address register well ahead of its load.
+// moves the index to an address register well ahead of its load. N samples:
+// 32 at half rate, 16 at a quarter, 8 at an eighth.
+template <u32 N>
 __attribute__((noinline)) u32 bank(i32* acc, u32 ph, u32 step_phase, i32 g, i32 slide) {
     ph += step_phase;
     const opxy::i16* at = tables::sine + (ph >> (32 - tables::sine_bits));
-    for (u32 i = 0; i < half_frames; ++i) {
+    for (u32 i = 0; i < N; ++i) {
         const i32 s = *at;
         ph += step_phase;
         at = tables::sine + (ph >> (32 - tables::sine_bits));
@@ -45,11 +47,12 @@ __attribute__((noinline)) u32 bank(i32* acc, u32 ph, u32 step_phase, i32 g, i32 
     }
     return ph - step_phase;   // the phase after the block's last sample
 }
-inline i32 tap(const i32* x, i32 t) {
+inline i32 tap(const i32* x, i32 t, i32 h) {
     const i32 pair = (x[-t] >> 1) + (x[t + 1] >> 1);   // Q29
-    return static_cast<opxy::i16>(static_cast<u32>(pair + 16384) >> 15) * static_cast<opxy::i16>(halfband[t]);   // 16 bits of it, rounded (truncating would
+    return static_cast<opxy::i16>(static_cast<u32>(pair + 16384) >> 15) * static_cast<opxy::i16>(h);   // 16 bits of it, rounded (truncating would
                                                        // offset these samples: a tone at 22 kHz)
 }
+inline i32 tap(const i32* x, i32 t) { return tap(x, t, halfband[t]); }
 // Back to the full rate: each half-rate sample, then the half-band's value
 // between it and the next, its seven taps written out (a seven-step inner
 // loop is left branching).
@@ -60,6 +63,51 @@ __attribute__((noinline)) void upsample(const i32* low, opxy::Output output) {
         output[2 * j] = clamp(x[0], -(1 << 30), (1 << 30) - 1);
         output[2 * j + 1] = clamp(between_samples, -(1 << 29), (1 << 29) - 1) * 2;
     }
+}
+// The slower rates' stages: Sand's equiripple half-bands (images 72 dB down,
+// flat within 0.0003 dB to 1.385 kHz from an eighth and to 2.076 kHz from a
+// quarter of the rate), their odd-phase taps in Q15 and summed as tap() sums
+// the half-band to the full rate. From n inputs after 2K - 1 of history,
+// 2n outputs: each input in turn (K late) and the value between it and the next.
+const i32 taps4[4] = {20017, -4749, 1356, -248}, taps3[3] = {19528, -3736, 600};
+__attribute__((noinline)) void up_from_eighth(const i32* low, i32* out) {
+    for (u32 j = 0; j < half_frames / 4; ++j) {
+        const i32* x = low + j + 3;
+        const i32 between = tap(x, 0, taps4[0]) + tap(x, 1, taps4[1]) + tap(x, 2, taps4[2]) + tap(x, 3, taps4[3]);
+        out[2 * j] = x[0];
+        out[2 * j + 1] = clamp(between, -(1 << 29), (1 << 29) - 1) * 2;
+    }
+}
+__attribute__((noinline)) void up_from_quarter(const i32* low, i32* out) {
+    for (u32 j = 0; j < half_frames / 2; ++j) {
+        const i32* x = low + j + 2;
+        const i32 between = tap(x, 0, taps3[0]) + tap(x, 1, taps3[1]) + tap(x, 2, taps3[2]);
+        out[2 * j] = x[0];
+        out[2 * j + 1] = clamp(between, -(1 << 29), (1 << 29) - 1) * 2;
+    }
+}
+// The half-band to the full rate with the quarter stage's three taps about
+// the same middle, for blocks no partial at the half rate reaches: what they
+// hold is under 2.1 kHz, which these pass flat (to 4.15 kHz here, images
+// 72 dB down), so either filter can take over from the other at a block.
+__attribute__((noinline)) void upsample_low(const i32* low, opxy::Output output) {
+    for (u32 j = 0; j < half_frames; ++j) {
+        const i32* x = low + j + halfband_taps - 1;
+        const i32 between_samples = tap(x, 0, taps3[0]) + tap(x, 1, taps3[1]) + tap(x, 2, taps3[2]);
+        output[2 * j] = clamp(x[0], -(1 << 30), (1 << 30) - 1);
+        output[2 * j + 1] = clamp(between_samples, -(1 << 29), (1 << 29) - 1) * 2;
+    }
+}
+// A partial's rate, from its pitch (a full-rate increment): an eighth below
+// 1.385 kHz, a quarter below 2.076 kHz, else a half, where those stages pass
+// it flat. It moves to a slower rate again only 8% below those, so a partial
+// at a boundary does not hop to and fro.
+const u32 rate_up[2] = {202184855u, 134887295u}, rate_down[2] = {186010067u, 124096311u};
+inline u32 rate_for(u32 now, u32 increment) {
+    const u32 most = 3u - (increment >= rate_up[1]) - (increment >= rate_up[0]);     // the slowest that holds it
+    const u32 least = 3u - (increment >= rate_down[1]) - (increment >= rate_down[0]);
+    const u32 r = now > most ? most : now;
+    return r < least ? least : r;
 }
 static_assert(halfband_taps == 7, "upsample writes out seven taps");
 
@@ -73,6 +121,12 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
         voice.increment_step[k] = voice.level_step[k] = voice.power_step[k] = voice.dim_step[k] = 0;
     }
     for (u32 i = 0; i < half_frames + 2 * halfband_taps; ++i) voice.low[i] = 0;
+    for (u32 i = 0; i < eighth_history + half_frames / 4; ++i) voice.eighth[i] = 0;
+    for (u32 i = 0; i < quarter_history + half_frames / 2; ++i) voice.quarter[i] = 0;
+    for (u32 i = 0; i < quarter_wait; ++i) voice.quarter_late[i] = 0;
+    for (u32 i = 0; i < half_wait; ++i) voice.half_late[i] = 0;
+    for (u32 k = 0; k < partials; ++k) voice.rate[k] = 3;
+    voice.high = 0;
     voice.gate = 0;
     voice.blocks = 0;
     voice.beat = voice.beat_site = 0;
@@ -217,6 +271,7 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
         for (u32 k = 0; k < partials; ++k) {
             voice.phase[k] = common + k * 0x9e3779b9u;
             voice.amplitude[k] = 0;
+            voice.rate[k] = 3;
         }
         voice.gate = 0;
         voice.blocks = 0;
@@ -271,7 +326,12 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
 
     bool sounding = false, rendered = false;
     i32* low = voice.low;
-    i32* acc = low + 2 * halfband_taps;
+    i32* eighth = voice.eighth + eighth_history;   // the sums at each rate this block
+    i32 quarter_sum[half_frames / 2], half_sum[half_frames];
+    bool slow = false;   // any partial at a quarter or an eighth
+    for (u32 i = 0; i < half_frames / 4; ++i) eighth[i] = 0;
+    for (u32 i = 0; i < half_frames / 2; ++i) quarter_sum[i] = 0;
+    for (u32 i = 0; i < half_frames; ++i) half_sum[i] = 0;
     if (light || voice.sounding) {   // dark and every partial silent: no targets, no bank
         // Each partial's target: its level through the gate at its power and
         // darkening, faded at the ceiling.
@@ -293,7 +353,6 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
             target[k] = t;
         }
         const i32 line = loudest >> cull_shift > quiet ? loudest >> cull_shift : quiet;
-        for (u32 i = 0; i < half_frames; ++i) acc[i] = 0;
         for (u32 k = 0; k < partials; ++k) {
             const i32 a = voice.amplitude[k];
             const i32 target_k = target[k] >= (a ? line >> 1 : line) ? target[k] : 0;
@@ -301,8 +360,14 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
             if (!target_k && !a) continue;
             rendered = true;
             if (target_k) sounding = true;
-            // The bank: 32 samples at half rate, the amplitude ramped across them.
-            voice.phase[k] = bank(acc, voice.phase[k], voice.increment[k] << 1, a, (target_k - a) >> 5);
+            // The bank: the block's samples at the partial's rate, the amplitude ramped across them.
+            const u32 inc = voice.increment[k], rate = rate_for(voice.rate[k], inc);
+            voice.rate[k] = static_cast<u8>(rate);
+            if (rate == 3) voice.phase[k] = bank<half_frames / 4>(eighth, voice.phase[k], inc << 3, a, (target_k - a) >> 3);
+            else if (rate == 2) voice.phase[k] = bank<half_frames / 2>(quarter_sum, voice.phase[k], inc << 2, a, (target_k - a) >> 4);
+            else voice.phase[k] = bank<half_frames>(half_sum, voice.phase[k], inc << 1, a, (target_k - a) >> 5);
+            slow = slow || rate > 1;
+            if (rate == 1) voice.high = 3;   // it reaches the full-rate stage's window for three blocks
         }
     }
     voice.sounding = sounding ? 1 : 0;
@@ -310,22 +375,49 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
         voice.hush = 0;
         voice.sounding = 0;
     }
-    // Nothing played and no tail of the last block left: the filter would give zeros.
-    if (!rendered) {
-        u32 tail = 0;
-        for (u32 i = 0; i < 2 * halfband_taps; ++i) tail |= static_cast<u32>(low[i]);
-        if (!tail) {
-            for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = 0;
-            return;
-        }
-        for (u32 i = 0; i < half_frames; ++i) acc[i] = 0;
+    // What the stages still hold from the last blocks.
+    u32 slow_tail = 0, tail = 0;
+    for (u32 i = 0; i < eighth_history; ++i) slow_tail |= static_cast<u32>(voice.eighth[i]);
+    for (u32 i = 0; i < quarter_history; ++i) slow_tail |= static_cast<u32>(voice.quarter[i]);
+    for (u32 i = 0; i < quarter_wait; ++i) slow_tail |= static_cast<u32>(voice.quarter_late[i]);
+    for (u32 i = 0; i < 2 * halfband_taps; ++i) tail |= static_cast<u32>(low[i]);
+    for (u32 i = 0; i < half_wait; ++i) tail |= static_cast<u32>(voice.half_late[i]);
+    // Nothing played and nothing left in the stages: they would give zeros.
+    if (!rendered && !slow_tail && !tail) {
+        for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = 0;
+        return;
     }
+    // The slower rates up to the half rate, each faster sum joining when the
+    // slower ones have caught up with it, into the half-band to the full rate.
+    i32* to_half = low + 2 * halfband_taps;
+    if (slow || slow_tail) {
+        i32* q = voice.quarter + quarter_history;
+        up_from_eighth(voice.eighth, q);
+        for (u32 i = 0; i < quarter_wait; ++i) {
+            q[i] += voice.quarter_late[i];
+            q[quarter_wait + i] += quarter_sum[i];
+            voice.quarter_late[i] = quarter_sum[quarter_wait + i];
+        }
+        up_from_quarter(voice.quarter, to_half);
+        for (u32 i = 0; i < eighth_history; ++i) voice.eighth[i] = voice.eighth[half_frames / 4 + i];
+        for (u32 i = 0; i < quarter_history; ++i) voice.quarter[i] = voice.quarter[half_frames / 2 + i];
+    } else {
+        for (u32 i = 0; i < half_frames; ++i) to_half[i] = 0;
+    }
+    for (u32 i = 0; i < half_wait; ++i) to_half[i] += voice.half_late[i];
+    for (u32 i = half_wait; i < half_frames; ++i) to_half[i] += half_sum[i - half_wait];
+    for (u32 i = 0; i < half_wait; ++i) voice.half_late[i] = half_sum[half_frames - half_wait + i];
     // Back to the full rate: each half-rate sample, then the half-band's
     // value between it and the next. The levels sum to at most 32767 (Q15),
     // 1.567 x that once lifted, so the bank stays within 0.78 of full scale
     // (Q30 here) and is held within half scale; the filter's sums run at half
     // that. Spread phases keep a played note's peaks near 0.4.
-    upsample(low, output);
+    if (voice.high) {
+        upsample(low, output);
+        --voice.high;
+    } else {
+        upsample_low(low, output);
+    }
     for (u32 i = 0; i < 2 * halfband_taps; ++i) low[i] = low[half_frames + i];
 }
 }
