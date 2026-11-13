@@ -33,6 +33,7 @@ struct Voice {
     i32 quarter_late[quarter_wait];                    // the quarter rate's sum still to come
     i32 half_late[half_wait];                          // the half rate's sum still to come
     u32 high;                  // blocks a half-rate partial's sum still reaches the stage to the full rate
+    u32 quarter_live;          // 1 when a quarter-rate partial sounded last block (its sum waits)
     i32 gate;                  // the vactrol's cell, Q30
     u32 blocks;                // since the strike
     u32 beat, beat_site;       // the wingbeat's phases, Q32 turns

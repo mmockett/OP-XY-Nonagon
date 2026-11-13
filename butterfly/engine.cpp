@@ -128,7 +128,7 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
         voice.amplitude[k] = 0;
         voice.rate[k] = 3;
     }
-    voice.high = 0;
+    voice.high = voice.quarter_live = 0;
     voice.strikes = owner * 0x2545f491u;
     voice.struck = voice.sounding = voice.hush = 0;
     voice.stage = voice.still = 0;
@@ -346,11 +346,12 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     bool sounding = false, rendered = false;
     i32* low = voice.low;
     i32* eighth = voice.eighth + eighth_history;   // the sums at each rate this block
-    i32 quarter_sum[half_frames / 2], half_sum[half_frames];
+    i32 quarter_sum[half_frames / 2], half_sum[half_frames];   // cleared when a partial first needs them
     bool slow = false;   // any partial at a quarter or an eighth
+    bool quarter_used = false, half_used = false;
+    // Whether the quarter and half rates' sums still wait from the last blocks (else they are zeros).
+    const bool quarter_waits = voice.quarter_live != 0, half_waits = voice.high != 0;
     for (u32 i = 0; i < half_frames / 4; ++i) eighth[i] = 0;
-    for (u32 i = 0; i < half_frames / 2; ++i) quarter_sum[i] = 0;
-    for (u32 i = 0; i < half_frames; ++i) half_sum[i] = 0;
     if (!reading && (light || voice.sounding)) {   // dark and every partial silent: no targets, no bank
         // Each partial's target: its level through the gate at its power and
         // darkening, faded at the ceiling.
@@ -386,8 +387,19 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
             const u32 inc = voice.increment[k], rate = rate_for(voice.rate[k], inc);
             voice.rate[k] = static_cast<u8>(rate);
             if (rate == 3) voice.phase[k] = bank<half_frames / 4>(eighth, voice.phase[k], inc << 3, a, (target_k - a) >> 3);
-            else if (rate == 2) voice.phase[k] = bank<half_frames / 2>(quarter_sum, voice.phase[k], inc << 2, a, (target_k - a) >> 4);
-            else voice.phase[k] = bank<half_frames>(half_sum, voice.phase[k], inc << 1, a, (target_k - a) >> 5);
+            else if (rate == 2) {
+                if (!quarter_used) {
+                    for (u32 i = 0; i < half_frames / 2; ++i) quarter_sum[i] = 0;
+                    quarter_used = true;
+                }
+                voice.phase[k] = bank<half_frames / 2>(quarter_sum, voice.phase[k], inc << 2, a, (target_k - a) >> 4);
+            } else {
+                if (!half_used) {
+                    for (u32 i = 0; i < half_frames; ++i) half_sum[i] = 0;
+                    half_used = true;
+                }
+                voice.phase[k] = bank<half_frames>(half_sum, voice.phase[k], inc << 1, a, (target_k - a) >> 5);
+            }
             slow = slow || rate > 1;
             if (rate == 1) voice.high = 3;   // it reaches the full-rate stage's window for three blocks
         }
@@ -401,9 +413,11 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     u32 slow_tail = 0, tail = 0;
     for (u32 i = 0; i < eighth_history; ++i) slow_tail |= static_cast<u32>(voice.eighth[i]);
     for (u32 i = 0; i < quarter_history; ++i) slow_tail |= static_cast<u32>(voice.quarter[i]);
-    for (u32 i = 0; i < quarter_wait; ++i) slow_tail |= static_cast<u32>(voice.quarter_late[i]);
+    if (quarter_waits)
+        for (u32 i = 0; i < quarter_wait; ++i) slow_tail |= static_cast<u32>(voice.quarter_late[i]);
     for (u32 i = 0; i < 2 * halfband_taps; ++i) tail |= static_cast<u32>(low[i]);
-    for (u32 i = 0; i < half_wait; ++i) tail |= static_cast<u32>(voice.half_late[i]);
+    if (half_waits)
+        for (u32 i = 0; i < half_wait; ++i) tail |= static_cast<u32>(voice.half_late[i]);
     // Nothing played and nothing left in the stages: they would give zeros.
     if (!rendered && !slow_tail && !tail) {
         for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = 0;
@@ -415,10 +429,15 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     if (slow || slow_tail) {
         i32* q = voice.quarter + quarter_history;
         up_from_eighth(voice.eighth, q);
-        for (u32 i = 0; i < quarter_wait; ++i) {
-            q[i] += voice.quarter_late[i];
-            q[quarter_wait + i] += quarter_sum[i];
-            voice.quarter_late[i] = quarter_sum[quarter_wait + i];
+        if (quarter_waits)
+            for (u32 i = 0; i < quarter_wait; ++i) q[i] += voice.quarter_late[i];
+        if (quarter_used) {
+            for (u32 i = 0; i < quarter_wait; ++i) {
+                q[quarter_wait + i] += quarter_sum[i];
+                voice.quarter_late[i] = quarter_sum[quarter_wait + i];
+            }
+        } else if (quarter_waits) {
+            for (u32 i = 0; i < quarter_wait; ++i) voice.quarter_late[i] = 0;
         }
         up_from_quarter(voice.quarter, to_half);
         for (u32 i = 0; i < eighth_history; ++i) voice.eighth[i] = voice.eighth[half_frames / 4 + i];
@@ -426,9 +445,15 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     } else {
         for (u32 i = 0; i < half_frames; ++i) to_half[i] = 0;
     }
-    for (u32 i = 0; i < half_wait; ++i) to_half[i] += voice.half_late[i];
-    for (u32 i = half_wait; i < half_frames; ++i) to_half[i] += half_sum[i - half_wait];
-    for (u32 i = 0; i < half_wait; ++i) voice.half_late[i] = half_sum[half_frames - half_wait + i];
+    voice.quarter_live = quarter_used ? 1 : 0;
+    if (half_waits)
+        for (u32 i = 0; i < half_wait; ++i) to_half[i] += voice.half_late[i];
+    if (half_used) {
+        for (u32 i = half_wait; i < half_frames; ++i) to_half[i] += half_sum[i - half_wait];
+        for (u32 i = 0; i < half_wait; ++i) voice.half_late[i] = half_sum[half_frames - half_wait + i];
+    } else if (half_waits) {
+        for (u32 i = 0; i < half_wait; ++i) voice.half_late[i] = 0;
+    }
     // Back to the full rate: each half-rate sample, then the half-band's
     // value between it and the next. The levels sum to at most 32767 (Q15),
     // 1.567 x that once lifted, so the bank stays within 0.78 of full scale
