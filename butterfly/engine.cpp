@@ -112,31 +112,27 @@ inline u32 rate_for(u32 now, u32 increment) {
 static_assert(halfband_taps == 7, "upsample writes out seven taps");
 
 // Callbacks run serially per voice; owner is a stable nonzero voice ID.
+// What initialize() leaves alone a note's first block sets before reading
+// it: the strike resets the phases, amplitudes, gate and wingbeat, and the
+// whole reading (stale) lands every partial at once. So it clears only the
+// stages' sums and the flags, and a voice's first block writes no more than
+// it needs (the SDK has already cleared it on the OP-XY; a browser preview
+// reuses one).
 inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
-    for (u32 k = 0; k < partials; ++k) {
-        voice.phase[k] = 0;
-        voice.amplitude[k] = 0;
-        voice.increment[k] = voice.ratio[k] = 0;
-        voice.level[k] = voice.power[k] = voice.dim[k] = 0;
-        voice.increment_step[k] = voice.level_step[k] = voice.power_step[k] = voice.dim_step[k] = 0;
-    }
     for (u32 i = 0; i < half_frames + 2 * halfband_taps; ++i) voice.low[i] = 0;
     for (u32 i = 0; i < eighth_history + half_frames / 4; ++i) voice.eighth[i] = 0;
     for (u32 i = 0; i < quarter_history + half_frames / 2; ++i) voice.quarter[i] = 0;
     for (u32 i = 0; i < quarter_wait; ++i) voice.quarter_late[i] = 0;
     for (u32 i = 0; i < half_wait; ++i) voice.half_late[i] = 0;
-    for (u32 k = 0; k < partials; ++k) voice.rate[k] = 3;
+    for (u32 k = 0; k < partials; ++k) {
+        voice.amplitude[k] = 0;
+        voice.rate[k] = 3;
+    }
     voice.high = 0;
-    voice.gate = 0;
-    voice.blocks = 0;
-    voice.beat = voice.beat_site = 0;
     voice.strikes = owner * 0x2545f491u;
     voice.struck = voice.sounding = voice.hush = 0;
     voice.stage = voice.still = 0;
-    voice.loudest = 0;
     voice.stale = 1;
-    voice.note = 0;
-    for (u32 i = 0; i < 5; ++i) voice.sampled[i] = 0;
 }
 // A note-on is the strike. There is no note-off: the gate holds while the
 // note sounds, and the OP-XY's amp envelope ends it.
