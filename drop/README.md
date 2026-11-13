@@ -289,11 +289,11 @@ voice at the midpoint measured **2.95%** on average and **7.02%** in its
 worst single block.
 
 Since then a block runs as passes over block buffers, each a loop the
-Blackfin's registers hold: the noise, the crackle, the
-beats, the jet's noise blown, the jet into the pipe (at half the rate), the
-pipe, the crackle and hiss as heard, the gated tone and the knee. Counted in
-the compiled code, a sounding voice runs about 250 instructions a sample
-in those loops, with about 6 stack loads and stores; the one loop before
+Blackfin's registers hold: the noise, the crackle, the beats, the jet's
+noise blown, the jet into the pipe (at half the rate), the pipe, the
+crackle and hiss as heard, the gated tone and the knee. Counted in the
+compiled code, a sounding voice runs about 255 to 270 instructions a sample
+in those loops, with about 8 stack loads and stores; the one loop before
 held about 340 and 70. That is not yet measured on an OP-XY.
 
 - `tools/cpu.py` is the SDK's host estimate, which has read well under the
