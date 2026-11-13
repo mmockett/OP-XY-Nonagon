@@ -114,6 +114,22 @@ __attribute__((noinline)) void finish(const i32* sum, opxy::Output output, i32 m
     }
 }
 
+// The tilt's gain, min(num / lean, 16384), for num < 2^28 and 0 < lean < 2^16,
+// without the runtime's divide: past the clamp it is the clamp, and under it
+// the quotient has 14 bits, which long division finds in 14 compares.
+inline u32 tilt_gain(u32 num, u32 lean) {
+    u32 d = lean << 14;
+    if (num >= d) return 16384;
+    u32 q = 0;
+    for (u32 i = 0; i < 14; ++i) {
+        d >>= 1;
+        const u32 take = num >= d;
+        num -= d & (0u - take);
+        q = (q << 1) | take;
+    }
+    return q;
+}
+
 inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
                    opxy::Parameters parameters, opxy::Pitch pitch) {
     using namespace sound;
@@ -175,8 +191,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         leaned += b * b;
     }
     const u32 lean = chain::root(leaned);
-    u32 hold = lean ? (chain::root(plain) << 12) / lean : 4096;   // Q12, once a block
-    hold = hold > 16384 ? 16384 : hold;
+    const u32 hold = lean ? tilt_gain(chain::root(plain) << 12, lean) : 4096;   // Q12, once a block
     // The increments (and their fades) change only with the pitch, the
     // dispersion, the springs or the chain.
     const u32 third = fade_to / 3;   // the body's third harmonic stays under 0.45 of the rate

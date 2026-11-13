@@ -370,7 +370,8 @@ masses or mode change). Ten voiced partials are what fit this budget.
 
 - `sdk.py test --firmware` compiles for the Blackfin: Fermi is 89.6 KiB of
   the 2040 KiB module region.
-- There is no division per sample, and one per block (the tilt's gain).
+- There is no division per sample, and none per block: the tilt's gain is a
+  14-step long division, without the runtime's divide.
 - **Memory:** a voice is 556 bytes, the voices' shared starting shape and setup 288
   and the screen state 804.
 
