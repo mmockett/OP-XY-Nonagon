@@ -92,16 +92,6 @@ inline i32 root30(u32 x) {
     return (a + (((b - a) * static_cast<i32>(frac)) >> 16)) >> (even >> 1);
 }
 
-// Two tables' lookups at one phase, t1 `gap` entries after t0: lookup()'s
-// arithmetic, with the index worked out once.
-inline void lookup2(const opxy::i16* t0, i32 gap, u32 phase, i32& a, i32& b) {
-    const opxy::i16* q = t0 + (phase >> 23);
-    const i32 frac = static_cast<i32>((phase >> 8) & 0x7fff);
-    const i32 a0 = q[0], b0 = q[1], a1 = q[gap], b1 = q[gap + 1];
-    a = a0 + (((b0 - a0) * frac) >> 15);
-    b = a1 + (((b1 - a1) * frac) >> 15);
-}
-
 // Table lookup with linear interpolation (512 samples a cycle, a guard sample).
 inline i32 lookup(const opxy::i16* t, u32 phase) {
     const u32 at = phase >> 23;
@@ -698,71 +688,108 @@ MACH_LOOP void rung(Root& root, i32* out, i32 step0, i32 step2, const i32* amp) 
 // would); each formant's phase is the fundamental's times its ratio, exact at
 // the sub-step's start and at every period's wrap, stepped between. The
 // ground's reflection keeps the first formant: the ground takes the highs.
+// The fundamental's and formants' phases one sample on: a formant resyncs
+// to the fundamental where it wraps (in the direction it runs), and steps
+// on between.
+template <int formants, bool forward>
+inline void voiced(u32& ph, u32 rise, u32& f0, u32& f1, u32& f2, u32 r0, u32 r1, u32 r2, u32 i0, u32 i1, u32 i2) {
+    const u32 before = ph;
+    ph += rise;
+    if (forward ? ph < before : ph > before) {
+        f0 = shr(umul(ph, r0), 16);
+        if (formants > 1) f1 = shr(umul(ph, r1), 16);
+        if (formants > 2) f2 = shr(umul(ph, r2), 16);
+    } else {
+        f0 += i0;
+        if (formants > 1) f1 += i1;
+        if (formants > 2) f2 += i2;
+    }
+}
+
+// The voice's loops work out each sample's table addresses a sample ahead,
+// so no read waits on its address (the last sample's reads are one past),
+// and leave the fundamental's phase one step back. The formants' phases
+// start from the fundamental's at every sub-step (sound()), so they aren't
+// kept.
 template <int formants, int n, bool forward>
-MACH_LOOP void sung(Root& root, i32* out, u32 rise, const i32* inc, const i32* amp, u32* f) {
+MACH_LOOP void sung(Root& root, i32* out, u32 rise, const i32* inc, const i32* amp, const u32* f) {
+    const opxy::i16* const sine = tables::sine;
     const u32 r0 = root.ratio[0], r1 = root.ratio[1], r2 = root.ratio[2];
     const opxy::i16 a0 = static_cast<opxy::i16>(amp[0]), a1 = static_cast<opxy::i16>(amp[1]), a2 = static_cast<opxy::i16>(amp[2]);
     const u32 i0 = static_cast<u32>(inc[0]), i1 = static_cast<u32>(inc[1]), i2 = static_cast<u32>(inc[2]);
     u32 ph = root.phase, f0 = f[0], f1 = f[1], f2 = f[2];
+    voiced<formants, forward>(ph, rise, f0, f1, f2, r0, r1, r2, i0, i1, i2);
+    const opxy::i16 *pw = tables::pulse + (ph >> 22), *p0 = sine + (f0 >> 22), *p1 = sine + (f1 >> 22), *p2 = sine + (f2 >> 22);
     i32 wave[n];
+    i32* w = wave;
     for (i32 i = 0; i < n; ++i) {
-        const u32 before = ph;
-        ph += rise;
-        if (forward ? ph < before : ph > before) {
-            f0 = shr(umul(ph, r0), 16);
-            if (formants > 1) f1 = shr(umul(ph, r1), 16);
-            if (formants > 2) f2 = shr(umul(ph, r2), 16);
-        } else {
-            f0 += i0;
-            if (formants > 1) f1 += i1;
-            if (formants > 2) f2 += i2;
-        }
-        const i32 w = tables::pulse[ph >> 22];
-        i32 sum = tables::sine[f0 >> 22] * a0;
-        if (formants > 1) sum += tables::sine[f1 >> 22] * a1;
-        if (formants > 2) sum += tables::sine[f2 >> 22] * a2;
-        const i32 x = ((sum >> 15) * w) >> 15;
-        wave[i] = x;
+        const i32 window = *pw;
+        i32 sum = *p0 * a0;
+        if (formants > 1) sum += *p1 * a1;
+        if (formants > 2) sum += *p2 * a2;
+        voiced<formants, forward>(ph, rise, f0, f1, f2, r0, r1, r2, i0, i1, i2);
+        pw = tables::pulse + (ph >> 22);
+        p0 = sine + (f0 >> 22);
+        if (formants > 1) p1 = sine + (f1 >> 22);
+        if (formants > 2) p2 = sine + (f2 >> 22);
+        *w++ = ((sum >> 15) * window) >> 15;
     }
-    root.phase = ph;
-    f[0] = f0; f[1] = f1; f[2] = f2;
+    root.phase = ph - rise;
     air<n>(root, out, wave);
 }
 
 // A wavetable source: two levels crossfading.
 template <int n>
 MACH_LOOP void played(Root& root, i32* out, const opxy::i16* t0, const opxy::i16* t1, i32 inc, i32 mix) {
-    u32 ph = root.phase;
+    // Two levels' lookups at one phase, each sample's addresses and fraction
+    // a sample ahead (the last sample reads one past, within the table).
+    const i32 fade = mix >> 5;
+    u32 ph = root.phase + static_cast<u32>(inc);
+    const opxy::i16 *q = t0 + (ph >> 23), *q1 = t1 + (ph >> 23);
+    i32 frac = static_cast<i32>((ph >> 8) & 0x7fff);
     i32 wave[n];
-    const i32 fade = mix >> 5, gap = static_cast<i32>(t1 - t0);
+    i32* w = wave;
     for (i32 i = 0; i < n; ++i) {
+        const i32 a0 = q[0], b0 = q[1], a1 = q1[0], b1 = q1[1], fr = frac;
         ph += static_cast<u32>(inc);
-        i32 a, b;
-        lookup2(t0, gap, ph, a, b);
-        const i32 x = a + (((b - a) * fade) >> 15);
-        wave[i] = x;
+        q = t0 + (ph >> 23);
+        q1 = t1 + (ph >> 23);
+        frac = static_cast<i32>((ph >> 8) & 0x7fff);
+        const i32 a = a0 + (((b0 - a0) * fr) >> 15), b = a1 + (((b1 - a1) * fr) >> 15);
+        *w++ = a + (((b - a) * fade) >> 15);
     }
-    root.phase = ph;
+    root.phase = ph - static_cast<u32>(inc);
     air<n>(root, out, wave);
 }
 
 // The pad: two oscillators on one level, 0.3% apart. The ground's reflection
 // of a wavetable source (sharp 0): one level, one oscillator.
+// The addresses and fractions a sample ahead (the last sample reads one
+// past); the second oscillator's phase moves by 0 when it has none.
 template <int n>
 MACH_LOOP void bowed(Root& root, i32* out, const opxy::i16* t0, i32 inc, i32 sharp) {
-    u32 ph = root.phase, ph2 = root.part[0];
+    u32 ph = root.phase + static_cast<u32>(inc), ph2 = root.part[0] + static_cast<u32>(sharp);
+    const opxy::i16 *q = t0 + (ph >> 23), *q2 = t0 + (ph2 >> 23);
+    i32 frac = static_cast<i32>((ph >> 8) & 0x7fff), frac2 = static_cast<i32>((ph2 >> 8) & 0x7fff);
     i32 wave[n];
+    i32* w = wave;
     for (i32 i = 0; i < n; ++i) {
-        ph += static_cast<u32>(inc);
-        i32 x = lookup(t0, ph);
+        const i32 a = q[0], b = q[1], fr = frac;
+        i32 x;
         if (sharp) {
+            const i32 a2 = q2[0], b2 = q2[1], fr2 = frac2;
             ph2 += static_cast<u32>(sharp);
-            x = (x + lookup(t0, ph2)) >> 1;
-        }
-        wave[i] = x;
+            q2 = t0 + (ph2 >> 23);
+            frac2 = static_cast<i32>((ph2 >> 8) & 0x7fff);
+            x = (a + (((b - a) * fr) >> 15) + (a2 + (((b2 - a2) * fr2) >> 15))) >> 1;
+        } else x = a + (((b - a) * fr) >> 15);
+        ph += static_cast<u32>(inc);
+        q = t0 + (ph >> 23);
+        frac = static_cast<i32>((ph >> 8) & 0x7fff);
+        *w++ = x;
     }
-    root.phase = ph;
-    root.part[0] = ph2;
+    root.phase = ph - static_cast<u32>(inc);
+    root.part[0] = ph2 - static_cast<u32>(sharp);
     air<n>(root, out, wave);
 }
 
@@ -859,52 +886,54 @@ MACH_LOOP void rung_swept(Root& root, i32* out, i32 s0, i32 d0, i32 s2, i32 d2, 
     air<substep>(root, out, wave);
 }
 template <int formants, bool forward>
-MACH_LOOP void sung_swept(Root& root, i32* out, u32 rise, const i32* inc, const i32* from, const i32* step, u32* f) {
+MACH_LOOP void sung_swept(Root& root, i32* out, u32 rise, const i32* inc, const i32* from, const i32* step, const u32* f) {
+    const opxy::i16* const sine = tables::sine;
     const u32 r0 = root.ratio[0], r1 = root.ratio[1], r2 = root.ratio[2];
     i32 a0 = from[0] + 2 * step[0], a1 = from[1] + 2 * step[1], a2 = from[2] + 2 * step[2];
     const i32 e0 = 2 * step[0], e1 = 2 * step[1], e2 = 2 * step[2];
     const u32 i0 = static_cast<u32>(inc[0]), i1 = static_cast<u32>(inc[1]), i2 = static_cast<u32>(inc[2]);
     u32 ph = root.phase, f0 = f[0], f1 = f[1], f2 = f[2];
+    voiced<formants, forward>(ph, rise, f0, f1, f2, r0, r1, r2, i0, i1, i2);
+    const opxy::i16 *pw = tables::pulse + (ph >> 22), *p0 = sine + (f0 >> 22), *p1 = sine + (f1 >> 22), *p2 = sine + (f2 >> 22);
     i32 wave[substep];
+    i32* w = wave;
     for (i32 i = 0; i < substep; ++i) {
-        const u32 before = ph;
-        ph += rise;
-        if (forward ? ph < before : ph > before) {
-            f0 = shr(umul(ph, r0), 16);
-            if (formants > 1) f1 = shr(umul(ph, r1), 16);
-            if (formants > 2) f2 = shr(umul(ph, r2), 16);
-        } else {
-            f0 += i0;
-            if (formants > 1) f1 += i1;
-            if (formants > 2) f2 += i2;
-        }
-        const i32 w = tables::pulse[ph >> 22];
-        i32 sum = tables::sine[f0 >> 22] * a0;
-        if (formants > 1) sum += tables::sine[f1 >> 22] * a1;
-        if (formants > 2) sum += tables::sine[f2 >> 22] * a2;
-        const i32 x = ((sum >> 15) * w) >> 15;
-        wave[i] = x;
+        const i32 window = *pw;
+        i32 sum = *p0 * a0;
+        if (formants > 1) sum += *p1 * a1;
+        if (formants > 2) sum += *p2 * a2;
+        voiced<formants, forward>(ph, rise, f0, f1, f2, r0, r1, r2, i0, i1, i2);
+        pw = tables::pulse + (ph >> 22);
+        p0 = sine + (f0 >> 22);
+        if (formants > 1) p1 = sine + (f1 >> 22);
+        if (formants > 2) p2 = sine + (f2 >> 22);
+        *w++ = ((sum >> 15) * window) >> 15;
         a0 += e0; a1 += e1; a2 += e2;
     }
-    root.phase = ph;
-    f[0] = f0; f[1] = f1; f[2] = f2;
+    root.phase = ph - rise;
     air<substep>(root, out, wave);
 }
 MACH_LOOP void played_swept(Root& root, i32* out, const opxy::i16* t0, const opxy::i16* t1, i32 inc, i32 dinc, i32 mix, i32 dmix) {
-    u32 ph = root.phase;
-    i32 wave[substep];
     i32 in = inc + dinc, mx = mix + dmix;
-    const i32 gap = static_cast<i32>(t1 - t0);
+    u32 ph = root.phase + static_cast<u32>(in);
+    in += 2 * dinc;
+    const opxy::i16 *q = t0 + (ph >> 23), *q1 = t1 + (ph >> 23);
+    i32 frac = static_cast<i32>((ph >> 8) & 0x7fff);
+    i32 wave[substep];
+    i32* w = wave;
     for (i32 i = 0; i < substep; ++i) {
+        const i32 a0 = q[0], b0 = q[1], a1 = q1[0], b1 = q1[1], fr = frac;
         ph += static_cast<u32>(in);
+        in += 2 * dinc;
+        q = t0 + (ph >> 23);
+        q1 = t1 + (ph >> 23);
+        frac = static_cast<i32>((ph >> 8) & 0x7fff);
         const i32 fade = mx >> 5;
-        i32 a, b;
-        lookup2(t0, gap, ph, a, b);
-        const i32 x = a + (((b - a) * fade) >> 15);
-        wave[i] = x;
-        in += 2 * dinc; mx += 2 * dmix;
+        const i32 a = a0 + (((b0 - a0) * fr) >> 15), b = a1 + (((b1 - a1) * fr) >> 15);
+        *w++ = a + (((b - a) * fade) >> 15);
+        mx += 2 * dmix;
     }
-    root.phase = ph;
+    root.phase += static_cast<u32>(inc) * static_cast<u32>(substep) + static_cast<u32>(dinc) * static_cast<u32>(substep * substep);
     air<substep>(root, out, wave);
 }
 MACH_LOOP void bowed_swept(Root& root, i32* out, const opxy::i16* t0, i32 inc, i32 dinc, i32 sharp, i32 dsharp, bool pad) {
