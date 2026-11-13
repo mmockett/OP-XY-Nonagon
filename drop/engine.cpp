@@ -53,6 +53,13 @@ inline i32 clamp(i32 v, i32 low, i32 high) { return v < low ? low : v > high ? h
 inline i32 magnitude(i32 v) { return v < 0 ? -v : v; }
 // v / 3, truncating as C does, for |v| < 32768, without the Blackfin's divide call.
 inline i32 third(i32 v) { return ((v * 21846) >> 16) - (v >> 31); }
+// Clears the pipe's line two samples a store, not one (the line is 4-byte
+// aligned: Voice holds only 4-byte fields before it).
+typedef u32 __attribute__((may_alias)) pair_of_samples;
+inline void clear(i16* line) {
+    pair_of_samples* pairs = reinterpret_cast<pair_of_samples*>(line);
+    for (u32 i = 0; i < pipe_length / 2; ++i) pairs[i] = 0;
+}
 // a * b for values that fit 16 bits: the Blackfin's single-cycle 16 x 16
 // multiply, where GCC would otherwise emit a 32-bit one. The same product.
 inline i32 mul16(i32 a, i32 b) { return static_cast<i32>(static_cast<i16>(a)) * static_cast<i16>(b); }
@@ -462,7 +469,7 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     voice.figured = -1;
     voice.crack_last = voice.hiss_last = 0;
     voice.dc_in = voice.dc_out = 0;
-    for (u32 i = 0; i < pipe_length; ++i) voice.pipe[i] = 0;
+    sound::clear(voice.pipe);
 }
 
 // Each note drops a new drop, which lands on the next block. A pipe still
@@ -649,7 +656,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         voice.quiet = 1;
         if (voice.counted && shared.sounding) --shared.sounding;
         voice.counted = 0;
-        for (u32 i = 0; i < pipe_length; ++i) voice.pipe[i] = 0;
+        clear(voice.pipe);
         voice.ap_in = voice.ap_out = voice.f1 = voice.f2 = voice.e1 = voice.e2 = voice.e3 = 0;
         voice.jet = voice.spark = voice.pulse = voice.soft_crack = voice.softer_crack = voice.settled = voice.hold = voice.held = voice.lowest = voice.jet_lp = 0;
         voice.dc_in = voice.dc_out = voice.crack_last = voice.hiss_last = 0;
