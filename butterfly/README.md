@@ -154,9 +154,14 @@ integer and 32-bit only, with no division.
   - Both members of a mirror pair whose energies agree to 2^−10 ring at one
     pitch: one carries both weights and the other is silent.
   - The engine reads the spectrum trilinearly, across flux, coupling and the
-    struck site, matching states by rank, every block.
-  - The tables come to about 106 KB: 17 KB of energies, 77 KB of amplitudes,
-    the 8 KB sine and small ones. They are defined once (`tables_data.h`,
+    struck site, matching states by rank.
+  - It reads it a stage a block, over eight blocks (a strike reads it whole
+    in its first block, which sounds nothing new: the note sounds from its
+    second, 1.45 ms on), and each partial ramps to where a reading puts it
+    across the next eight (11.6 ms). The gate and the pitch follow every
+    block. With the wingbeat at 0 and the controls still, the reading rests.
+  - The tables come to about 100 KB: 17 KB of energies, 77 KB of amplitudes,
+    the 2 KB sine and small ones. They are defined once (`tables_data.h`,
     included by `engine.cpp`), so the engine's object and the display's share
     them.
 - **The key** is the lowest band's middle, weighted as the strike excites it.
@@ -185,11 +190,22 @@ integer and 32-bit only, with no division.
     up by tilt × 1 dB, never above a partial's own level, so the note keeps
     its loudness and the levels' sum its headroom).
 - **The bank.**
-  - The 17 partials run at half the sample rate, 32 samples a block, as
-    sine-table oscillators, each amplitude ramped across the block.
-  - A 27-tap half-band (a Kaiser sinc, beta 5.5, rounded) doubles the rate
-    back: flat to 8 kHz, with images 58 dB down above 14 kHz.
+  - The 17 partials run as sine-table oscillators (1,024 steps), each
+    amplitude ramped across the block: below 1.385 kHz at an eighth of the
+    sample rate, below 2.076 kHz at a quarter, and above at half. A partial
+    moves to a slower rate again only 8% below those.
+  - Half-band stages bring the eighth and quarter rates up to the half rate
+    (Sand's equiripple designs: flat within 0.0003 dB, images 72 dB down).
+    The faster sums wait for the slower ones, so every partial leaves the
+    stages aligned to the sample, 1.0 ms after its block.
+  - A 27-tap half-band (a Kaiser sinc, beta 5.5, rounded) doubles the half
+    rate back: flat to 8 kHz, with images 58 dB down above 14 kHz. In blocks
+    no half-rate partial reaches, three taps about the same middle do it.
+  - A partial sounds while it is within 36 dB of the loudest and above
+    −72 dB, and once sounding until 6 dB under that.
   - Partials fade between 7.2 and 8 kHz.
+  - Once the gate is dark, the reading and the bank stop until it lights
+    again.
   - Each partial starts at a phase of its own (golden-ratio steps from the
     note's), so a chord's strikes do not pile up.
 - **The note-on and the amp envelope.**
@@ -343,18 +359,21 @@ the midpoint.
 
 The figures below are host estimates made during development.
 
-- By count of the Blackfin build: the bank is a hardware loop of 10
-  instructions a partial a half-rate sample, about 5,400 a block for 17
-  partials, and the half-band one of 75 instructions an output pair, about
-  2,400; with the table reads, the gate and the held hum's fade, each
-  partial's tilt and the increments, about 10,500 a block.
-- The SDK's host estimate (`sdk.py test`) reads 11,500 Blackfin instructions
-  per voice block at the heaviest setting, on a heavily loaded host.
+- By count of the Blackfin build: at middle C with the defaults every
+  partial runs at an eighth of the rate. Each bank is a hardware loop of 9
+  instructions a sample, about 1,500 a block for 17 partials; the slower
+  stages about 940; the last half-band 41 instructions an output pair,
+  about 1,300; each partial's target from the gate about 1,100; and an
+  eighth of the spectrum's reading, a few hundred. A strike's first block
+  reads it whole (about 3,900 instructions) and runs no bank.
+- The SDK's host estimate (`sdk.py test`) reads 4,600 Blackfin instructions
+  per voice block at the heaviest setting (11,300 before the CPU pass).
 - Both are within 15,000; Moth reads 10,300 by the same count. Nothing is
   solved at run time.
-- **Memory.** Butterfly takes 144.5 KiB of the 2040 KiB module region, most
-  of it the tables, and needs no runtime helpers. Eight voices are 352 bytes
-  each, with no shared state.
+- **Memory.** Butterfly takes about 162 KiB of the 2040 KiB module region in
+  a build of its own, most of it the tables, and needs no runtime helpers.
+  Eight voices are 1,372 bytes each (the ramps, the reading in progress and
+  the slower rates' stages), with no shared state.
 
 ## Tests
 
@@ -373,7 +392,7 @@ the screen and outline tests under ASan too.
     at 2.
   - **No clicks** from any control swept under a held pad: 1.5 to 1.8 on a
     detector that reads 38 for a 0.003 step.
-  - **Every note sounds in its first block.**
+  - **A note reads its spectrum in its first block and sounds in its second.**
   - **The pad holds** within 0.5 dB over 4 s.
   - **In tune.** The lowest band's middle is within 16 cents of the key from
     C2 to C6, and within 7.2 cents from C3.
@@ -419,7 +438,7 @@ the screen and outline tests under ASan too.
 | File | What it is |
 | --- | --- |
 | `harper.h` | The chain's controls and their laws, snap, the table reads, the key, the levels, the gate and the wingbeat, shared by engine and screen |
-| `core.h`, `engine.cpp` | The voice: the half-rate bank behind its gate, and the half-band |
+| `core.h`, `engine.cpp` | The voice: the spectrum read a stage a block, the bank at three rates behind its gate, and the half-band stages |
 | `tables.h`, `tables_data.h` | The tables' declarations, and their one definition (from `tools/make_tables.py`) |
 | `display.h`, `display.cpp` | The screen |
 | `amp.h` | The amp envelope as the screen follows it, a copy of the suite's `tools/amp.h` |

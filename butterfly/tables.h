@@ -6,13 +6,13 @@ namespace butterfly {
 namespace tables {
 using opxy::i16; using opxy::u16; using opxy::u8; using opxy::u32;
 
-const u32 sine_bits = 12;
+const u32 sine_bits = 10;
 const u32 sites = 17, half_sites = 9, fluxes = 72, couplings = 7;
 // The snap fractions, the Farey sequence of order 8 from 0 to 1: 0, 1/8, 1/7, 1/6, 1/5, 1/4, 2/7, 1/3, 3/8, 2/5, 3/7, 1/2, 4/7, 3/5, 5/8, 2/3, 5/7, 3/4, 4/5, 5/6, 6/7, 7/8, 1.
 const u32 fraction_count = 23;
 
-// sin(2 pi k / 4096), Q15; the last entry is the first again
-extern const i16 sine[4097];
+// sin(2 pi k / 1024), Q15; the last entry is the first again
+extern const i16 sine[1025];
 // 2^(k / 256), Q15 (k = 256: 2 as 65536)
 extern const u32 exp2[257];
 // log2(1 + k / 256), Q16 (the last clamps 1 to 65535)

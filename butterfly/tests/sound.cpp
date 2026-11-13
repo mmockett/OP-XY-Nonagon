@@ -4,7 +4,8 @@
 //  - at flux p/q the spectrum gathers into q clusters;
 //  - below lambda = 1 the strike excites many partials, above it a few;
 //  - sweeps of every control, and the wingbeat, have no clicks;
-//  - a note sounds in its first block, a pad holds, a struck note dies;
+//  - a note reads its spectrum in its first block and sounds in its second,
+//    a pad holds, a struck note dies;
 //  - the lowest band sits on the key across the keyboard;
 //  - levels at the suites' shared loudness, and chords within bounds.
 #include "../engine.cpp"
@@ -304,10 +305,11 @@ void sweeps() {
     check(all, "sweeps of flux, coupling, site, spread and tilt, and the wingbeat, add no clicks to a held pad");
 }
 
-// A note sounds in its first block; a pad holds while held; a struck note dies.
+// A note reads its spectrum in its first block and sounds in its second; a
+// pad holds while held; a struck note dies.
 void envelope() {
     const double a3[1] = {220};
-    bool first = false;
+    bool first = false, second = false;
     {
         static Voice v;
         static Shared shared;
@@ -319,6 +321,8 @@ void envelope() {
         for (u32 i = 0; i < opxy::block_frames; ++i) pitch[i] = increment(220);
         render(v, shared, 1, o, p, pitch);
         for (u32 i = 0; i < opxy::block_frames; ++i) first = first || o[i];
+        render(v, shared, 1, o, p, pitch);
+        for (u32 i = 0; i < opxy::block_frames; ++i) second = second || o[i];
     }
     const Render pad = play(a3, 1, 5, [](double, double* c) {
         for (u32 i = 0; i < 8; ++i) c[i] = presets[3].c[i];
@@ -326,9 +330,9 @@ void envelope() {
     const double one = rms_db(pad.out, 44100, 88200), four = rms_db(pad.out, 176400, 220500);
     const Render bell = play(a3, 1, 5, [](double, double* c) { c[STRIKE] = 1; });
     const double ring = rms_db(bell.out, 0, 22050), late = rms_db(bell.out, 176400, 220500);
-    std::printf("      the first block sounds: %s; Shimmer at 1 s %.1f dBFS, at 4 s %.1f; Specimen struck at 100, its first half second %.1f, its "
-                "fifth second %.1f\n", first ? "yes" : "no", one, four, ring, late);
-    check(first, "a note sounds in its first block (no wait for a spectrum)");
+    std::printf("      the first block silent: %s, the second sounds: %s; Shimmer at 1 s %.1f dBFS, at 4 s %.1f; Specimen struck at 100, its first half second %.1f, its "
+                "fifth second %.1f\n", first ? "no" : "yes", second ? "yes" : "no", one, four, ring, late);
+    check(!first && second, "a note reads its spectrum in its first block and sounds in its second (no longer wait)");
     check(std::fabs(one - four) < 2.5, "a pad (strike 0) holds within 2.5 dB while the note is held");
     check(ring - late > 15, "a struck note rings down by its glow");
 }
