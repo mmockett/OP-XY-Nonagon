@@ -25,7 +25,11 @@ const u32 kBlock = 64, kHistory4 = 7, kHistory3 = 5, kQuarterWait = 8, kHalfWait
 // A mode's rates (1 / 2^r of the sample rate): its own (dst) and, while it
 // fades to it over `left` more blocks, the one it is leaving (src), which
 // holds the rest of its amplitude: the own rate's share ended the last block at kept.
-const u32 fade_blocks = 8;
+// Two blocks (2.9 ms) do: a mode only moves between rates whose bands both
+// hold it, where the two rates sound the same sine within 0.0003 dB, so the
+// fade moves nothing but the stages' images, 72 dB down. (Each fading block
+// sings the mode twice, one of them at the full rate after a tap.)
+const u32 fade_blocks = 2;
 struct Band {
     opxy::u8 dst, src, left, spare;
     opxy::i32 kept;
@@ -42,7 +46,7 @@ struct Voice {
     u32 taps;                    // taps so far in this note
     u32 seed;                    // random numbers: the pops, and where a mode at rest starts
     u32 seen;                    // the shared clock's tick this voice last rendered at
-    u32 fresh;                   // 1 from start until the note's first block stirs
+    u32 fresh;                   // 1 from start until the note's first block stirs; 2 until the next taps
     u32 quiet;                   // 1 once a single tap has rung out
     u32 alive;                   // 1 from start to destroy: counted in Shared's alive
     u32 wait;                    // blocks before a chord's later note taps (a strum)
@@ -68,6 +72,11 @@ struct Voice {
     Band band[liquid_modes + cup_modes];   // each mode's rates
     opxy::u8 live;                             // bits 0-3: rate 2^-r written last block; 4, 5: the quarter and half stages had input
     opxy::u8 spare[2];
+    // The first tap, planned in the note's silent first block (engine.cpp):
+    // the drink's step for the block it sounds in, and each mode's strike.
+    i32 planned_void, planned_wobble;
+    u32 planned_contact;
+    i32 planned_struck[liquid_modes + cup_modes];
     i32 eighth[kHistory4 + kBlock / 8];  // the eighth-rate sum, after the last block's tail
     i32 quarter[kHistory3 + kBlock / 4]; // the quarter-rate stage's input, after its tail
     i32 half[kHistory3 + kBlock / 2];    // the half-rate stage's input, after its tail

@@ -57,7 +57,7 @@ double measure(int control, double value) {
     c[control] = control == 3 ? (value < 0.34 ? 0.1667 : value < 0.67 ? 0.5 : 0.8333) : value;
     switch (control) {
     case 0: {   // powder: the first tap's pitch, from the drink's drop
-        Mug m(c); m.note(0); m.play();
+        Mug m(c); m.note(0); m.play(); m.play();   // the first block stirs, in silence
         return -12.0 * m.voice[0].drop / 65536.0;
     }
     case 1: {   // taps: taps a second over 4 s
@@ -122,7 +122,7 @@ double measure(int control, double value) {
     default: {  // stir: a second note 0.25 s after the first
         Mug m(c); m.note(0);
         for (int b = 0; b < 172; ++b) m.play();
-        m.note(1); m.play();
+        m.note(1); m.play(); m.play();   // the first block stirs, in silence
         return m.semitones(1);
     }
     }
