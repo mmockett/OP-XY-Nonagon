@@ -854,12 +854,59 @@ MACH_LOOP void bowed_swept(Root& root, i32* out, const opxy::i16* t0, i32 inc, i
 // held()'s step: the change over a piece of 2^bits.
 inline i32 piece(i32 from, i32 to, u32 bits) { return ((to >> 1) - (from >> 1)) >> bits; }
 
+// How far a phase moves over a sub-step, as the loops move it: at its step's
+// mean, held (bits 0), or along the step's ramp a sample at a time (the sum
+// of from + (2 j + 1) piece over the sub-step's samples j).
+inline u32 travel(i32 from, i32 to, u32 bits) {
+    if (!bits) return static_cast<u32>(held(from, to, 1, 0, true)) * static_cast<u32>(substep);
+    return static_cast<u32>(from) * static_cast<u32>(substep) + static_cast<u32>(piece(from, to, bits)) * static_cast<u32>(substep * substep);
+}
+
+// Whether a root adds nothing this sub-step: no gain and no ramp (before the
+// cone's images or a strike swell in, or past Nyquist), or (bell, voice) every
+// partial it plays silent, with its air at rest either way. Then its loops
+// would only move its phases on.
+inline bool silent(const Voice& v, const Root& root) {
+    if (root.low) return false;
+    if (!root.gain && !root.slope) return true;
+    const u32 parts = v.source == BELL ? (root.image ? 2 : 4) : v.source == VOICE ? (root.image ? 1 : 3) : 0;
+    if (!parts) return false;
+    for (u32 k = 0; k < parts; ++k)
+        if (root.part_amp[k] || root.amp_was[k]) return false;
+    return true;
+}
+
+// A silent root's sub-step: its phases and steps move on exactly as its loops
+// would move them, its gain along its ramp; nothing is added to the block.
+inline void coast(const Voice& v, Root& root, u32 bits) {
+    if (v.source == VOICE) {
+        root.phase += static_cast<u32>(held(root.inc, root.inc_to, 1, 0, true)) * static_cast<u32>(substep);
+    } else if (v.source == BELL) {
+        root.part[0] += travel(root.part_inc[0], root.part_to[0], bits);
+        if (!root.image) root.part[2] += travel(root.part_inc[2], root.part_to[2], bits);
+        for (u32 j = 0; j < 4; ++j) root.part_inc[j] = root.part_to[j];
+    } else {
+        root.phase += travel(root.inc, root.inc_to, bits);
+        if (v.source == PAD && !root.image) {
+            root.part[0] += travel(root.part_inc[0], root.part_to[0], bits);
+            root.part_inc[0] = root.part_to[0];
+        }
+    }
+    root.gain += root.slope * substep;
+    root.inc = root.inc_to;
+    root.mix = root.mix_to;
+}
+
 // One root's sub-step of samples, added to out. Steps, amplitudes and the
 // tables' crossfade are held over the sub-step (each phase steps at its mean,
 // so it ends where a ramp would); while sweeping, they move sample by sample
 // along the ramps.
 inline void sound(Voice& v, Root& root, i32* out) {
     const u32 bits = root.sweeping ? substep_bits : 0, pieces = 1u << bits;
+    if (silent(v, root)) {
+        coast(v, root, bits);
+        return;
+    }
     const i32 n = substep >> bits;
     if (v.source == VOICE) {
         const i32 mean = held(root.inc, root.inc_to, 1, 0, true);
