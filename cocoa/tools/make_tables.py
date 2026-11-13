@@ -117,8 +117,8 @@ lines.append(f"const i32 wood_density = {round(DENSITY * 2 ** 31)};")
 lines.append("// 2^15 / (K - 1), Q10: a void fraction (Q31) from 4^drop - 1 (Q16).")
 lines.append(f"const u32 wood_inverse = {round(2 ** 15 / (K - 1) * 1024)};")
 
-emit("// sin(2 pi i / 4096), Q15, read without interpolation (its spurs are 72 dB down).\nconst i16 sine[4096]",
-     [round(32767 * math.sin(2 * math.pi * i / 4096)) for i in range(4096)], per=16)
+emit("// sin(2 pi i / 1024), Q15, read without interpolation (its spurs are 60 dB down).\nconst i16 sine[1024]",
+     [round(32767 * math.sin(2 * math.pi * i / 1024)) for i in range(1024)], per=16)
 emit("// log2(1 + i / 256), Q16.\nconst u32 log2_fraction[257]",
      [round(math.log2(1 + i / 256) * Q16) for i in range(257)])
 emit("// 2^(i / 256), Q30.\nconst u32 exp2_fraction[257]",

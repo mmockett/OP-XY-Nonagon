@@ -85,12 +85,12 @@ __attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 a
     i32 a = amp;
     if (!glide) {   // a steady pitch: the same sums without the glide's add
         for (u32 i = 0; i < split; ++i) {
-            sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
+            sum[i] += ((a >> 16) * tables::sine[p >> 22]) >> 3;
             a += slope;
             p += inc;
         }
         for (u32 i = split; i < opxy::block_frames; ++i) {
-            sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
+            sum[i] += ((a >> 16) * tables::sine[p >> 22]) >> 3;
             a += after;
             p += inc;
         }
@@ -98,13 +98,13 @@ __attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 a
         return;
     }
     for (u32 i = 0; i < split; ++i) {
-        sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
+        sum[i] += ((a >> 16) * tables::sine[p >> 22]) >> 3;
         a += slope;
         p += inc;
         inc += static_cast<u32>(glide);
     }
     for (u32 i = split; i < opxy::block_frames; ++i) {
-        sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
+        sum[i] += ((a >> 16) * tables::sine[p >> 22]) >> 3;
         a += after;
         p += inc;
         inc += static_cast<u32>(glide);
@@ -126,7 +126,7 @@ __attribute__((noinline)) void sing_at(i32* sum, Mode& m, u32 inc, i32 glide, i3
     if (!glide) {
         const u32 advance = inc << R;
         for (u32 i = 0; i < ramped; ++i) {
-            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
             a += ramp;
             p += advance;
         }
@@ -134,12 +134,12 @@ __attribute__((noinline)) void sing_at(i32* sum, Mode& m, u32 inc, i32 glide, i3
         if (!after) {
             const opxy::i16 held = static_cast<opxy::i16>(static_cast<u32>(a) >> 16);
             for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
-                sum[i] += (held * tables::sine[p >> 20]) >> 3;
+                sum[i] += (held * tables::sine[p >> 22]) >> 3;
                 p += advance;
             }
         } else {
             for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
-                sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+                sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
                 a += after << R;
                 p += advance;
             }
@@ -150,14 +150,14 @@ __attribute__((noinline)) void sing_at(i32* sum, Mode& m, u32 inc, i32 glide, i3
     const u32 bend = static_cast<u32>(glide) << R, curve = static_cast<u32>(glide) * ((steps * (steps - 1)) >> 1);
     u32 advance = (inc << R) + curve;
     for (u32 i = 0; i < ramped; ++i) {
-        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
         a += ramp;
         p += advance;
         advance += bend << R;
     }
     a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << R) - split);
     for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
-        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
         a += after << R;
         p += advance;
         advance += bend << R;
@@ -589,7 +589,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     i32 wobble = 0;
     if (voice.slosh) {
         voice.slosh_phase += static_cast<u32>(drink::along(tables::slosh_inc, fill));
-        wobble = (((voice.slosh * slosh_depth) >> 15) * tables::sine[voice.slosh_phase >> 20]) >> 15;
+        wobble = (((voice.slosh * slosh_depth) >> 15) * tables::sine[voice.slosh_phase >> 22]) >> 15;
         voice.slosh -= (voice.slosh >> 9) + 1;   // dies away in about 0.7 s
         if (voice.slosh < 64) voice.slosh = 0;
     }
@@ -759,7 +759,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         i32 a = p.amp;
         const u32 shift = p.shift, chirp = inc >> 13;
         for (unsigned i = 0; i < block_frames; ++i) {
-            sum[i] += ((a >> 16) * tables::sine[ph >> 20]) >> 3;
+            sum[i] += ((a >> 16) * tables::sine[ph >> 22]) >> 3;
             a -= a >> shift;
             ph += inc;
             inc += chirp;

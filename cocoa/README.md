@@ -90,8 +90,8 @@ its shape: fast at first, as the floor clears and the big bubbles leave, then
 a soft landing as the fine ones go. Once every class is out, x_eff is exactly
 0 and the pitch is exactly the key's.
 
-**The modes.** Each mode is a sine from a 4096-point table, read without
-interpolation (its spurs are about 72 dB down). Its increment glides sample
+**The modes.** Each mode is a sine from a 1024-point table, read without
+interpolation (its spurs are about 60 dB down). Its increment glides sample
 by sample, so a ringing tap keeps its level as it climbs. A tap adds to each
 mode's amplitude over the spoon's contact time. Between taps the modes decay,
 (1 + 0.75 × drop) times faster while bubbles damp the column, higher modes
@@ -382,7 +382,7 @@ At the heaviest setting:
 
 **Memory.** A voice is 304 bytes, `Shared` 96 and the display state 236.
 `sdk.py test --firmware` compiles it for the Blackfin in 65.6 KiB of module
-memory, 8 KiB of it the sine table.
+memory, 2 KiB of it the sine table.
 
 ## Prior art
 
