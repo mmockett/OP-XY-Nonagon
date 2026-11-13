@@ -295,7 +295,7 @@ integers only.
 - **Synthesis.**
   - Ten table oscillators run two to a pass, with levels stepped every 16
     samples. A note's first block ramps every sample, so the attack never
-    clicks.
+    clicks. Silent partials only keep time, the first block's too.
   - Each oscillator reads the body wave (sine, plus 0.32 of the second
     harmonic and 0.12 of the third) while its third harmonic fits under 0.45
     of the sample rate, else a plain sine. It changes wave only once it has

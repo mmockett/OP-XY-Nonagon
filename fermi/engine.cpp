@@ -102,6 +102,18 @@ inline void pair_ramped(i32* out, const i16* w1, u32& p1, u32 i1, i32 from1, i32
     p1 = q1;
     p2 = q2;
 }
+// One ramped partial alone, the last of an odd number.
+inline void single_ramped(i32* out, const i16* w, u32& p, u32 inc, i32 from, i32 to) {
+    u32 q = p;
+    i32 a = from << 15;
+    const i32 d = ((to - from) << 15) >> 6;
+    for (unsigned i = 0; i < opxy::block_frames; ++i) {
+        out[i] += w[q >> 22] * (a >> 15);
+        q += inc;
+        a += d;
+    }
+    p = q;
+}
 
 // The output, held within half scale: a function of its own so its loop is a
 // hardware loop. The ceiling is passed in, so the compiler keeps the clamp as
@@ -245,13 +257,24 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
 
     i32 sum[opxy::block_frames];
     for (unsigned i = 0; i < opxy::block_frames; ++i) sum[i] = 0;
+    // Silent partials only keep time; the rest sound two by two, whichever
+    // they are. On a note's first block a partial is silent when it was
+    // silent in the last note and stays so in this one.
+    u32 waiting = chain::voiced;
     if (load) {
-        for (u32 k = 0; k < chain::voiced; k += 2)
-            pair_ramped(sum, wave[k], voice.phase[k], voice.inc[k], was[k], gains[k][3],
-                        wave[k + 1], voice.phase[k + 1], voice.inc[k + 1], was[k + 1], gains[k + 1][3]);
+        for (u32 k = 0; k < chain::voiced; ++k) {
+            if (!gains[k][3] && !moving[k]) {
+                voice.phase[k] += voice.inc[k] << 6;
+            } else if (waiting == chain::voiced) {
+                waiting = k;
+            } else {
+                pair_ramped(sum, wave[waiting], voice.phase[waiting], voice.inc[waiting], was[waiting], gains[waiting][3],
+                            wave[k], voice.phase[k], voice.inc[k], was[k], gains[k][3]);
+                waiting = chain::voiced;
+            }
+        }
+        if (waiting != chain::voiced) single_ramped(sum, wave[waiting], voice.phase[waiting], voice.inc[waiting], was[waiting], gains[waiting][3]);
     } else {
-        // Silent partials only keep time; the rest sound two by two, whichever they are.
-        u32 waiting = chain::voiced;
         for (u32 k = 0; k < chain::voiced; ++k) {
             if (!gains[k][3] && !moving[k]) {
                 voice.phase[k] += voice.inc[k] << 6;
