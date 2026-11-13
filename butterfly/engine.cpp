@@ -227,8 +227,12 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
         }
     }
 
-    // The solve: whole at the strike, then a stage a block.
-    if (voice.stale) {
+    // The solve: whole at the strike, then a stage a block. A dark gate
+    // silences every partial whatever the chain, so the solve waits, and
+    // runs whole again if the gate lights (a slower glow, a lighter strike).
+    if (!light) {
+        voice.stale = 1;
+    } else if (voice.stale) {
         voice.note = note;
         for (u32 s = 0; s < solve_stages; ++s) solve_stage(voice, p, s, true);
         voice.stale = 0;
@@ -255,7 +259,7 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
     bool sounding = false, rendered = false;
     i32* low = voice.low;
     i32* acc = low + 2 * halfband_taps;
-    {
+    if (light || voice.sounding) {   // dark and every partial silent: no targets, no bank
         // Each partial's target: its level through the gate at its power and
         // darkening, faded at the ceiling.
         const u32 e = light ? static_cast<u32>(-gate_log2(light)) >> 4 : 0;   // -log2 of the light, Q12
