@@ -24,7 +24,9 @@ the bubbles rise out, the note climbs back to the key.
 **Status: experimental.** Cocoa passes the SDK's tests and runs on an
 OP-XY, where its CPU is
 measured (below). Its screen follows the track's amp envelope, which needs
-version 1.10 of the Open-XY SDK, on its `staging` branch.
+version 1.10 of the Open-XY SDK, on its `staging` branch. Each note sounds one
+block (64 samples, 1.45 ms) after its key: Cocoa stirs the drink in that
+silent block, and the spoon taps in the next.
 
 ## Controls
 

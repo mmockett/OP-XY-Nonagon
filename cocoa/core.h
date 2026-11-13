@@ -42,7 +42,7 @@ struct Voice {
     u32 taps;                    // taps so far in this note
     u32 seed;                    // random numbers: the pops, and where a mode at rest starts
     u32 seen;                    // the shared clock's tick this voice last rendered at
-    u32 fresh;                   // 1 from start until the note's first block stirs
+    u32 fresh;                   // 1 from start until the note's first block stirs; 2 until the next taps
     u32 quiet;                   // 1 once a single tap has rung out
     u32 alive;                   // 1 from start to destroy: counted in Shared's alive
     u32 wait;                    // blocks before a chord's later note taps (a strum)

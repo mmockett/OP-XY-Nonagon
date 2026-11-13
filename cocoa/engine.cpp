@@ -510,6 +510,28 @@ inline void flush(Voice& voice, opxy::Output output) {
     voice.live = 0;
 }
 
+// What the fill and the cup alone set, worked out when they change: each
+// liquid mode's ratio and clear loss, and the wall's pitches and losses.
+inline void fill_cup(Voice& voice, i32 fill, u32 cup) {
+    using namespace sound;
+    if (voice.filled && fill == voice.filled_fill && cup == voice.filled_cup) return;
+    const i32 depth = drink::along(tables::liquid_depth, fill);          // shallow drinks ring shorter
+    for (u32 k = 0; k < liquid_modes; ++k) {
+        voice.ratio[k] = drink::along(tables::liquid_ratio[k], fill);
+        voice.liquid_loss[k] = drink::scale(static_cast<u32>(tables::liquid_decay[cup]), voice.ratio[k] / 2 + depth, ceiling);
+    }
+    const i32 lowered = drink::along(tables::cup_lowering, fill);
+    const i32 damped = drink::along(tables::cup_damping, fill);
+    for (u32 k = 0; k < cup_modes; ++k) {
+        voice.cup_log2[k] = tables::cup_pitch[cup][k] + lowered;
+        voice.cup_inc[k] = drink::exp2_int(voice.cup_log2[k]);
+        voice.cup_loss[k] = static_cast<i32>(drink::scale(static_cast<u32>(tables::cup_decay[cup][k]), damped, ceiling));
+    }
+    voice.filled = 1;
+    voice.filled_fill = fill;
+    voice.filled_cup = cup;
+}
+
 inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output output,
                    opxy::Parameters parameters, opxy::Pitch pitch) {
     using namespace sound;
@@ -541,9 +563,12 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     }
 
     // A new note stirs the drink as the last stir left it, cleared since,
-    // and the spoon taps at once.
+    // and the spoon taps in the next block: a note's first block only stirs,
+    // in silence, so no block both stirs and strikes. Everything sounds as
+    // before, 64 samples (1.45 ms) later. A voice still sounding (a note
+    // restarted in place) stirs and taps in one block, as it always has.
     bool tap = false;
-    if (voice.fresh) {
+    if (voice.fresh == 1) {
         i32 d[drink::classes], s[drink::classes];
         for (u32 i = 0; i < drink::classes; ++i) {
             d[i] = shared.poured ? shared.d[i] : 0;
@@ -563,7 +588,6 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         voice.seed = (shared.stirs * 0x9e3779b9u) ^ (owner * 0x85ebca6bu) ^ 0x2545f491u;
         voice.tap_phase = 0;
         voice.taps = 0;
-        voice.fresh = 0;
         const u32 together = shared.started_at == voice.started_at ? shared.strum : 0;
         voice.share = chord_share[together < 7 ? together : 7];
         // The stir raises a head of foam, more for more powder, and sets the
@@ -572,6 +596,16 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         voice.foam = voice.foam > foam ? voice.foam : foam;
         voice.slosh = static_cast<i32>(drink::q16(parameters[STIR]) >> 1);
         voice.slosh_phase = 0;
+        if (!voice.live) {
+            voice.fresh = 2;
+            fill_cup(voice, fill, cup);
+            for (unsigned i = 0; i < block_frames; ++i) output[i] = 0;
+            return;
+        }
+        voice.fresh = 0;
+        tap = true;
+    } else if (voice.fresh) {   // stirred last block: the spoon taps
+        voice.fresh = 0;
         tap = true;
     } else if (step) {
         const u32 before = voice.tap_phase;
@@ -642,25 +676,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     }
     const i32 damping = 65536 + ((drop >> 2) * (bubble_damping >> 6) >> 8);   // Q16
     bool ringing = false;
-    // What the fill and the cup alone set, worked out when they change: each
-    // liquid mode's ratio and clear loss, and the wall's pitches and losses.
-    if (!voice.filled || fill != voice.filled_fill || cup != voice.filled_cup) {
-        const i32 depth = drink::along(tables::liquid_depth, fill);          // shallow drinks ring shorter
-        for (u32 k = 0; k < liquid_modes; ++k) {
-            voice.ratio[k] = drink::along(tables::liquid_ratio[k], fill);
-            voice.liquid_loss[k] = drink::scale(static_cast<u32>(tables::liquid_decay[cup]), voice.ratio[k] / 2 + depth, ceiling);
-        }
-        const i32 lowered = drink::along(tables::cup_lowering, fill);
-        const i32 damped = drink::along(tables::cup_damping, fill);
-        for (u32 k = 0; k < cup_modes; ++k) {
-            voice.cup_log2[k] = tables::cup_pitch[cup][k] + lowered;
-            voice.cup_inc[k] = drink::exp2_int(voice.cup_log2[k]);
-            voice.cup_loss[k] = static_cast<i32>(drink::scale(static_cast<u32>(tables::cup_decay[cup][k]), damped, ceiling));
-        }
-        voice.filled = 1;
-        voice.filled_fill = fill;
-        voice.filled_cup = cup;
-    }
+    fill_cup(voice, fill, cup);
     for (u32 k = 0; k < liquid_modes; ++k) {
         Mode& m = voice.liquid[k];
         const i32 ratio = voice.ratio[k];
