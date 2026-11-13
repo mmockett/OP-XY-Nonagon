@@ -399,19 +399,55 @@ __attribute__((noinline)) void last_direct(const i32* tone, const i32* rattle, o
     for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = output_of<Rattle>(tone[i], rattle, i);
 }
 
+// What the smoothed controls (Figure aside) make of the sound. Out of line, so
+// a block whose controls stand still neither runs nor fetches its code.
+__attribute__((noinline)) void settings_for(Settings& s, const i32* controls) {
+    const i32 bow = controls[1], sand = controls[2], grain = controls[3], plate = controls[4],
+              settle = controls[5], tilt = controls[6], shake = controls[7];
+    s.mat = material(plate);
+    plan_throw(s.plan, settle, tilt, shake);
+    s.grains = static_cast<u32>(sand * static_cast<i32>(kGrains) + 16384) >> 15;
+    s.mass = 96 + (grain * 288 >> 15);   // Q8: dust 0.375 to pebbles 1.5
+    s.loud = 154 + (grain * 153 >> 15);  // Q8: a click's loudness, the root of its mass
+    // The rattle's band-pass, by Grain: each landing's impulse goes in through
+    // its gain, g, as it is made.
+    const u32 step = static_cast<u32>(grain) * (kClickSteps - 1);
+    const u32 low = step >> 15;
+    const i32 toward = static_cast<i32>(step & 32767u);
+    const u32 high = low + 1 < kClickSteps ? low + 1 : low;
+    s.g = mix(kClick[low][0] >> 1, kClick[high][0] >> 1, toward) << 1;
+    s.c1 = mix(kClick[low][1] >> 1, kClick[high][1] >> 1, toward) << 1;
+    s.c2 = mix(kClick[low][2] >> 1, kClick[high][2] >> 1, toward) << 1;
+    s.ring = s.mat.ring * s.mass >> 8;
+    // Settle in the rattle: slippery sand lands hard and bounces, sticky sand
+    // lands dead and stays.
+    s.dead = 384 - (settle * 256 >> 15);  // Q8: 1.5 to 0.5
+    const i32 slip = 32767 - settle;
+    s.bounce = (slip * slip >> 15) * 19661 >> 15;  // Q15: up to 0.6
+    s.strike = strike_share(bow);
+    s.drive = bow_level(bow);
+    s.rosin = s.drive * kRosin >> 15;
+    s.shaken = (((shake * shake >> 15) + shake) >> 1) * kShakeAmplitude >> 15;  // halfway between Shake and its square
+    s.held = multiply(s.mat.rise, bow << 16);  // the bow's pull, by how much it bows
+    s.level = (bow * bow >> 15) * kHarmonicShare >> 15;  // Q15 of the bowed level
+}
+
 // Controls: Figure, Bow, Sand, Grain; Plate, Settle, Tilt, Shake.
 inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
                    opxy::Parameters parameters, opxy::Pitch pitch) {
+    bool moved = !voice.primed;
     for (u32 c = 1; c < 8; ++c) {
         // Plate picks metal, glass or wood; between blocks it glides from one to the next.
         const u32 plate_index = c == 4 ? choice(parameters[4], 3) : 0;
         const i32 target = c != 4 ? control(parameters[c]) : plate_index == 2 ? 32767 : static_cast<i32>(plate_index) * 16384;
-        voice.controls[c] = voice.primed ? voice.controls[c] + ((target - voice.controls[c]) >> 2) : target;
+        const i32 next = voice.primed ? voice.controls[c] + ((target - voice.controls[c]) >> 2) : target;
+        moved = moved || next != voice.controls[c];
+        voice.controls[c] = next;
     }
     voice.primed = 1;
-    const i32 bow = voice.controls[1], sand = voice.controls[2], grain = voice.controls[3],
-              plate = voice.controls[4], settle = voice.controls[5], tilt = voice.controls[6],
-              shake = voice.controls[7];
+    if (moved) settings_for(voice.set, voice.controls);
+    const Settings& set = voice.set;
+    const Material& mat = set.mat;
     // A new figure bows another mode at the same pitch: the amplitudes carry
     // on into the new modes, and the sand, lying on the old figure's nodal
     // lines, finds itself on moving ground.
@@ -421,12 +457,10 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     ++shared.clock;
     if (shared.latest == owner) shared.fresh = shared.clock;
     const PlateMode* const modes = kFigureModes[voice.figure];
-    const Material mat = material(plate);
     const u32 increment = pitch[0] < kLowestIncrement ? kLowestIncrement : pitch[0];
     const i32 octave = log2_q16(increment);
-    const u32 grains = static_cast<u32>(sand * static_cast<i32>(kGrains) + 16384) >> 15;
-    const i32 mass = 96 + (grain * 288 >> 15);   // Q8: dust 0.375 to pebbles 1.5
-    const i32 loud = 154 + (grain * 153 >> 15);  // Q8: a click's loudness, the root of its mass
+    const u32 grains = set.grains;
+    const i32 mass = set.mass, loud = set.loud;
 
     // How the plate throws sand this block, from what each mode is doing now.
     // The twin and the bow's harmonics move in the figure's own shape, so
@@ -439,9 +473,17 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     const i32 figure_lift = lift(swing(voice.modes[0]) + swing(voice.twin), modes[0].ratio) +
                             (lift(magnitude(voice.harmonic.a) >> 16, modes[0].ratio * 3) >> 2);
     t.weight[0] = (figure_lift > 65535 ? 65535 : figure_lift) * 5 >> 3;
-    plan_throw(t, settle, tilt, shake);
+    t.threshold = set.plan.threshold;
+    t.reach = set.plan.reach;
+    t.tilt = set.plan.tilt;
+    t.slope = set.plan.slope;
+    t.jitter = set.plan.jitter;
+    t.jolts = set.plan.jolts;
+    t.bias = set.plan.bias;
+    t.flight = set.plan.flight;
+    t.creep = set.plan.creep;
     // A strike jolts every grain on the plate for one round of looks.
-    const i32 strike = strike_share(bow);
+    const i32 strike = set.strike;
     if (voice.struck) voice.jolted = kGrains;
     if (voice.jolted) {
         t.jitter += strike * kJolt >> 15;
@@ -449,15 +491,8 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
         voice.jolted = voice.jolted > kLooks ? voice.jolted - kLooks : 0;
     }
 
-    // The rattle's band-pass, by Grain: each landing's impulse goes in through
-    // its gain, g, as it is made.
-    const u32 step = static_cast<u32>(grain) * (kClickSteps - 1);
-    const u32 low = step >> 15;
-    const i32 toward = static_cast<i32>(step & 32767u);
-    const u32 high = low + 1 < kClickSteps ? low + 1 : low;
-    const i32 g = mix(kClick[low][0] >> 1, kClick[high][0] >> 1, toward) << 1;
-    const i32 c1 = mix(kClick[low][1] >> 1, kClick[high][1] >> 1, toward) << 1;
-    const i32 c2 = mix(kClick[low][2] >> 1, kClick[high][2] >> 1, toward) << 1;
+    // The rattle's band-pass: each landing's impulse goes in through its gain, g.
+    const i32 g = set.g;
     // Look at the next grains: gather their weight on the modes, and click
     // and knock the plate for each that lands.
     // The landings wait for the slow paths: this block's are written kFullWait on,
@@ -474,12 +509,7 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     i32 knock_a[kModes], knock_b[kModes];
     for (u32 k = 0; k < kModes; ++k) knock_a[k] = knock_b[k] = 0;
     u32 seed = voice.seed;
-    const i32 ring = mat.ring * mass >> 8;
-    // Settle in the rattle: slippery sand lands hard and bounces, sticky sand
-    // lands dead and stays.
-    const i32 dead = 384 - (settle * 256 >> 15);  // Q8: 1.5 to 0.5
-    const i32 slip = 32767 - settle;
-    const i32 bounce = (slip * slip >> 15) * 19661 >> 15;  // Q15: up to 0.6
+    const i32 ring = set.ring, dead = set.dead, bounce = set.bounce;
     for (u32 n = 0; n < kLooks; ++n) {
         const u32 at = voice.cursor;
         if (++voice.cursor == kGrains) {
@@ -533,11 +563,8 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     sums.at[2] = quarter + kQuarterWait;
     sums.at[3] = voice.eighth + kHistory4;
     sums.written = 0;
-    const i32 drive = bow_level(bow);
-    const i32 rosin = drive * kRosin >> 15;
-    const i32 shaken = (((shake * shake >> 15) + shake) >> 1) * kShakeAmplitude >> 15;  // halfway between Shake and its square
+    const i32 drive = set.drive, rosin = set.rosin, shaken = set.shaken, held = set.held;
     const i32 hit = voice.struck ? strike * kStrikeAmplitude >> 15 : 0;
-    const i32 held = multiply(mat.rise, bow << 16);  // the bow's pull, by how much it bows
     for (u32 k = 0; k < kModes; ++k) {
         const PlateMode& pm = modes[k];
         Mode& m = voice.modes[k];
@@ -618,7 +645,7 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
         // with it, rising with Bow (pressure brightens a bowed tone); faded
         // out where the 4th would pass the top.
         Mode& harm = voice.harmonic;
-        const i32 level = inc > kTopIncrement / 4 ? 0 : (bow * bow >> 15) * kHarmonicShare >> 15;  // Q15 of the bowed level
+        const i32 level = inc > kTopIncrement / 4 ? 0 : set.level;  // Q15 of the bowed level
         const i32 harm_target = static_cast<i32>(times(static_cast<u32>(drive * (level * (mat.harmonic >> 3) >> 9) >> 15),
                                                        static_cast<u32>(kHarmonicPeak) << 4)) << 16;
         harm.a = clamp_amplitude(multiply(harm.a, decay) + multiply(harm_target - harm.a, held));
@@ -709,7 +736,7 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     const bool waited = last & 64u;
     for (u32 i = 0; i < kFullWait; ++i) voice.click_wait[i] = impulses[opxy::block_frames - kFullWait + i];
     i32 rattle[opxy::block_frames];
-    const bool rattling = rattle_of(voice, waiting, clicked || waited, c1, c2, kHalf >> 1, rattle);
+    const bool rattling = rattle_of(voice, waiting, clicked || waited, set.c1, set.c2, kHalf >> 1, rattle);
     const bool half_on = half_in || (last & 32u);
     if (half_on) {
         if (!half_in) for (u32 i = 0; i < opxy::block_frames / 2; ++i) stage3[i] = 0;

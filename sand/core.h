@@ -16,6 +16,24 @@ struct Mode { u32 phase; i32 a, b, sa, sb; };
 // rate's 22 and the full rate's, and the rattle, 50.
 const u32 kBlock = 64, kHistory4 = 7, kHistory3 = 5, kQuarterWait = 8, kHalfWait = 22, kFullWait = 50;
 
+// What the smoothed controls make of the sound, worked out again only when
+// one of them moves (engine.cpp's settings_for()): most blocks of a held note
+// skip that work, and its code and tables stay out of the cache.
+struct Settings {
+    Material mat;         // the plate's material, by Plate
+    Throw plan;           // plan_throw()'s part of the throw (its weights are each block's)
+    u32 grains;           // grains on the plate, by Sand
+    i32 mass, loud;       // Q8: a grain's weight on the modes and its click's loudness, by Grain
+    i32 g, c1, c2;        // the rattle's band-pass, by Grain
+    i32 ring;             // how hard a landing knocks the modes
+    i32 dead, bounce;     // Q8, Q15: a landing's thud and its bounce, by Settle
+    i32 strike;           // Q15: the strike's share, by Bow
+    i32 drive, rosin;     // the bow's level and its rosin hiss (amplitude units)
+    i32 shaken;           // the shake's stationary amplitude
+    i32 held;             // Q31: the bow's pull each block
+    i32 level;            // Q15: the bow's harmonics, of the bowed level
+};
+
 struct Voice {
     Mode modes[kModes];   // the figure's mode and six of the plate's modes above it
     Mode twin;            // the bowed mode's near-degenerate twin: its amplitude, and the beat's phase
@@ -26,6 +44,7 @@ struct Voice {
     i32 gather[kModes];   // the same, gathered over the round of looks in progress
     i32 controls[8];      // smoothed controls, 0..32767
     u32 primed;           // controls hold real values; the first block snaps them
+    Settings set;         // what the controls make of the sound
     u32 figure;           // the figure the modes were last bowed in
     u32 cursor;           // the next grain to look at
     u32 seed;
