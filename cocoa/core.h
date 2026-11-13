@@ -25,7 +25,11 @@ const u32 kBlock = 64, kHistory4 = 7, kHistory3 = 5, kQuarterWait = 8, kHalfWait
 // A mode's rates (1 / 2^r of the sample rate): its own (dst) and, while it
 // fades to it over `left` more blocks, the one it is leaving (src), which
 // holds the rest of its amplitude: the own rate's share ended the last block at kept.
-const u32 fade_blocks = 8;
+// Two blocks (2.9 ms) do: a mode only moves between rates whose bands both
+// hold it, where the two rates sound the same sine within 0.0003 dB, so the
+// fade moves nothing but the stages' images, 72 dB down. (Each fading block
+// sings the mode twice, one of them at the full rate after a tap.)
+const u32 fade_blocks = 2;
 struct Band {
     opxy::u8 dst, src, left, spare;
     opxy::i32 kept;
