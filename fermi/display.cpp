@@ -41,6 +41,27 @@
 namespace fermi {
 namespace screen {
 using namespace opxy::draw;
+
+// opxy::draw's sine and rotation, the same math kept in this file. The SDK's
+// are plain inline: a copy GCC keeps out of line becomes a global symbol, and
+// another machine's copy then clashes with it in one firmware (open-xy
+// docs/toolchain.md, "One definition for shared code").
+// sin of a tenth-degree angle, Q10, interpolated between whole degrees.
+static inline i32 sine_tenths(i32 tenths) {
+    tenths %= 3600;
+    if (tenths < 0) tenths += 3600;
+    const i32 sign = tenths >= 1800 ? -1 : 1;
+    tenths %= 1800;
+    if (tenths > 900) tenths = 1800 - tenths;
+    const i32 degree = tenths / 10, fraction = tenths % 10;
+    const i32 low = sine_q10[degree], high = sine_q10[degree < 90 ? degree + 1 : 90];
+    return sign * (low + (high - low) * fraction / 10);
+}
+// A clockwise rotation by tenths of a degree.
+static inline Turn rotated(i32 tenths) {
+    const Turn turn = {sine_tenths(tenths + 900), sine_tenths(tenths)};
+    return turn;
+}
 const i32 linger = 2048;          // Q10 s the chain runs on after the last key is let go
 const u32 catch_up = 172;         // blocks a frame at most (0.25 s)
 const i32 steps = 32;             // the envelope's level as the chain is drawn
@@ -187,7 +208,7 @@ inline i32 ease(i32 value, i32 target, u32 left) {   // left: Q16 share of the d
 }
 inline i32 normal(i32 tenths) { return tenths < 0 ? tenths + 3600 : tenths; }
 inline u32 put_angle(Frame& frame, u32 n, i32 x, i32 y, i32 scale, i32 tenths, u32 grey, Paint paint) {
-    const Turn t = rotation(normal(tenths));
+    const Turn t = rotated(normal(tenths));
     return put_turned(frame, n, x, y, scale, t.cos, t.sin, grey, paint);
 }
 
@@ -437,8 +458,8 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
     spent += put(frame, node::stand_right, right_stand, plate::row_y * unit, unit, shade::stand, fill_and_stroke);
     {
         // The regulator: its rod on the knife edge, the bob slid along it.
-        const i32 sway = ((st.swing >> 8) * rotation(st.phase).cos) >> 10;   // tenths
-        const Turn t = rotation(normal(sway));
+        const i32 sway = ((st.swing >> 8) * rotated(st.phase).cos) >> 10;   // tenths
+        const Turn t = rotated(normal(sway));
         const i32 along = st.slide << 2;   // Q10 px
         const i32 px = l.hook_right + plate::pendulum_out * unit, py = plate::pendulum_y * unit;
         spent += put_turned(frame, node::rod, px, py, unit, t.cos, t.sin, shade::rod, stroke);
@@ -491,8 +512,8 @@ inline void display(DisplayState& st, const opxy::draw::Input& input, Frame& fra
         if (toward_left[j] < 0) toward_left[j] += 3600;
         toward_right[j] = angle_of(rx - bob_x(j), bob_y(j) - ry);
     }
-    auto rim_x = [&](u32 j, i32 tenths) { return bob_x(j) + ((radius * sine(tenths + 900)) >> 10); };
-    auto rim_y = [&](u32 j, i32 tenths) { return bob_y(j) - ((radius * sine(tenths)) >> 10); };
+    auto rim_x = [&](u32 j, i32 tenths) { return bob_x(j) + ((radius * sine_tenths(tenths + 900)) >> 10); };
+    auto rim_y = [&](u32 j, i32 tenths) { return bob_y(j) - ((radius * sine_tenths(tenths)) >> 10); };
     for (u32 q = 0; q < 4; ++q) {
         const i32 left_x = first[q] == 0 ? l.hook_left : bob_x(first[q] - 1);
         const i32 right_x = first[q + 1] == n + 1 ? l.hook_right : bob_x(first[q + 1] - 1);

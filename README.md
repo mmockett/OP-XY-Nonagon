@@ -24,7 +24,8 @@ track's amp envelope, which needs version 1.10 of the Open-XY SDK; Mach's
 flyby leaves the glass plate whole; and Mach, Butterfly and Ghost cost less
 at their peaks, with the same sound. In v0.9.2 Sand, Cocoa, Coin, Fermi,
 Mach, Butterfly and Drop play at the one loudness the Hexagon Suite shares.
-Expect rough edges.
+In v0.9.3 Fermi builds into one firmware with Tetragon's CURIO. Expect rough
+edges.
 
 All nine are live in the [open-xy.com](https://open-xy.com) builder:
 [Sand](https://open-xy.com/#preview/machines/sand),
@@ -37,8 +38,8 @@ All nine are live in the [open-xy.com](https://open-xy.com) builder:
 [Butterfly](https://open-xy.com/#preview/machines/butterfly) and
 [Drop](https://open-xy.com/#preview/machines/drop). The builder installs the
 version the Open-XY catalog pins for each, which can be older than this
-repository's latest tag (`v0.9.2`). Sand, Cocoa, Coin, Fermi, Mach, Butterfly
-and Drop are moving to v0.9.2, and Ghost and Recur stay at v0.9.0; until the
+repository's latest tag (`v0.9.3`). Sand, Cocoa, Coin, Mach, Butterfly and
+Drop are moving to v0.9.2, Fermi to v0.9.3, and Ghost and Recur stay at v0.9.0; until the
 builder has a version, build it from source (below). The builder plays Recur's presets with
 no sample loaded, as it doesn't install a machine's own samples; a build from
 source opens them on its break.
