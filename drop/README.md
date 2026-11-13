@@ -134,7 +134,9 @@ stepped once a 64-sample block by both. Integer and 32-bit only.
   blows a puff of jet noise and a tick of random sign.
 - **The tone**: a waveguide pipe tuned to the key (a delay of one period, an
   allpass for its fraction, a linear-phase three-tap loop filter) blown like
-  a flute: the jet feeds the pipe's own sound back through a soft limit
+  a flute (the jet's noise, the vents' ticks and the crackle reach it through
+  two low-passes at 2 to 16 times the key that run at half the sample rate):
+  the jet feeds the pipe's own sound back through a soft limit
   (u − u³/3), low-passed at 2.5 times the key so it blows the fundamental
   and not the octave, and high-passed at an eighth of it so it does not blow
   the loop's slow drift. Fed back at three times the loop's loss it settles at
@@ -286,15 +288,18 @@ In a later capture of the same sound code, on a firmware holding v0.9.0, one
 voice at the midpoint measured **2.95%** on average and **7.02%** in its
 worst single block.
 
-The figures below are host estimates made during development.
+Since then a block runs as passes over block buffers, each a loop the
+Blackfin's registers hold: the noise, the crackle, the beats, the jet's
+noise blown, the jet into the pipe (at half the rate), the pipe, the
+crackle and hiss as heard, the gated tone and the knee. Counted in the
+compiled code, a sounding voice runs about 255 to 270 instructions a sample
+in those loops, with about 8 stack loads and stores; the one loop before
+held about 340 and 70. That is not yet measured on an OP-XY.
 
-- `tools/cpu.py` builds `sdk.py test`'s own bench and reference and runs
-  them alternately 20 times, keeping the fastest of each: 11,100 Blackfin
-  instructions per voice block at Drop's heaviest setting, on a busy host
-  (a load of 7). `sdk.py test`'s single runs read 10,500.
-- The pipe and filters take 16-bit products. No sample divides; the allpass's
-  division comes only when the key or the vapour moves, and two small ones
-  remain a block.
+- `tools/cpu.py` is the SDK's host estimate, which has read well under the
+  device (11,100 instructions a block where the OP-XY measured about 6%).
+- No sample divides; the allpass's division comes only when the key or the
+  vapour moves, and two small ones remain a block.
 - **Memory.** Compiled for the Blackfin (`--firmware`), Drop takes about 81 KiB
   of module memory, eight voices of 4,348 bytes.
 

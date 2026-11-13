@@ -24,7 +24,9 @@ the bubbles rise out, the note climbs back to the key.
 **Status: experimental.** Cocoa passes the SDK's tests and runs on an
 OP-XY, where its CPU is
 measured (below). Its screen follows the track's amp envelope, which needs
-version 1.10 of the Open-XY SDK, on its `staging` branch.
+version 1.10 of the Open-XY SDK, on its `staging` branch. Each note sounds one
+block (64 samples, 1.45 ms) after its key: Cocoa stirs the drink in that
+silent block, and the spoon taps in the next.
 
 ## Controls
 
@@ -90,8 +92,8 @@ its shape: fast at first, as the floor clears and the big bubbles leave, then
 a soft landing as the fine ones go. Once every class is out, x_eff is exactly
 0 and the pitch is exactly the key's.
 
-**The modes.** Each mode is a sine from a 4096-point table, read without
-interpolation (its spurs are about 72 dB down). Its increment glides sample
+**The modes.** Each mode is a sine from a 1024-point table, read without
+interpolation (its spurs are about 60 dB down). Its increment glides sample
 by sample, so a ringing tap keeps its level as it climbs. A tap adds to each
 mode's amplitude over the spoon's contact time. Between taps the modes decay,
 (1 + 0.75 × drop) times faster while bubbles damp the column, higher modes
@@ -141,7 +143,9 @@ column.
 
 **No division, no float in the audio.** Per sample, a mode costs a table
 read, a product and four adds. Logarithms and powers of two come from tables
-a few times a block. The stir divides once per class at a note's start.
+a few times a block. Only a note that restirs a settling drink divides,
+once per class, in its silent first block; a fresh stir and the rising
+bubbles never do.
 
 ### The release, and the OP-XY's amp envelope
 
@@ -382,7 +386,7 @@ At the heaviest setting:
 
 **Memory.** A voice is 304 bytes, `Shared` 96 and the display state 236.
 `sdk.py test --firmware` compiles it for the Blackfin in 65.6 KiB of module
-memory, 8 KiB of it the sine table.
+memory, 2 KiB of it the sine table.
 
 ## Prior art
 

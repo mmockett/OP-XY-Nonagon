@@ -30,6 +30,7 @@ enum { kFigure, kBow, kSand, kGrain, kPlate, kSettle, kTilt, kShake };
 i32 word(double normalized) { return static_cast<i32>(std::lround(normalized * 2147483647.0)); }
 // The middle of figure f's (or another enum's) range.
 double pick(unsigned f, unsigned count) { return (f + 0.5) / count; }
+unsigned choice_of(i32 w) { return sand::choice(w, sand::kFigures); }
 
 void defaults(i32* p) {
     const double d[8] = {pick(2, 12), 0.6, 0.6, 0.3, 0, 0.5, 0, 0};
@@ -255,6 +256,77 @@ int main() {
         check("a struck legato note throws the settled sand", again > quiet * 5);
     }
 
+    // A struck wooden plate rings out and its sand comes to rest: the voice
+    // goes quiet, rendering exact silence, until a new strike or a control
+    // wakes it, and it sounds again as before.
+    {
+        defaults(p);
+        p[kBow] = 0;
+        p[kPlate] = word(pick(2, 3));
+        Note n(220);
+        Meter m;
+        double early = 0;
+        m.rattle(n, p, kSecond / 4, &early);
+        m.rattle(n, p, kSecond * 4);
+        bool silent = true;
+        for (unsigned b = 0; b < kSecond / 2; ++b) {
+            n.block(p);
+            for (unsigned i = 0; i < opxy::block_frames; ++i) silent = silent && n.out[i] == 0;
+        }
+        check("a struck wooden plate rings out to silence and goes quiet", silent && n.voice.quiet);
+        sand::start(n.voice, n.shared, 1);
+        double again = 0;
+        m.rattle(n, p, kSecond / 4, &again);
+        char what[96];
+        std::snprintf(what, sizeof what, "a strike after the quiet sounds as the first did (%.4f, %.4f)", early, again);
+        check(what, again > early * 0.5 && again < early * 2);
+        m.rattle(n, p, kSecond * 4);
+        p[kBow] = word(0.6);
+        double bowed = 0;
+        m.rattle(n, p, kSecond, &bowed);
+        check("raising Bow wakes a quiet plate", !n.voice.quiet && bowed > 0.02 && n.bounded);
+    }
+
+    // A chord's notes start in one block: the second takes over the first's
+    // sand before the looks have poured it, and sounds exactly as it would
+    // had the first poured it all at once.
+    {
+        defaults(p);
+        static Voice a, b, ref;
+        static Shared shared, whole;
+        for (Voice* v : {&a, &b, &ref}) {
+            unsigned char* bytes = reinterpret_cast<unsigned char*>(v);
+            for (unsigned i = 0; i < sizeof(Voice); ++i) bytes[i] = 0;
+        }
+        for (Shared* s : {&shared, &whole}) {
+            unsigned char* bytes = reinterpret_cast<unsigned char*>(s);
+            for (unsigned i = 0; i < sizeof(Shared); ++i) bytes[i] = 0;
+        }
+        sand::initialize(a, shared, 1);
+        sand::start(a, shared, 1);
+        sand::initialize(b, shared, 2);
+        sand::start(b, shared, 2);
+        // The reference: the first note's sand poured whole, as its own pour draws it.
+        u32 seed = (1u * 2654435761u | 1u) * 1723622977u + 786704080u;
+        sand::pour(whole.sand, sand::kGrains, seed);
+        whole.pour_seed = seed;
+        whole.poured = sand::kGrains;
+        whole.latest = 1;
+        sand::initialize(ref, whole, 2);
+        sand::start(ref, whole, 2);
+        u32 pitch[opxy::block_frames];
+        for (unsigned i = 0; i < opxy::block_frames; ++i) pitch[i] = static_cast<u32>(110.0 / 44100.0 * 4294967296.0);
+        i32 out_a[opxy::block_frames], out_b[opxy::block_frames], out_ref[opxy::block_frames];
+        bool same = true;
+        for (unsigned blk = 0; blk < kSecond * 2; ++blk) {
+            sand::render(a, shared, 1, out_a, p, pitch);
+            sand::render(b, shared, 2, out_b, p, pitch);
+            sand::render(ref, whole, 2, out_ref, p, pitch);
+            for (unsigned i = 0; i < opxy::block_frames; ++i) same = same && out_b[i] == out_ref[i];
+        }
+        check("a chord's second note pours the first's sand as a whole pour would", same);
+    }
+
     // Pitch: the bowed mode sounds the note. The strongest component within
     // 3% of the note, by a fine sweep of single-bin DFTs over three seconds of
     // the settled, sand-free tone (long enough to part the bowed mode from its twin), lies within 3 cents of it.
@@ -349,6 +421,50 @@ int main() {
         std::snprintf(what, sizeof what, "an eight-note chord of %s peaks between 0.66 and 1.33 (%.2f)", preset.name, peak);
         std::printf("%s chord peak %.2f\n", preset.name, peak);
         check(what, peak >= 0.66 && peak <= 1.33);
+    }
+
+    // The output's fingerprint: a hash of every sample over a set of scenes
+    // (a bowed note, a struck one, shaken and tilted sand, a figure change, a
+    // legato note, a fresh pour, and high notes whose modes sound at the
+    // faster rates). Work that only saves time leaves it unchanged.
+    {
+        struct Scene { double hz; double values[8]; };
+        const Scene scenes[] = {
+            {261.63, {pick(2, 12), 0.6, 0.6, 0.3, 0, 0.5, 0, 0}},
+            {261.63, {pick(4, 12), 0, 0.85, 0.45, 0.8333, 0.75, 0, 0}},
+            {110.0, {pick(0, 12), 0.6, 1, 0, 0.5, 0, 0, 0.375}},
+            {196.0, {pick(9, 12), 0.75, 0.8, 0.15, 0.1667, 0.4, 0.6, 0}},
+            {880.0, {pick(7, 12), 0.3, 0.6, 1, 0.1667, 1, 0, 0.1}},
+            {3000.0, {pick(11, 12), 0.9, 0.5, 0.5, 1, 0.5, 0.2, 0}},
+            {65.41, {pick(5, 12), 0.1, 0.7, 0.7, 1, 0.25, 0, 0}},
+        };
+        unsigned long long hash = 1469598103934665603ull;
+        for (const Scene& scene : scenes) {
+            for (unsigned c = 0; c < 8; ++c) p[c] = word(scene.values[c]);
+            Note n(scene.hz);
+            for (unsigned b = 0; b < kSecond * 2; ++b) {
+                if (b == kSecond) p[kFigure] = word(pick((choice_of(p[kFigure]) + 5) % 12, 12));
+                if (b == kSecond * 3 / 2) sand::start(n.voice, n.shared, 1);
+                n.block(p);
+                for (unsigned i = 0; i < opxy::block_frames; ++i) {
+                    hash ^= static_cast<u32>(n.out[i]);
+                    hash *= 1099511628211ull;
+                }
+            }
+            sand::destroy(n.voice, n.shared, 1);
+            sand::start(n.voice, n.shared, 1);
+            for (unsigned b = 0; b < kSecond / 2; ++b) {
+                n.block(p);
+                for (unsigned i = 0; i < opxy::block_frames; ++i) {
+                    hash ^= static_cast<u32>(n.out[i]);
+                    hash *= 1099511628211ull;
+                }
+            }
+        }
+        std::printf("output fingerprint %016llx\n", hash);
+        char what[80];
+        std::snprintf(what, sizeof what, "the output as expected (fingerprint %016llx)", hash);
+        check(what, hash == 0x2866314085ac9b08ull);  // ae9f4ad: the jolt from the second block (3b10263807a12347 before, cc8742c0d2a3648b at 95130c1)
     }
 
     if (!failures) std::puts("Sand: all sound checks pass");

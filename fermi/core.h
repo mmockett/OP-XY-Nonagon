@@ -18,12 +18,14 @@ struct Voice {
     i32 springs;
     u32 turn;                   // which third of the modes this block measures
     u32 fresh;                  // 1 until the note's first block loads the chain
+    u32 quiet;                  // 1 once a damped note has died away, until the next load
 };
 // State shared by every voice: the latest starting shape, made once for a
 // seed, masses and mode and copied by every note.
 struct Shared {
     i32 start[chain::most + 2];
     u32 key;                    // the seed, masses and mode it was made for, plus 1 (0: none)
+    u32 level[chain::voiced];   // its modes' levels, Q16: a note's first block sounds them
     // The figures a block's controls make, kept while the controls stay.
     chain::Setup setup;
     i32 controls[8];            // the controls they were made from

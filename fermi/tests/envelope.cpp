@@ -136,7 +136,7 @@ int main() {
         hash = fnv(hash, &h, sizeof h);
     }
     std::printf("envelope: unknown, frames hash %016llx\n", hash);
-    const unsigned long long before = 0x4c70169f67987d83ull;  // the stock-look redraw, the chain whole every frame, f5bb96f
+    const unsigned long long before = 0xbfb9e8324a17d1e2ull;  // the stock-look redraw (f5bb96f), the heavy scene's chain at the step cap
     if (hash != before) { std::printf("FAIL unknown envelope: frames hash %016llx, before %016llx\n", hash, before); ++failures; }
 
     // 2. A short envelope against a long one: the init sound, and the same

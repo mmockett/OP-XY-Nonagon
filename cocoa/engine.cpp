@@ -77,90 +77,70 @@ inline u32 next(u32& seed) {
     return seed;
 }
 
-// Adds a mode's block to sum (Q27): its amplitude ramps by `slope` until
-// sample `split`, then by `after`; its increment by `glide` a sample. Two
-// plain loops, so neither tests the split each sample.
-__attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split) {
+// Adds a mode's block, or its first `frames` samples, to sum (Q27) at
+// 1 / 2^r of the sample rate: every 2^r-th sample of the full rate's, with
+// the same phases and amplitudes there. Over 2^r samples the phase moves 2^r
+// increments and the glide's 2^r (2^r - 1) / 2, and the increment 2^r
+// glides; the amplitude ramps by `slope` until sample `split`, then by
+// `after`. One function for every rate, so a block runs less code; each
+// sine's address is worked out a sample ahead, so its read never waits on
+// the address register.
+__attribute__((noinline)) void sing(i32* sum, Mode& m, u32 r, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split, u32 frames) {
+    const u32 steps = 1u << r;
     u32 p = m.phase;
     i32 a = amp;
-    if (!glide) {   // a steady pitch: the same sums without the glide's add
-        for (u32 i = 0; i < split; ++i) {
-            sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
-            a += slope;
-            p += inc;
-        }
-        for (u32 i = split; i < opxy::block_frames; ++i) {
-            sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
-            a += after;
-            p += inc;
-        }
-        m.phase = p;
-        return;
-    }
-    for (u32 i = 0; i < split; ++i) {
-        sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
-        a += slope;
-        p += inc;
-        inc += static_cast<u32>(glide);
-    }
-    for (u32 i = split; i < opxy::block_frames; ++i) {
-        sum[i] += ((a >> 16) * tables::sine[p >> 20]) >> 3;
-        a += after;
-        p += inc;
-        inc += static_cast<u32>(glide);
-    }
-    m.phase = p;
-}
-// Sings a mode's block at 1 / 2^R of the sample rate: every 2^R-th sample of
-// the full rate's, with the same phases and amplitudes there. Over 2^R
-// samples the phase moves 2^R increments and the glide's 2^R (2^R - 1) / 2,
-// and the increment 2^R glides; the amplitude ramps by `slope` until sample
-// `split`, then by `after`.
-template <u32 R>
-__attribute__((noinline)) void sing_at(i32* sum, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split) {
-    const u32 steps = 1u << R;
-    u32 p = m.phase;
-    i32 a = amp;
-    const u32 ramped = (split + steps - 1) >> R;   // samples before the split
-    const i32 ramp = slope << R;
+    const u32 ramped = (split + steps - 1) >> r, n = frames >> r;   // samples before the split, and in all
+    const i32 ramp = slope << r, later = after << r;
+    const opxy::i16* at = tables::sine + (p >> 22);
     if (!glide) {
-        const u32 advance = inc << R;
+        const u32 advance = inc << r;
         for (u32 i = 0; i < ramped; ++i) {
-            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
-            a += ramp;
+            const opxy::i16 v = *at;
             p += advance;
+            at = tables::sine + (p >> 22);
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * v) >> 3;
+            a += ramp;
         }
-        a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << R) - split);
+        a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << r) - split);
         if (!after) {
             const opxy::i16 held = static_cast<opxy::i16>(static_cast<u32>(a) >> 16);
-            for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
-                sum[i] += (held * tables::sine[p >> 20]) >> 3;
+            for (u32 i = ramped; i < n; ++i) {
+                const opxy::i16 v = *at;
                 p += advance;
+                at = tables::sine + (p >> 22);
+                sum[i] += (held * v) >> 3;
             }
         } else {
-            for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
-                sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
-                a += after << R;
+            for (u32 i = ramped; i < n; ++i) {
+                const opxy::i16 v = *at;
                 p += advance;
+                at = tables::sine + (p >> 22);
+                sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * v) >> 3;
+                a += later;
             }
         }
         m.phase = p;
         return;
     }
-    const u32 bend = static_cast<u32>(glide) << R, curve = static_cast<u32>(glide) * ((steps * (steps - 1)) >> 1);
-    u32 advance = (inc << R) + curve;
+    const u32 bend = static_cast<u32>(glide) << r, curve = static_cast<u32>(glide) * ((steps * (steps - 1)) >> 1);
+    const u32 turn = bend << r;
+    u32 advance = (inc << r) + curve;
     for (u32 i = 0; i < ramped; ++i) {
-        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
+        const opxy::i16 v = *at;
+        p += advance;
+        at = tables::sine + (p >> 22);
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * v) >> 3;
         a += ramp;
-        p += advance;
-        advance += bend << R;
+        advance += turn;
     }
-    a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << R) - split);
-    for (u32 i = ramped; i < (opxy::block_frames >> R); ++i) {
-        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 20]) >> 3;
-        a += after << R;
+    a = amp + slope * static_cast<i32>(split) + after * static_cast<i32>((ramped << r) - split);
+    for (u32 i = ramped; i < n; ++i) {
+        const opxy::i16 v = *at;
         p += advance;
-        advance += bend << R;
+        at = tables::sine + (p >> 22);
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * v) >> 3;
+        a += later;
+        advance += turn;
     }
     m.phase = p;
 }
@@ -178,12 +158,10 @@ inline void clear_sum(Sums& sums, u32 r) {
     for (u32 i = 0; i < (opxy::block_frames >> r); ++i) sum[i] = 0;
 }
 // Sings a mode at rate r.
-inline void sing_rate(Sums& sums, u32 r, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split) {
+inline void sing_rate(Sums& sums, u32 r, Mode& m, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split,
+                      u32 frames = opxy::block_frames) {
     clear_sum(sums, r);
-    if (r == 3) sing_at<3>(sums.at[3], m, inc, glide, amp, slope, after, split);
-    else if (r == 2) sing_at<2>(sums.at[2], m, inc, glide, amp, slope, after, split);
-    else if (r == 1) sing_at<1>(sums.at[1], m, inc, glide, amp, slope, after, split);
-    else sing(sums.at[0], m, inc, glide, amp, slope, after, split);
+    sing(sums.at[r], m, r, inc, glide, amp, slope, after, split, frames);
 }
 
 // A mode's rate, from the highest increment it sings this block. The
@@ -201,10 +179,14 @@ inline u32 rate_for(u32 now, u32 top) {
     const u32 r = now > most ? most : now;
     return r < least ? least : r;
 }
-// Whether a tap's block is sung at the full rate: its strike ramps in over
-// the spoon's contact, as short as 4 samples, whose edge the slower rates
-// would round off.
-const bool taps_at_full_rate = true;
+// The slowest rate a tap's strike is sung at. The strike ramps in over the
+// spoon's contact (2^contact samples, 4 to 64), and a rate holds that ramp
+// once the contact spans 4 of its samples: the ramp's spectrum then has its
+// main lobe under a quarter of the rate, about where the rate's half-band
+// stage stops being flat. So a hard spoon's 4-sample click strikes at the
+// full rate, 8 samples at a half, 16 (the default) at a quarter, and a soft
+// spoon at an eighth: each mode at its own rate, with no fade after.
+inline u32 strike_rate(u32 contact) { return contact - 2; }
 
 // The half-band stages that double a rate: from n inputs after 2K - 1 of
 // history (low), 2n outputs, each input in turn (K of them late) and the
@@ -254,10 +236,11 @@ __attribute__((noinline)) void twice(const i32* low, i32* out, u32 n) {
 // increment to `to`.
 // One path of a mode's block: from its phase now (keeping the phase it ends at
 // only when told to, so a mode on two paths moves on once).
-inline void path(Sums& sums, u32 r, Mode& m, u32 phase, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split, bool keep) {
+inline void path(Sums& sums, u32 r, Mode& m, u32 phase, u32 inc, i32 glide, i32 amp, i32 slope, i32 after, u32 split, bool keep,
+                 u32 frames = opxy::block_frames) {
     const u32 was = m.phase;
     m.phase = phase;
-    sing_rate(sums, r, m, inc, glide, amp, slope, after, split);
+    sing_rate(sums, r, m, inc, glide, amp, slope, after, split, frames);
     if (!keep) m.phase = was;
 }
 // The share of what is left to move that a fade moves this block, 1 / left (Q31; left > 1).
@@ -286,26 +269,39 @@ inline void play(Sums& sums, Band& band, Mode& m, u32 to, i32 loss, bool tap, i3
     const i32 glide = static_cast<i32>(to - from) >> 6;
     const u32 top = from > to ? from : to;
     const u32 p = m.phase;
-    if (tap && taps_at_full_rate) {
-        // A tap's strike rings in at the full rate (its contact can be 4
-        // samples), and moves to the mode's own rate over the next blocks.
-        // The mode's own rate holds its share through the block.
+    if (tap) {
+        // A tap's strike rings in at the mode's own rate, or a faster one if
+        // the spoon's contact is too short for it (strike_rate), and then
+        // moves to the mode's own rate over the next blocks. The mode's own
+        // rate holds its share through the block.
         const i32 strike = (m.out - start) >> contact;
         const u32 split = 1u << contact;
         if (!band.left && !start) band.dst = static_cast<opxy::u8>(rate_for(band.dst, top));
+        const u32 most_slow = strike_rate(contact), at = band.dst < most_slow ? band.dst : most_slow;
         const i32 own = band.left ? band.kept : start, lent = start - own;
-        const bool moving = band.left && band.src;   // between slower rates: the old one hands its share to the full rate
+        const bool moving = band.left && band.src != at;   // the old rate hands its share to the strike's
         if (moving && lent) path(sums, band.src, m, p, from, glide, lent, (-lent) >> 6, 0, block_frames, false);
         const i32 handed = moving ? lent >> 6 : 0;
-        if (!band.dst) {   // the mode's own rate is the full rate
-            path(sums, 0, m, p, from, glide, moving ? own : start, strike + handed, handed, split, true);
+        if (at == band.dst) {   // struck at the mode's own rate
+            path(sums, at, m, p, from, glide, moving ? own : start, strike + handed, handed, split, true);
             band.left = 0;
             return;
         }
+        if (!band.left) {
+            // Not fading: the own rate takes the whole tap, ramping it in
+            // over 4 of its samples (reach), and the strike's rate sings only
+            // what that ramp leaves out, the contact's sharper corners, for
+            // as long: it starts and ends at 0, and the mode needs no fade.
+            const u32 reach = 1u << (band.dst + 2);
+            const i32 take = (m.out - start) >> (band.dst + 2);
+            path(sums, at, m, p, from, glide, 0, strike - take, -take, split, false, reach);
+            path(sums, band.dst, m, p, from, glide, start, take, 0, reach, true);
+            return;
+        }
         if (own) path(sums, band.dst, m, p, from, glide, own, 0, 0, block_frames, false);
-        path(sums, 0, m, p, from, glide, moving ? 0 : lent, strike + handed, handed, split, true);
+        path(sums, at, m, p, from, glide, moving ? 0 : lent, strike + handed, handed, split, true);
         band.kept = own;
-        band.src = 0;
+        band.src = static_cast<opxy::u8>(at);
         band.left = static_cast<opxy::u8>(fade_blocks);
         return;
     }
@@ -361,6 +357,9 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     for (u32 k = 0; k < liquid_modes + cup_modes; ++k) voice.band[k].dst = 3, voice.band[k].src = 3, voice.band[k].left = 0, voice.band[k].spare = 0, voice.band[k].kept = 0;
     voice.live = 0;
     voice.spare[0] = voice.spare[1] = 0;
+    voice.planned_void = voice.planned_wobble = 0;
+    voice.planned_contact = 0;
+    for (u32 k = 0; k < liquid_modes + cup_modes; ++k) voice.planned_struck[k] = 0;
     for (u32 i = 0; i < kHistory4 + kBlock / 8; ++i) voice.eighth[i] = 0;
     for (u32 i = 0; i < kHistory3 + kBlock / 4; ++i) voice.quarter[i] = 0;
     for (u32 i = 0; i < kHistory3 + kBlock / 2; ++i) voice.half[i] = 0;
@@ -407,7 +406,7 @@ inline i32 finish_one(i32 x, i32& dc_in, i32& dc_out, i32 hi, i32 reach) {
     const i32 lifted = r + multiply(r, lift);   // the level after the knee, so its shape is kept
     return (lifted ^ sign) - sign;
 }
-__attribute__((noinline)) void finish(Voice& voice, const i32* sum, opxy::Output output, i32 hi, i32 reach, u32 count) {
+__attribute__((noinline)) void finish(Voice& voice, const i32* sum, i32* output, i32 hi, i32 reach, u32 count) {   // sum may be output
     i32 dc_in = voice.dc_in, dc_out = voice.dc_out;
     for (unsigned i = 0; i < count; ++i) output[i] = finish_one(sum[i], dc_in, dc_out, hi, reach);
     for (unsigned i = count; i < opxy::block_frames; ++i) output[i] = 0;
@@ -479,11 +478,12 @@ inline void back_to_full_rate(Voice& voice, sound::Sums& sums, i32* full, i32* h
     const i32 hi = (1 << 27) - 1, reach = 1 << 29;
     if (half_on) {
         if (!half_in) for (u32 i = 0; i < block_frames / 2; ++i) stage3[i] = 0;
-        i32 tone[block_frames];
-        if (to_full) twice<3, false>(voice.half, full, tone, block_frames / 2);
-        else twice<3, false>(voice.half, tone, block_frames / 2);
+        // The last stage writes straight into the output, which finish
+        // then works on in place: no block buffer of its own.
+        if (to_full) twice<3, false>(voice.half, full, output, block_frames / 2);
+        else twice<3, false>(voice.half, output, block_frames / 2);
         for (u32 i = 0; i < kHistory3; ++i) voice.half[i] = voice.half[block_frames / 2 + i];
-        finish(voice, tone, output, hi, reach, count);
+        finish(voice, output, output, hi, reach, count);
     } else {
         if (!to_full) for (u32 i = 0; i < block_frames; ++i) full[i] = 0;
         finish(voice, full, output, hi, reach, count);
@@ -508,6 +508,110 @@ inline void flush(Voice& voice, opxy::Output output) {
     for (u32 i = 0; i < kHistory3 + kBlock / 4; ++i) voice.quarter[i] = 0;
     for (u32 i = 0; i < kHistory3 + kBlock / 2; ++i) voice.half[i] = 0;
     voice.live = 0;
+}
+
+// What the fill and the cup alone set, worked out when they change: each
+// liquid mode's ratio and clear loss, and the wall's pitches and losses.
+__attribute__((noinline)) void fill_cup(Voice& voice, i32 fill, u32 cup) {
+    using namespace sound;
+    if (voice.filled && fill == voice.filled_fill && cup == voice.filled_cup) return;
+    const i32 depth = drink::along(tables::liquid_depth, fill);          // shallow drinks ring shorter
+    for (u32 k = 0; k < liquid_modes; ++k) {
+        voice.ratio[k] = drink::along(tables::liquid_ratio[k], fill);
+        voice.liquid_loss[k] = drink::scale(static_cast<u32>(tables::liquid_decay[cup]), voice.ratio[k] / 2 + depth, ceiling);
+    }
+    const i32 lowered = drink::along(tables::cup_lowering, fill);
+    const i32 damped = drink::along(tables::cup_damping, fill);
+    for (u32 k = 0; k < cup_modes; ++k) {
+        voice.cup_log2[k] = tables::cup_pitch[cup][k] + lowered;
+        voice.cup_inc[k] = drink::exp2_int(voice.cup_log2[k]);
+        voice.cup_loss[k] = static_cast<i32>(drink::scale(static_cast<u32>(tables::cup_decay[cup][k]), damped, ceiling));
+    }
+    voice.filled = 1;
+    voice.filled_fill = fill;
+    voice.filled_cup = cup;
+}
+
+// The bubbles rise; the column's pitch at the block's end. The drink
+// sloshes at its first sloshing mode, swinging the pitch as it dies away.
+// Sets the voice's drop and returns the void fraction and the swing.
+__attribute__((noinline)) i32 rise(Voice& voice, const i32* rate, i32 fill, i32& wobble) {
+    using namespace sound;
+    drink::advance(voice.s, rate, 1);
+    const i32 void_now = drink::effective(voice.d, voice.s);
+    voice.drop = drink::wood_drop(void_now);
+    wobble = 0;
+    if (voice.slosh) {
+        voice.slosh_phase += static_cast<u32>(drink::along(tables::slosh_inc, fill));
+        wobble = (((voice.slosh * slosh_depth) >> 15) * tables::sine[voice.slosh_phase >> 22]) >> 15;
+        voice.slosh -= (voice.slosh >> 9) + 1;   // dies away in about 0.7 s
+        if (voice.slosh < 64) voice.slosh = 0;
+    }
+    return void_now;
+}
+// What only a tap needs: the spoon, how hard it strikes, and how it takes
+// the key.
+struct Tap {
+    u32 contact;
+    i32 corner, hit, log2_key, tone, make_up, upper, clink;
+};
+__attribute__((noinline)) Tap tap_of(const Voice& voice, opxy::Parameters parameters, u32 cup, u32 key, i32 drop, i32 shift, u32 taps) {
+    using namespace sound;
+    Tap t;
+    const i32 hard = static_cast<i32>(drink::q16(parameters[SPOON]));
+    t.corner = tables::log2_soft_corner + static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * static_cast<u32>(hard) >> 12);
+    // The contact, 4 ms to 75 us, as a power of two of samples: 64 to 4.
+    t.contact = static_cast<u32>(drink::clamp((tables::log2_soft_samples - (static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * static_cast<u32>(hard) >> 12)) + 32768) >> 16, 2, 6));
+    // The tap's strength, a little uneven, as a hand's is.
+    const i32 lean = static_cast<i32>((taps * 2654435761u) >> 24) - 128;   // -128..127
+    // A bubbly column's impedance (rho c) is low, so it takes up less of the
+    // spoon's blow: the tap's level falls a quarter octave each octave of drop.
+    // Fast taps on a long-ringing column pile up: each strikes softer by
+    // 1 / sqrt(1 + rate T60 / 2), so tapping holds about a single tap's level.
+    const u32 pile = 256u + drink::tap_tenths(parameters[TAPS]) * ring_time[cup] / 20u;   // Q8
+    const i32 soften = (drink::log2_q16(pile) - 8 * octave) / 2;
+    t.hit = static_cast<i32>(drink::scale(static_cast<u32>(((strike >> 15) * voice.share >> 15) * (32768 + lean * 20)),
+                                          -drop / 4 - soften, ceiling));
+    t.log2_key = drink::log2_q16(key);
+    // The spoon strikes the drink's modes up to a corner that follows the key,
+    // from half an octave under it (soft) to three and a half over (hard), so
+    // it brightens alike at every pitch; the wall's clink takes its absolute
+    // contact (corner, above).
+    t.tone = t.log2_key - octave / 2 + 4 * hard;
+    t.make_up = boost(t.log2_key + shift, t.tone);
+    // and a hard spoon's sharper blow carries more into the upper modes: 0.3
+    // (wood) to 2 (silver) times their level, about 1.1 at the default.
+    const u32 hard2 = (static_cast<u32>(hard) * static_cast<u32>(hard)) >> 16;
+    t.upper = 9830 + static_cast<i32>((((static_cast<u32>(hard) + hard2) >> 1) * 55706u) >> 16);   // Q15
+    // A hard spoon rings the wall harder: its clink 0.25 to 1.75 times.
+    t.clink = 8192 + static_cast<i32>(((static_cast<u32>(hard) * static_cast<u32>(hard) >> 16) * 49152u) >> 16);
+    return t;
+}
+// A liquid mode's strike, and the wall's.
+inline i32 liquid_strike(const Tap& t, u32 k, i32 ratio, i32 shift) {
+    using namespace sound;
+    const i32 level = k ? (tables::liquid_level[k] * t.upper) >> 15 : tables::liquid_level[0];
+    return strike_of(t.hit, level, spoon(t.log2_key + ratio + shift, t.tone), t.make_up);
+}
+inline i32 cup_strike(const Tap& t, u32 cup, u32 k, i32 log2_inc) {
+    using namespace sound;
+    const i32 level = (tables::cup_level[cup][k] * t.clink) >> 15;
+    return strike_of(t.hit, level < 32767 ? level : 32767, spoon(log2_inc, t.corner), t.make_up);
+}
+// The note's first tap, planned in its silent first block: the drink's step
+// for the block the tap sounds in, taken now, and each mode's strike, so the
+// tap's block does neither. (Every input is the same in both blocks unless a
+// control or the pitch moves between them; then the first tap takes them as
+// they were a block earlier.)
+__attribute__((noinline)) void plan_tap(Voice& voice, opxy::Parameters parameters, u32 cup, u32 key, i32 fill) {
+    i32 wobble;
+    voice.planned_void = rise(voice, voice.rate, fill, wobble);
+    voice.planned_wobble = wobble;
+    const i32 shift = wobble - voice.drop;
+    const Tap t = tap_of(voice, parameters, cup, key, voice.drop, shift, voice.taps + 1);
+    voice.planned_contact = t.contact;
+    for (u32 k = 0; k < liquid_modes; ++k) voice.planned_struck[k] = liquid_strike(t, k, voice.ratio[k], shift);
+    for (u32 k = 0; k < cup_modes; ++k) voice.planned_struck[liquid_modes + k] = cup_strike(t, cup, k, voice.cup_log2[k]);
 }
 
 inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output output,
@@ -541,9 +645,12 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     }
 
     // A new note stirs the drink as the last stir left it, cleared since,
-    // and the spoon taps at once.
-    bool tap = false;
-    if (voice.fresh) {
+    // and the spoon taps in the next block: a note's first block only stirs,
+    // in silence, so no block both stirs and strikes. Everything sounds as
+    // before, 64 samples (1.45 ms) later. A voice still sounding (a note
+    // restarted in place) stirs and taps in one block, as it always has.
+    bool tap = false, planned = false;
+    if (voice.fresh == 1) {
         i32 d[drink::classes], s[drink::classes];
         for (u32 i = 0; i < drink::classes; ++i) {
             d[i] = shared.poured ? shared.d[i] : 0;
@@ -563,7 +670,6 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         voice.seed = (shared.stirs * 0x9e3779b9u) ^ (owner * 0x85ebca6bu) ^ 0x2545f491u;
         voice.tap_phase = 0;
         voice.taps = 0;
-        voice.fresh = 0;
         const u32 together = shared.started_at == voice.started_at ? shared.strum : 0;
         voice.share = chord_share[together < 7 ? together : 7];
         // The stir raises a head of foam, more for more powder, and sets the
@@ -572,7 +678,18 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         voice.foam = voice.foam > foam ? voice.foam : foam;
         voice.slosh = static_cast<i32>(drink::q16(parameters[STIR]) >> 1);
         voice.slosh_phase = 0;
+        if (!voice.live) {
+            voice.fresh = 2;
+            fill_cup(voice, fill, cup);
+            plan_tap(voice, parameters, cup, pitch[0] ? pitch[0] : 1, fill);
+            for (unsigned i = 0; i < block_frames; ++i) output[i] = 0;
+            return;
+        }
+        voice.fresh = 0;
         tap = true;
+    } else if (voice.fresh) {   // stirred last block: the spoon taps, as planned there
+        voice.fresh = 0;
+        tap = planned = true;
     } else if (step) {
         const u32 before = voice.tap_phase;
         voice.tap_phase += step;
@@ -580,19 +697,15 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     }
     if (tap) ++voice.taps;
 
-    // The bubbles rise; the column's pitch at the block's end. The drink
-    // sloshes at its first sloshing mode, swinging the pitch as it dies away.
-    drink::advance(voice.s, rate, 1);
-    const i32 void_now = drink::effective(voice.d, voice.s);
-    const i32 drop = drink::wood_drop(void_now);
-    voice.drop = drop;
-    i32 wobble = 0;
-    if (voice.slosh) {
-        voice.slosh_phase += static_cast<u32>(drink::along(tables::slosh_inc, fill));
-        wobble = (((voice.slosh * slosh_depth) >> 15) * tables::sine[voice.slosh_phase >> 20]) >> 15;
-        voice.slosh -= (voice.slosh >> 9) + 1;   // dies away in about 0.7 s
-        if (voice.slosh < 64) voice.slosh = 0;
+    // The drink's step (rise), already taken for a planned tap.
+    i32 wobble, void_now;
+    if (planned) {
+        wobble = voice.planned_wobble;
+        void_now = voice.planned_void;
+    } else {
+        void_now = rise(voice, rate, fill, wobble);
     }
+    const i32 drop = voice.drop;
     const i32 shift = wobble - drop;   // the liquid's pitch against the clear key, Q16 octaves
 
     // The sums at each rate. The faster rates' sums wait for the eighth's:
@@ -607,60 +720,14 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
 
     // The liquid's modes: tuned to the key with no bubbles, falling by the drop.
     const u32 key = pitch[0] ? pitch[0] : 1;
-    // What only a tap needs: the spoon, how hard it strikes, and how it takes
-    // the key. Most blocks have no tap.
-    u32 contact = 0;
-    i32 corner = 0, hit = 0, log2_key = 0, tone = 0, make_up = 0, upper = 0, clink = 0;
-    if (tap) {
-        const i32 hard = static_cast<i32>(drink::q16(parameters[SPOON]));
-        corner = tables::log2_soft_corner + static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * static_cast<u32>(hard) >> 12);
-        // The contact, 4 ms to 75 us, as a power of two of samples: 64 to 4.
-        contact = static_cast<u32>(drink::clamp((tables::log2_soft_samples - (static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * static_cast<u32>(hard) >> 12)) + 32768) >> 16, 2, 6));
-        // The tap's strength, a little uneven, as a hand's is.
-        const i32 lean = static_cast<i32>((voice.taps * 2654435761u) >> 24) - 128;   // -128..127
-        // A bubbly column's impedance (rho c) is low, so it takes up less of the
-        // spoon's blow: the tap's level falls a quarter octave each octave of drop.
-        // Fast taps on a long-ringing column pile up: each strikes softer by
-        // 1 / sqrt(1 + rate T60 / 2), so tapping holds about a single tap's level.
-        const u32 pile = 256u + drink::tap_tenths(parameters[TAPS]) * ring_time[cup] / 20u;   // Q8
-        const i32 soften = (drink::log2_q16(pile) - 8 * octave) / 2;
-        hit = static_cast<i32>(drink::scale(static_cast<u32>(((strike >> 15) * voice.share >> 15) * (32768 + lean * 20)),
-                                            -drop / 4 - soften, ceiling));
-        log2_key = drink::log2_q16(key);
-        // The spoon strikes the drink's modes up to a corner that follows the key,
-        // from half an octave under it (soft) to three and a half over (hard), so
-        // it brightens alike at every pitch; the wall's clink takes its absolute
-        // contact (corner, above).
-        tone = log2_key - octave / 2 + 4 * hard;
-        make_up = boost(log2_key + shift, tone);
-        // and a hard spoon's sharper blow carries more into the upper modes: 0.3
-        // (wood) to 2 (silver) times their level, about 1.1 at the default.
-        const u32 hard2 = (static_cast<u32>(hard) * static_cast<u32>(hard)) >> 16;
-        upper = 9830 + static_cast<i32>((((static_cast<u32>(hard) + hard2) >> 1) * 55706u) >> 16);   // Q15
-        // A hard spoon rings the wall harder: its clink 0.25 to 1.75 times.
-        clink = 8192 + static_cast<i32>(((static_cast<u32>(hard) * static_cast<u32>(hard) >> 16) * 49152u) >> 16);
-    }
+    // What only a tap needs (tap_of); most blocks have no tap, and a note's
+    // first tap was planned in its silent block.
+    Tap t = Tap();
+    if (tap && !planned) t = tap_of(voice, parameters, cup, key, drop, shift, voice.taps);
+    const u32 contact = !tap ? 0 : planned ? voice.planned_contact : t.contact;
     const i32 damping = 65536 + ((drop >> 2) * (bubble_damping >> 6) >> 8);   // Q16
     bool ringing = false;
-    // What the fill and the cup alone set, worked out when they change: each
-    // liquid mode's ratio and clear loss, and the wall's pitches and losses.
-    if (!voice.filled || fill != voice.filled_fill || cup != voice.filled_cup) {
-        const i32 depth = drink::along(tables::liquid_depth, fill);          // shallow drinks ring shorter
-        for (u32 k = 0; k < liquid_modes; ++k) {
-            voice.ratio[k] = drink::along(tables::liquid_ratio[k], fill);
-            voice.liquid_loss[k] = drink::scale(static_cast<u32>(tables::liquid_decay[cup]), voice.ratio[k] / 2 + depth, ceiling);
-        }
-        const i32 lowered = drink::along(tables::cup_lowering, fill);
-        const i32 damped = drink::along(tables::cup_damping, fill);
-        for (u32 k = 0; k < cup_modes; ++k) {
-            voice.cup_log2[k] = tables::cup_pitch[cup][k] + lowered;
-            voice.cup_inc[k] = drink::exp2_int(voice.cup_log2[k]);
-            voice.cup_loss[k] = static_cast<i32>(drink::scale(static_cast<u32>(tables::cup_decay[cup][k]), damped, ceiling));
-        }
-        voice.filled = 1;
-        voice.filled_fill = fill;
-        voice.filled_cup = cup;
-    }
+    fill_cup(voice, fill, cup);
     for (u32 k = 0; k < liquid_modes; ++k) {
         Mode& m = voice.liquid[k];
         const i32 ratio = voice.ratio[k];
@@ -676,10 +743,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         }
         const i32 loss = static_cast<i32>((voice.liquid_loss[k] * static_cast<u32>(damping)) >> 16);
         i32 struck = 0;
-        if (tap) {
-            const i32 level = k ? (tables::liquid_level[k] * upper) >> 15 : tables::liquid_level[0];
-            struck = strike_of(hit, level, spoon(log2_key + ratio + shift, tone), make_up);
-        }
+        if (tap) struck = planned ? voice.planned_struck[k] : liquid_strike(t, k, ratio, shift);
         play(sums, voice.band[k], m, to, loss, tap, struck, contact, tap ? next(voice.seed) : 0);
         ringing = ringing || m.out;
     }
@@ -697,10 +761,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         const u32 to = voice.cup_inc[k];
         const i32 loss = voice.cup_loss[k];
         i32 struck = 0;
-        if (tap && shared.leader == owner) {
-            const i32 level = (tables::cup_level[cup][k] * clink) >> 15;
-            struck = strike_of(hit, level < 32767 ? level : 32767, spoon(log2_inc, corner), make_up);
-        }
+        if (tap && shared.leader == owner) struck = planned ? voice.planned_struck[liquid_modes + k] : cup_strike(t, cup, k, log2_inc);
         play(sums, voice.band[liquid_modes + k], m, to, loss, tap, struck, contact, tap ? next(voice.seed) : 0);
         ringing = ringing || m.out;
     }
@@ -758,10 +819,13 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         u32 ph = p.phase, inc = p.inc;
         i32 a = p.amp;
         const u32 shift = p.shift, chirp = inc >> 13;
+        const opxy::i16* at = tables::sine + (ph >> 22);   // a sample ahead, as in sing
         for (unsigned i = 0; i < block_frames; ++i) {
-            sum[i] += ((a >> 16) * tables::sine[ph >> 20]) >> 3;
-            a -= a >> shift;
+            const opxy::i16 v = *at;
             ph += inc;
+            at = tables::sine + (ph >> 22);
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * v) >> 3;
+            a -= a >> shift;
             inc += chirp;
         }
         p.phase = ph;

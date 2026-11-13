@@ -27,6 +27,12 @@ const u32 level = 2358;                     // a mode's amplitude (Q12) to its p
 const u32 fade_from = 1717986918u;          // partials fade out from 0.40 of the sample rate...
 const u32 fade_to = 1932735283u;            // ...to silence at 0.45
 const i32 ceiling = 1 << 30;                // half scale
+// The partials' floor: one under -80 dBFS (a level of 65536 is full scale),
+// or more than 40 dB under the note's loudest, falls silent and costs nothing;
+// a silent one sounds again only once it is within 36 dB, so a partial
+// hovering at the line does not flicker.
+const u32 quietest = 7;                     // -80 dBFS, Q16
+const u32 below_off = 100, below_on = 64;   // 40 and 36 dB
 }
 
 inline void initialize(Voice& voice, Shared& shared, opxy::u32) {
@@ -46,6 +52,7 @@ inline void initialize(Voice& voice, Shared& shared, opxy::u32) {
     voice.turn = 0;
     voice.chain.n = 0;
     voice.fresh = 1;
+    voice.quiet = 0;
 }
 
 // Each note loads its chain afresh on its first block, from the controls then.
@@ -53,54 +60,59 @@ inline void start(Voice& voice, Shared&, opxy::u32) { voice.fresh = 1; }
 
 inline void destroy(Voice&, Shared&, opxy::u32) {}
 
-// Two partials side by side, so their loads and sums share one pass. Each
-// reads its own wave: the body, or a plain sine once the body's third
-// harmonic would pass Nyquist. Levels step four times a block (every 16
-// samples) toward their targets: a ramp a sample cost the loop four
-// registers it could not spare on the Blackfin.
-inline void pair(i32* out, const i16* w1, u32& p1, u32 i1, const i32* g1, const i16* w2, u32& p2, u32 i2, const i32* g2) {
-    u32 q1 = p1, q2 = p2;
-    for (unsigned quarter = 0; quarter < 4; ++quarter) {
-        const i32 a1 = g1[quarter], a2 = g2[quarter];
-        i32* o = out + 16 * quarter;
-        for (unsigned i = 0; i < 16; ++i) {
-            o[i] += w1[q1 >> 20] * a1 + w2[q2 >> 20] * a2;
-            q1 += i1;
-            q2 += i2;
-        }
-    }
-    p1 = q1;
-    p2 = q2;
-}
-// One partial alone, the last of an odd number.
-inline void single(i32* out, const i16* w, u32& p, u32 inc, const i32* g) {
+// One partial over the block, added into out. Levels step four times a
+// block (every 16 samples) toward their targets: a ramp a sample costs
+// registers the Blackfin cannot spare. Two samples a pass, each read through
+// an address made a sample earlier, so the address register is ready when
+// the load needs it (an address made just before costs 4 cycles a read).
+// Partials run one at a time: two to a pass needed four such addresses and
+// spilled. The phase ends 64 increments on, as two were made past the block.
+inline void partial(i32* out, const i16* w, u32& p, u32 inc, const i32* g) {
     u32 q = p;
+    const i16* even = w + (q >> 22);
+    q += inc;
+    const i16* odd = w + (q >> 22);
+    q += inc;
     for (unsigned quarter = 0; quarter < 4; ++quarter) {
         const i32 a = g[quarter];
         i32* o = out + 16 * quarter;
-        for (unsigned i = 0; i < 16; ++i) {
-            o[i] += w[q >> 20] * a;
+        for (unsigned i = 0; i < 16; i += 2) {
+            const i32 x = *even;
+            even = w + (q >> 22);
             q += inc;
+            o[i] += x * a;
+            const i32 y = *odd;
+            odd = w + (q >> 22);
+            q += inc;
+            o[i + 1] += y * a;
         }
     }
-    p = q;
+    p = q - 2 * inc;
 }
-// The same pair with levels ramped every sample, for a note's first block,
-// where a level rises from silence and quartered steps would click.
-inline void pair_ramped(i32* out, const i16* w1, u32& p1, u32 i1, i32 from1, i32 to1,
-                        const i16* w2, u32& p2, u32 i2, i32 from2, i32 to2) {
-    u32 q1 = p1, q2 = p2;
-    i32 a1 = from1 << 15, a2 = from2 << 15;
-    const i32 d1 = ((to1 - from1) << 15) >> 6, d2 = ((to2 - from2) << 15) >> 6;
-    for (unsigned i = 0; i < opxy::block_frames; ++i) {
-        out[i] += w1[q1 >> 20] * (a1 >> 15) + w2[q2 >> 20] * (a2 >> 15);
-        q1 += i1;
-        q2 += i2;
-        a1 += d1;
-        a2 += d2;
+// The same with its level ramped every sample, for a note's first block,
+// where a level rises from silence (or a retriggered note's falls) and
+// quartered steps would click.
+inline void partial_ramped(i32* out, const i16* w, u32& p, u32 inc, i32 from, i32 to) {
+    u32 q = p;
+    i32 a = from << 15;
+    const i32 d = ((to - from) << 15) >> 6;
+    const i16* even = w + (q >> 22);
+    q += inc;
+    const i16* odd = w + (q >> 22);
+    q += inc;
+    for (unsigned i = 0; i < opxy::block_frames; i += 2) {
+        const i32 x = *even;
+        even = w + (q >> 22);
+        q += inc;
+        out[i] += x * (a >> 15);
+        a += d;
+        const i32 y = *odd;
+        odd = w + (q >> 22);
+        q += inc;
+        out[i + 1] += y * (a >> 15);
+        a += d;
     }
-    p1 = q1;
-    p2 = q2;
+    p = q - 2 * inc;
 }
 
 // The output, held within half scale: a function of its own so its loop is a
@@ -114,6 +126,101 @@ __attribute__((noinline)) void finish(const i32* sum, opxy::Output output, i32 m
     }
 }
 
+// The tilt's gain, min(num / lean, 16384), for num < 2^28 and 0 < lean < 2^16,
+// without the runtime's divide: past the clamp it is the clamp, and under it
+// the quotient has 14 bits, which long division finds in 14 compares.
+inline u32 tilt_gain(u32 num, u32 lean) {
+    u32 d = lean << 14;
+    if (num >= d) return 16384;
+    u32 q = 0;
+    for (u32 i = 0; i < 14; ++i) {
+        d >>= 1;
+        const u32 take = num >= d;
+        num -= d & (0u - take);
+        q = (q << 1) | take;
+    }
+    return q;
+}
+
+// Each partial's increment, from the mode's ratio to the struck mode's: the
+// chain's own, blended toward harmonic. Partials near Nyquist fade, and those
+// at even multiples of the struck mode fade with springs. Out of line: it
+// runs only when they change, and render is called from two places.
+static __attribute__((noinline)) void tune(Voice& voice, const chain::Setup& s, u32 key) {
+    using namespace sound;
+    const chain::Chain& c = voice.chain;
+    const u32 count = c.n < chain::voiced ? c.n : chain::voiced;
+    const u32* chain_ratio = &tables::ratio[(c.size * 4 + c.m - 1) * 17];
+    const u32* harmonic = &tables::harmonic[(c.m - 1) * 17];
+    const u32 even = static_cast<u32>(32768 - s.springs);   // Q15: gone at the cubic law
+    u32 next = 2 * c.m;                                      // the next even multiple, 1-based
+    for (u32 k = 0; k < chain::voiced; ++k) {
+        const bool doubled = k + 1 == next;   // an even multiple of the struck mode
+        if (doubled) next += 2 * c.m;
+        voice.inc[k] = 0;
+        voice.fade[k] = 0;
+        if (k >= count) continue;
+        const i32 h = static_cast<i32>(harmonic[k + 1]), r = static_cast<i32>(chain_ratio[k + 1]);
+        const u32 ratio = static_cast<u32>(h + ((((r - h) >> 4) * s.stretch) >> 11));   // Q16
+        const u32 scaled = static_cast<u32>(multiply(static_cast<i32>(key >> 1), static_cast<i32>(ratio << 10)));
+        if (scaled >= (fade_to >> 6)) continue;
+        voice.inc[k] = scaled << 6;   // key x ratio / 64, back to Q32
+        voice.fade[k] = voice.inc[k] > fade_from ? (((fade_to - voice.inc[k]) >> 13) * 1280) >> 10 : 32768;
+        if (doubled) voice.fade[k] = (voice.fade[k] * even) >> 15;
+    }
+    voice.key = key;
+    voice.dispersion = s.stretch;
+    voice.springs = s.springs;
+}
+// A damped chain that has died away: every displacement and velocity under
+// 2^-8 of a unit (Q20), far below anything its modes still sound.
+inline bool still(const chain::Chain& c) {
+    u32 widest = 0;
+    for (u32 j = 1; j <= c.n; ++j) {
+        const i32 x = c.x[j], v = c.v[j];
+        widest |= static_cast<u32>(x < 0 ? -x : x) | static_cast<u32>(v < 0 ? -v : v);
+    }
+    return widest < 4096;
+}
+
+// The controls' figures, made when they change. Out of line: it runs once a
+// change, and inline it sat in the middle of every block's code.
+static __attribute__((noinline)) void configure(Shared& shared, const i32* parameters) {
+    chain::configure_sound(shared.setup, parameters);
+    for (u32 k = 0; k < 8; ++k) shared.controls[k] = parameters[k];
+    shared.configured = 1;
+}
+// A new starting shape (a new seed, masses or mode), made once for every note
+// that shares it, with its modes' levels: the chain at rest in it, so dt does
+// not enter them. Out of line: it runs once a shape, not once a block.
+static __attribute__((noinline)) void make_start(Shared& shared, const chain::Setup& s, chain::Chain& c) {
+    chain::shape(shared.start, s);
+    chain::init(c, s, shared.start);
+    chain::Folded f;
+    chain::fold(c, f);
+    const u32 count = c.n < chain::voiced ? c.n : chain::voiced;
+    for (u32 k = 0; k < chain::voiced; ++k)
+        shared.level[k] = k < count ? chain::root(chain::energy(c, f, k + 1, s.shift)) << 4 : 0;   // Q16
+}
+
+// The block a new starting shape is made in, the voice only holds what it
+// was sounding: its partials at their levels, or silence. Out of line, with
+// the shape: once a shape, not once a block.
+static __attribute__((noinline)) void hold(Voice& voice, opxy::Output output) {
+    i32 sum[opxy::block_frames];
+    for (unsigned i = 0; i < opxy::block_frames; ++i) sum[i] = 0;
+    for (u32 k = 0; k < chain::voiced; ++k) {
+        const i32 a = voice.amp[k] >> 15;
+        if (!a) {
+            voice.phase[k] += voice.inc[k] << 6;
+            continue;
+        }
+        const i32 g[4] = {a, a, a, a};
+        partial(sum, voice.plain[k] ? tables::sine : tables::body, voice.phase[k], voice.inc[k], g);
+    }
+    finish(sum, output, sound::ceiling);
+}
+
 inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
                    opxy::Parameters parameters, opxy::Pitch pitch) {
     using namespace sound;
@@ -122,11 +229,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     chain::Setup& s = shared.setup;
     u32 changed = !shared.configured;
     for (u32 k = 0; k < 8; ++k) changed |= static_cast<u32>(parameters[k] ^ shared.controls[k]);
-    if (changed) {
-        chain::configure_sound(s, parameters);
-        for (u32 k = 0; k < 8; ++k) shared.controls[k] = parameters[k];
-        shared.configured = 1;
-    }
+    if (changed) configure(shared, parameters);
     chain::Chain& c = voice.chain;
 
     // A new note, or a new chain: masses and the struck mode restart it.
@@ -136,34 +239,49 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         // the seed's nudge costs about 1,400 instructions at 32 masses.
         const u32 key = ((s.seed << 8) | (s.size << 4) | s.m) + 1;
         if (shared.key != key) {
-            chain::shape(shared.start, s);
+            // A new shape waits a block: this one makes it and holds what
+            // the voice was sounding, and the note starts on the next.
+            make_start(shared, s, c);
             shared.key = key;
+            voice.fresh = 1;
+            hold(voice, output);
+            return;
         }
         chain::init(c, s, shared.start);
+        // The first block sounds the starting shape's levels; the modes are
+        // measured from the next block, a third a block, as always.
+        for (u32 k = 0; k < chain::voiced; ++k) voice.level[k] = shared.level[k];
+        voice.turn = 0;
         voice.fresh = 0;
+        voice.quiet = 0;
+    }
+    const u32 key = pitch[0];
+    const bool retune = load || key != voice.key || s.stretch != voice.dispersion || s.springs != voice.springs;
+    // A damped note that has died away stays silent until a new note or a new
+    // chain: no steps, no projections, no partials. Its partials keep time
+    // (and their pitch), so the next note starts them where it would have.
+    if (voice.quiet) {
+        if (retune) tune(voice, s, key);
+        for (u32 k = 0; k < chain::voiced; ++k) voice.phase[k] += voice.inc[k] << 6;
+        for (unsigned i = 0; i < opxy::block_frames; ++i) output[i] = 0;
+        return;
     }
     const u32 steps = chain::advance(c, s);
     const u32 count = c.n < chain::voiced ? c.n : chain::voiced;
-    if (steps || load || s.loss) {
+    if (!load && (steps || s.loss)) {
         chain::Folded f;
         chain::fold(c, f);
         // Each level eases an eighth of the way (a 35 ms lag): at a fast clock
         // a mode's energy flickers within a block, and taking it raw would
         // roughen the partial; eased, chaos shimmers instead. A third of the
         // modes are measured a block, in turn.
-        voice.turn = load ? 0 : voice.turn == 2 ? 0 : voice.turn + 1;
-        for (u32 k = load ? 0 : voice.turn; k < chain::voiced; k += load ? 1 : 3) {
+        voice.turn = voice.turn == 2 ? 0 : voice.turn + 1;
+        for (u32 k = voice.turn; k < chain::voiced; k += 3) {
             const u32 now = k < count ? chain::root(chain::energy(c, f, k + 1, s.shift)) << 4 : 0;   // Q16
-            voice.level[k] = load ? now : voice.level[k] + ((static_cast<i32>(now - voice.level[k])) >> 3);
+            voice.level[k] = voice.level[k] + ((static_cast<i32>(now - voice.level[k])) >> 3);
         }
     }
 
-    // Each partial's increment, from the mode's ratio to the struck mode's:
-    // the chain's own, blended toward harmonic. Partials near Nyquist fade,
-    // and those at even multiples of the struck mode fade with springs.
-    const u32 key = pitch[0];
-    const u32* chain_ratio = &tables::ratio[(c.size * 4 + c.m - 1) * 17];
-    const u32* harmonic = &tables::harmonic[(c.m - 1) * 17];
     // The tilt, and the gain that keeps the note's energy where the chain has it.
     const u16* tilt = &tables::tilt[(c.m - 1) * 17];
     u32 tilted[chain::voiced];
@@ -175,36 +293,17 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
         leaned += b * b;
     }
     const u32 lean = chain::root(leaned);
-    u32 hold = lean ? (chain::root(plain) << 12) / lean : 4096;   // Q12, once a block
-    hold = hold > 16384 ? 16384 : hold;
+    const u32 hold = lean ? tilt_gain(chain::root(plain) << 12, lean) : 4096;   // Q12, once a block
     // The increments (and their fades) change only with the pitch, the
     // dispersion, the springs or the chain.
     const u32 third = fade_to / 3;   // the body's third harmonic stays under 0.45 of the rate
-    if (load || key != voice.key || s.stretch != voice.dispersion || s.springs != voice.springs) {
-        const u32 even = static_cast<u32>(32768 - s.springs);   // Q15: gone at the cubic law
-        u32 next = 2 * c.m;                                      // the next even multiple, 1-based
-        for (u32 k = 0; k < chain::voiced; ++k) {
-            const bool doubled = k + 1 == next;   // an even multiple of the struck mode
-            if (doubled) next += 2 * c.m;
-            voice.inc[k] = 0;
-            voice.fade[k] = 0;
-            if (k >= count) continue;
-            const i32 h = static_cast<i32>(harmonic[k + 1]), r = static_cast<i32>(chain_ratio[k + 1]);
-            const u32 ratio = static_cast<u32>(h + ((((r - h) >> 4) * s.stretch) >> 11));   // Q16
-            const u32 scaled = static_cast<u32>(multiply(static_cast<i32>(key >> 1), static_cast<i32>(ratio << 10)));
-            if (scaled >= (fade_to >> 6)) continue;
-            voice.inc[k] = scaled << 6;   // key x ratio / 64, back to Q32
-            voice.fade[k] = voice.inc[k] > fade_from ? (((fade_to - voice.inc[k]) >> 13) * 1280) >> 10 : 32768;
-            if (doubled) voice.fade[k] = (voice.fade[k] * even) >> 15;
-        }
-        voice.key = key;
-        voice.dispersion = s.stretch;
-        voice.springs = s.springs;
-    }
+    if (retune) tune(voice, s, key);
     const i16* wave[chain::voiced];
     i32 gains[chain::voiced][4];   // each partial's level over the block's four quarters, Q16
     bool moving[chain::voiced];
     i32 was[chain::voiced];
+    u32 targets[chain::voiced];
+    u32 loudest = 0;
     for (u32 k = 0; k < chain::voiced; ++k) {
         u32 target = 0;
         if (voice.inc[k]) {
@@ -220,6 +319,12 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
             if (!voice.plain[k] && target) target = (target * tables::body_gain) >> 15;
             target = (target * voice.fade[k]) >> 15;
         }
+        targets[k] = target;
+        loudest = target > loudest ? target : loudest;
+    }
+    for (u32 k = 0; k < chain::voiced; ++k) {
+        u32 target = targets[k];
+        if (target < quietest || target * (voice.amp[k] ? below_off : below_on) < loudest) target = 0;
         was[k] = voice.amp[k] >> 15;
         const i32 delta = static_cast<i32>(target << 15) - voice.amp[k];
         for (u32 q = 0; q < 4; ++q) gains[k][q] = (voice.amp[k] + (delta >> 2) * static_cast<i32>(q + 1)) >> 15;
@@ -230,24 +335,20 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
 
     i32 sum[opxy::block_frames];
     for (unsigned i = 0; i < opxy::block_frames; ++i) sum[i] = 0;
-    if (load) {
-        for (u32 k = 0; k < chain::voiced; k += 2)
-            pair_ramped(sum, wave[k], voice.phase[k], voice.inc[k], was[k], gains[k][3],
-                        wave[k + 1], voice.phase[k + 1], voice.inc[k + 1], was[k + 1], gains[k + 1][3]);
-    } else {
-        // Silent partials only keep time; the rest sound two by two, whichever they are.
-        u32 waiting = chain::voiced;
-        for (u32 k = 0; k < chain::voiced; ++k) {
-            if (!gains[k][3] && !moving[k]) {
-                voice.phase[k] += voice.inc[k] << 6;
-            } else if (waiting == chain::voiced) {
-                waiting = k;
-            } else {
-                pair(sum, wave[waiting], voice.phase[waiting], voice.inc[waiting], gains[waiting], wave[k], voice.phase[k], voice.inc[k], gains[k]);
-                waiting = chain::voiced;
-            }
-        }
-        if (waiting != chain::voiced) single(sum, wave[waiting], voice.phase[waiting], voice.inc[waiting], gains[waiting]);
+    // Silent partials (silent all block: on a note's first block, silent in
+    // the last note and in this one) only keep time; the rest sound, ramped
+    // on a note's first block.
+    for (u32 k = 0; k < chain::voiced; ++k) {
+        if (!gains[k][3] && !moving[k]) voice.phase[k] += voice.inc[k] << 6;
+        else if (load) partial_ramped(sum, wave[k], voice.phase[k], voice.inc[k], was[k], gains[k][3]);
+        else partial(sum, wave[k], voice.phase[k], voice.inc[k], gains[k]);
+    }
+    // Silent, with every mode's level at zero and damping holding the chain
+    // there: from the next block, the note stops.
+    if (s.loss) {
+        u32 any = 0;
+        for (u32 k = 0; k < chain::voiced; ++k) any |= voice.level[k] | static_cast<u32>(voice.amp[k]);
+        if (!any) voice.quiet = still(c);
     }
     finish(sum, output, ceiling);
 }

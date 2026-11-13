@@ -44,7 +44,7 @@ def table(kind, name, values, comment, per=16):
     return ""
 
 
-SINE_BITS = 12
+SINE_BITS = 10
 sine = [round(32767 * math.sin(2 * math.pi * k / 2 ** SINE_BITS)) for k in range(2 ** SINE_BITS + 1)]
 exp2 = [round(32768 * 2 ** (k / 256)) for k in range(257)]                    # Q15, 1 to 2
 log2m = [round(65536 * math.log2(1 + k / 256)) for k in range(257)]             # Q16, 0 to 1

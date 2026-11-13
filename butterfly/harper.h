@@ -290,10 +290,9 @@ inline i32 amplitude_on_row(const Grid& g, u32 k, u32 d) {
     return mix(a[0] << 7, a[tables::couplings * partials * half_chain] << 7, g.across);
 }
 
-// The spectrum of the chain at flux alpha (Q32 turns) and coupling lambda
-// (Q12), struck at distance `site` from its middle (Q16).
-inline void spectrum(u32 alpha, i32 lambda, i32 site, Spectrum& out) {
-    const Grid g = grid(alpha, lambda);
+// States from..to-1 of the spectrum on the grid g, struck at distance `site`
+// from the chain's middle (Q16): the engine reads them a few at a time.
+inline void spectrum_states(const Grid& g, i32 site, u32 from, u32 to, Spectrum& out) {
     const u32 c = tables::couplings;
     const i16* e = tables::energy + g.corner * partials;
     const u32 nf = c * partials, nc = partials;
@@ -302,18 +301,30 @@ inline void spectrum(u32 alpha, i32 lambda, i32 site, Spectrum& out) {
     const i32 between = d0 + 1 < half_chain ? (site >> 1) & 0x7fff : 0;
     // On a stored coupling (the self-dual detent is one) the upper row's share is exactly nothing.
     if (!g.up) {
-        for (u32 k = 0; k < partials; ++k) {
+        for (u32 k = from; k < to; ++k) {
             out.energy[k] = mix(e[k], e[nf + k], g.across);
             const i32 a = mix(amplitude_on_row(g, k, d0), amplitude_on_row(g, k, d1), between);   // Q15
             out.weight[k] = (a * a) >> 14;                                                         // Q16
         }
-    } else for (u32 k = 0; k < partials; ++k) {
+    } else for (u32 k = from; k < to; ++k) {
         out.energy[k] = mix(mix(e[k], e[nf + k], g.across), mix(e[nc + k], e[nf + nc + k], g.across), g.up);
         const i32 a = mix(amplitude_at(g, k, d0), amplitude_at(g, k, d1), between);   // Q15
         out.weight[k] = (a * a) >> 14;                                                   // Q16
     }
+}
+// The key from the tables, on the grid g.
+inline i32 spectrum_key(const Grid& g) {
+    const u32 c = tables::couplings;
     const i16* key = tables::key + g.corner;
-    out.key = mix(mix(key[0], key[c], g.across), mix(key[1], key[c + 1], g.across), g.up);
+    return mix(mix(key[0], key[c], g.across), mix(key[1], key[c + 1], g.across), g.up);
+}
+
+// The spectrum of the chain at flux alpha (Q32 turns) and coupling lambda
+// (Q12), struck at distance `site` from its middle (Q16).
+inline void spectrum(u32 alpha, i32 lambda, i32 site, Spectrum& out) {
+    const Grid g = grid(alpha, lambda);
+    spectrum_states(g, site, 0, partials, out);
+    out.key = spectrum_key(g);
 }
 
 // Where state k lives on the half-chain, for the screen: its mean distance
@@ -368,7 +379,9 @@ inline i32 key_of(const Spectrum& s, i32 lambda) {
     return s.energy[0] + (mul16(moment, reciprocal(static_cast<i32>(weight) << 6)) >> 10);   // moment / weight, Q12
 }
 
-inline void shape(const Spectrum& s, i32 lambda, Notes& out) {
+// shape() in two halves, so the engine can read them a block apart: each
+// partial's place, giving the weights' sum ...
+inline u32 shape_places(const Spectrum& s, i32 lambda, Notes& out) {
     const i32 inverse_span = reciprocal(((4 << 12) + 4 * lambda) << 4);   // 1 / (4 + 4 lambda), Q16
     const i32 key = key_of(s, lambda);
     u32 sum = 0;
@@ -376,6 +389,10 @@ inline void shape(const Spectrum& s, i32 lambda, Notes& out) {
         out.place[k] = mul16((s.energy[k] - key) * 16, inverse_span);
         sum += static_cast<u32>(s.weight[k]);
     }
+    return sum;
+}
+// ... then from that sum, each partial's level.
+inline void shape_levels(const Spectrum& s, u32 sum, Notes& out) {
     if (sum < 64) sum = 64;
     const i32 inverse_sum = reciprocal(static_cast<i32>(sum));
     u32 r = 0;   // sum of normalised weights squared, Q16
@@ -391,6 +408,7 @@ inline void shape(const Spectrum& s, i32 lambda, Notes& out) {
                             65536 - static_cast<i32>((r * 39) >> 6));
     for (u32 k = 0; k < partials; ++k) out.level[k] = static_cast<i32>((static_cast<u32>(w[k] >> 1) * static_cast<u32>(scale)) >> 15);
 }
+inline void shape(const Spectrum& s, i32 lambda, Notes& out) { shape_levels(s, shape_places(s, lambda, out), out); }
 
 // ---------------------------------------------------------------- the gate
 

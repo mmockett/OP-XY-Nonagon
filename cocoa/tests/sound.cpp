@@ -58,6 +58,8 @@ struct Mug {
         cocoa::start(voice[v], shared, v + 1);
         on[v] = true;
     }
+    // A note's first block only stirs, in silence; it sounds from the next.
+    void stir(unsigned v = 0) { play(v); }
     // One block of every voice that has a note; `out` is voice v's.
     void play(unsigned v = 0) {
         for (unsigned u = 0; u < 8; ++u) {
@@ -75,6 +77,7 @@ struct Mug {
 void rises_monotonically() {
     Mug mug(standard);
     mug.note(0, 220.0);
+    mug.stir();
     double last = 0, first = 0, window = 0;
     bool monotonic = true, strictly = true;
     int cleared = -1;
@@ -151,6 +154,7 @@ void follows_wood() {
     // And the engine's own pitch at its own effective void fraction.
     Mug mug(standard);
     mug.note(0, 440.0);
+    mug.stir();
     double worst_e = 0;
     for (int b = 0; b < 10 * 689; ++b) {
         mug.play();
@@ -236,6 +240,7 @@ void clear_drink_in_tune() {
     c.c[1] = 0.6;
     Mug mug(c);
     mug.note(0, 330.0);
+    mug.stir();
     bool exact = true;
     for (int b = 0; b < 5 * 689; ++b) {
         mug.play();
@@ -262,6 +267,7 @@ void stir_continues() {
     for (int b = 0; b < 2 * 689; ++b) mug.play();
     mug.set(c);
     mug.note(1, 220.0);
+    mug.stir();
     mug.play();
     const double a = mug.drink(0), b = mug.drink(1);
     std::printf("stir 0: a note 2 s after a stir starts at %.2f Hz, the first note is at %.2f Hz\n", b, a);
@@ -272,6 +278,7 @@ void stir_continues() {
     again.note(0, 220.0);
     for (int k = 0; k < 2 * 689; ++k) again.play();
     again.note(1, 220.0);
+    again.stir();
     again.play();
     check(again.fundamental(1) < again.fundamental(0) * 0.6, "stir 1 does not stir the drink afresh");
     // Taps keep their rate: 0.5 Hz x 24^c.
@@ -290,6 +297,7 @@ void plays_as_keys() {
     // The default scoops a few semitones and lands within a cent well inside a second.
     Mug mug(keys);
     mug.note(0, 220.0);
+    mug.stir();
     mug.play();
     const double first = mug.fundamental();
     int near = -1, landed = -1;
@@ -303,7 +311,8 @@ void plays_as_keys() {
                 -12 * std::log2(first / 220.0), near * block / rate * 1000, landed * block / rate * 1000);
     check(first < 220.0 * std::pow(2.0, -3.0 / 12) && first > 220.0 * std::pow(2.0, -8.0 / 12), "the default scoop is not 3 to 8 semitones");
     check(landed > 0 && landed * block / rate < 0.8, "the default does not land within a cent in 0.8 s");
-    // A chord strums: four notes started together tap a block apart.
+    // A chord strums: four notes started together tap a block apart, the
+    // first after its silent block.
     Mug chord(keys);
     for (unsigned v = 0; v < 4; ++v) chord.note(v, 220.0 * std::pow(2.0, v * 4 / 12.0));
     int first_tap[4] = {-1, -1, -1, -1};
@@ -312,7 +321,7 @@ void plays_as_keys() {
         for (unsigned v = 0; v < 4; ++v) if (first_tap[v] < 0 && chord.voice[v].taps) first_tap[v] = b;
     }
     std::printf("strum: a four-note chord's first taps at blocks %d %d %d %d\n", first_tap[0], first_tap[1], first_tap[2], first_tap[3]);
-    check(first_tap[0] == 0 && first_tap[1] == 1 && first_tap[2] == 2 && first_tap[3] == 3, "a chord does not strum a block apart");
+    check(first_tap[0] == 1 && first_tap[1] == 2 && first_tap[2] == 3 && first_tap[3] == 4, "a chord does not strum a block apart");
     // A pause settles the drink: with stir 0, a note after every note has
     // ended is stirred afresh; one that overlaps carries the drink on.
     Controls still = standard;
@@ -323,6 +332,7 @@ void plays_as_keys() {
     cocoa::destroy(pause.voice[0], pause.shared, 1);
     pause.on[0] = false;
     pause.note(1, 220.0);
+    pause.stir(1);
     pause.play(1);
     std::printf("pause: after the drink has risen 3 s and the note ended, a stir-0 note starts at %.1f Hz\n", pause.fundamental(1));
     check(pause.fundamental(1) < 220.0 / 6, "a note after a pause does not stir afresh");
@@ -338,6 +348,7 @@ void sloshes() {
         c.c[7] = stir;
         Mug mug(c);
         mug.note(0, 220.0);
+        mug.stir();
         double most = 0, late = 0, previous = 0;
         int crossings = 0;
         for (int b = 0; b < 3 * 689; ++b) {

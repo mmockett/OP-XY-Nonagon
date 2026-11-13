@@ -127,13 +127,22 @@ inline void rates(i32 fill, i32 fizz, i32* rate) {
         rate[i] = static_cast<i32>(exp2_int(tables::log2_block + speed - height));
     }
 }
-// Clears each class by `blocks` blocks at its rate.
+// Clears each class by `blocks` blocks at its rate: cleared once blocks x
+// rate reaches what is left, compared exactly and without a divide (the
+// Blackfin has none). Past the first two tests both are under 2^30, so their
+// product is a whole 64-bit one; a single block needs only the first.
+inline bool reaches(u32 blocks, u32 r, u32 left) {
+    if (r >= left) return true;
+    if (blocks == 1) return false;
+    return blocks >= left || opxy::q31::wide(static_cast<i32>(blocks), static_cast<i32>(r)) >= static_cast<opxy::i64>(left);
+}
 inline void advance(i32* s, const i32* rate, u32 blocks) {
+    if (!blocks) return;
     for (u32 i = 0; i < classes; ++i) {
         if (s[i] >= clear) continue;
         const u32 left = static_cast<u32>(clear - s[i]);
         const u32 r = static_cast<u32>(rate[i]);
-        s[i] = blocks && r && (blocks >= left / r + 1 || r * blocks >= left) ? clear : s[i] + static_cast<i32>(r * blocks);
+        s[i] = r && reaches(blocks, r, left) ? clear : s[i] + static_cast<i32>(r * blocks);
     }
 }
 // W(s), Q30: the pressure-weighted share of the column a class still fills.
@@ -161,11 +170,18 @@ inline void stir(i32* d, i32* s, i32 x0, i32 amount) {
         const i32 left = s[i] >= clear ? 0 : multiply(d[i], (clear - s[i]) << 1);   // its column average
         const i32 mixed = left + (((fresh - left) >> 15) * amount) + (((((fresh - left) & 32767) * amount)) >> 15);
         const i32 depth = amount >= 32767 ? 0 : static_cast<i32>((static_cast<u32>(s[i] >= clear ? clear : s[i]) >> 15) * static_cast<u32>(32767 - amount));
-        // d' = mixed / (1 - s'), in three steps of long division (1 - s' is at least stir).
-        const u32 open = static_cast<u32>(clear - depth) >> 10;   // 1 - s', Q20
-        const u32 m = static_cast<u32>(mixed < 0 ? 0 : mixed), q = m / open, r = m % open;
-        const u32 r1 = (r << 10) / open, r2 = (((r << 10) % open) << 10) / open;
-        d[i] = static_cast<i32>((q << 20) + (r1 << 10) + r2);
+        // d' = mixed / (1 - s'), in three steps of long division (1 - s' is at
+        // least stir). Mixed back to the bottom (s' 0: a fresh stir, or a class
+        // not yet risen), 1 - s' is 1 and d' is mixed, with no divide.
+        const u32 m = static_cast<u32>(mixed < 0 ? 0 : mixed);
+        if (!depth) {
+            d[i] = static_cast<i32>(m);
+        } else {
+            const u32 open = static_cast<u32>(clear - depth) >> 10;   // 1 - s', Q20
+            const u32 q = m / open, r = m % open;
+            const u32 r1 = (r << 10) / open, r2 = (((r << 10) % open) << 10) / open;
+            d[i] = static_cast<i32>((q << 20) + (r1 << 10) + r2);
+        }
         s[i] = depth;
     }
 }
