@@ -201,10 +201,14 @@ inline u32 rate_for(u32 now, u32 top) {
     const u32 r = now > most ? most : now;
     return r < least ? least : r;
 }
-// Whether a tap's block is sung at the full rate: its strike ramps in over
-// the spoon's contact, as short as 4 samples, whose edge the slower rates
-// would round off.
-const bool taps_at_full_rate = true;
+// The slowest rate a tap's strike is sung at. The strike ramps in over the
+// spoon's contact (2^contact samples, 4 to 64), and a rate holds that ramp
+// once the contact spans 4 of its samples: the ramp's spectrum then has its
+// main lobe under a quarter of the rate, about where the rate's half-band
+// stage stops being flat. So a hard spoon's 4-sample click strikes at the
+// full rate, 8 samples at a half, 16 (the default) at a quarter, and a soft
+// spoon at an eighth: each mode at its own rate, with no fade after.
+inline u32 strike_rate(u32 contact) { return contact - 2; }
 
 // The half-band stages that double a rate: from n inputs after 2K - 1 of
 // history (low), 2n outputs, each input in turn (K of them late) and the
@@ -286,26 +290,28 @@ inline void play(Sums& sums, Band& band, Mode& m, u32 to, i32 loss, bool tap, i3
     const i32 glide = static_cast<i32>(to - from) >> 6;
     const u32 top = from > to ? from : to;
     const u32 p = m.phase;
-    if (tap && taps_at_full_rate) {
-        // A tap's strike rings in at the full rate (its contact can be 4
-        // samples), and moves to the mode's own rate over the next blocks.
-        // The mode's own rate holds its share through the block.
+    if (tap) {
+        // A tap's strike rings in at the mode's own rate, or a faster one if
+        // the spoon's contact is too short for it (strike_rate), and then
+        // moves to the mode's own rate over the next blocks. The mode's own
+        // rate holds its share through the block.
         const i32 strike = (m.out - start) >> contact;
         const u32 split = 1u << contact;
         if (!band.left && !start) band.dst = static_cast<opxy::u8>(rate_for(band.dst, top));
+        const u32 most_slow = strike_rate(contact), at = band.dst < most_slow ? band.dst : most_slow;
         const i32 own = band.left ? band.kept : start, lent = start - own;
-        const bool moving = band.left && band.src;   // between slower rates: the old one hands its share to the full rate
+        const bool moving = band.left && band.src != at;   // the old rate hands its share to the strike's
         if (moving && lent) path(sums, band.src, m, p, from, glide, lent, (-lent) >> 6, 0, block_frames, false);
         const i32 handed = moving ? lent >> 6 : 0;
-        if (!band.dst) {   // the mode's own rate is the full rate
-            path(sums, 0, m, p, from, glide, moving ? own : start, strike + handed, handed, split, true);
+        if (at == band.dst) {   // struck at the mode's own rate
+            path(sums, at, m, p, from, glide, moving ? own : start, strike + handed, handed, split, true);
             band.left = 0;
             return;
         }
         if (own) path(sums, band.dst, m, p, from, glide, own, 0, 0, block_frames, false);
-        path(sums, 0, m, p, from, glide, moving ? 0 : lent, strike + handed, handed, split, true);
+        path(sums, at, m, p, from, glide, moving ? 0 : lent, strike + handed, handed, split, true);
         band.kept = own;
-        band.src = 0;
+        band.src = static_cast<opxy::u8>(at);
         band.left = static_cast<opxy::u8>(fade_blocks);
         return;
     }
