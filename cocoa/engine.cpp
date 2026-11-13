@@ -357,6 +357,9 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     for (u32 k = 0; k < liquid_modes + cup_modes; ++k) voice.band[k].dst = 3, voice.band[k].src = 3, voice.band[k].left = 0, voice.band[k].spare = 0, voice.band[k].kept = 0;
     voice.live = 0;
     voice.spare[0] = voice.spare[1] = 0;
+    voice.planned_void = voice.planned_wobble = 0;
+    voice.planned_contact = 0;
+    for (u32 k = 0; k < liquid_modes + cup_modes; ++k) voice.planned_struck[k] = 0;
     for (u32 i = 0; i < kHistory4 + kBlock / 8; ++i) voice.eighth[i] = 0;
     for (u32 i = 0; i < kHistory3 + kBlock / 4; ++i) voice.quarter[i] = 0;
     for (u32 i = 0; i < kHistory3 + kBlock / 2; ++i) voice.half[i] = 0;
@@ -529,6 +532,88 @@ __attribute__((noinline)) void fill_cup(Voice& voice, i32 fill, u32 cup) {
     voice.filled_cup = cup;
 }
 
+// The bubbles rise; the column's pitch at the block's end. The drink
+// sloshes at its first sloshing mode, swinging the pitch as it dies away.
+// Sets the voice's drop and returns the void fraction and the swing.
+__attribute__((noinline)) i32 rise(Voice& voice, const i32* rate, i32 fill, i32& wobble) {
+    using namespace sound;
+    drink::advance(voice.s, rate, 1);
+    const i32 void_now = drink::effective(voice.d, voice.s);
+    voice.drop = drink::wood_drop(void_now);
+    wobble = 0;
+    if (voice.slosh) {
+        voice.slosh_phase += static_cast<u32>(drink::along(tables::slosh_inc, fill));
+        wobble = (((voice.slosh * slosh_depth) >> 15) * tables::sine[voice.slosh_phase >> 22]) >> 15;
+        voice.slosh -= (voice.slosh >> 9) + 1;   // dies away in about 0.7 s
+        if (voice.slosh < 64) voice.slosh = 0;
+    }
+    return void_now;
+}
+// What only a tap needs: the spoon, how hard it strikes, and how it takes
+// the key.
+struct Tap {
+    u32 contact;
+    i32 corner, hit, log2_key, tone, make_up, upper, clink;
+};
+__attribute__((noinline)) Tap tap_of(const Voice& voice, opxy::Parameters parameters, u32 cup, u32 key, i32 drop, i32 shift, u32 taps) {
+    using namespace sound;
+    Tap t;
+    const i32 hard = static_cast<i32>(drink::q16(parameters[SPOON]));
+    t.corner = tables::log2_soft_corner + static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * static_cast<u32>(hard) >> 12);
+    // The contact, 4 ms to 75 us, as a power of two of samples: 64 to 4.
+    t.contact = static_cast<u32>(drink::clamp((tables::log2_soft_samples - (static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * static_cast<u32>(hard) >> 12)) + 32768) >> 16, 2, 6));
+    // The tap's strength, a little uneven, as a hand's is.
+    const i32 lean = static_cast<i32>((taps * 2654435761u) >> 24) - 128;   // -128..127
+    // A bubbly column's impedance (rho c) is low, so it takes up less of the
+    // spoon's blow: the tap's level falls a quarter octave each octave of drop.
+    // Fast taps on a long-ringing column pile up: each strikes softer by
+    // 1 / sqrt(1 + rate T60 / 2), so tapping holds about a single tap's level.
+    const u32 pile = 256u + drink::tap_tenths(parameters[TAPS]) * ring_time[cup] / 20u;   // Q8
+    const i32 soften = (drink::log2_q16(pile) - 8 * octave) / 2;
+    t.hit = static_cast<i32>(drink::scale(static_cast<u32>(((strike >> 15) * voice.share >> 15) * (32768 + lean * 20)),
+                                          -drop / 4 - soften, ceiling));
+    t.log2_key = drink::log2_q16(key);
+    // The spoon strikes the drink's modes up to a corner that follows the key,
+    // from half an octave under it (soft) to three and a half over (hard), so
+    // it brightens alike at every pitch; the wall's clink takes its absolute
+    // contact (corner, above).
+    t.tone = t.log2_key - octave / 2 + 4 * hard;
+    t.make_up = boost(t.log2_key + shift, t.tone);
+    // and a hard spoon's sharper blow carries more into the upper modes: 0.3
+    // (wood) to 2 (silver) times their level, about 1.1 at the default.
+    const u32 hard2 = (static_cast<u32>(hard) * static_cast<u32>(hard)) >> 16;
+    t.upper = 9830 + static_cast<i32>((((static_cast<u32>(hard) + hard2) >> 1) * 55706u) >> 16);   // Q15
+    // A hard spoon rings the wall harder: its clink 0.25 to 1.75 times.
+    t.clink = 8192 + static_cast<i32>(((static_cast<u32>(hard) * static_cast<u32>(hard) >> 16) * 49152u) >> 16);
+    return t;
+}
+// A liquid mode's strike, and the wall's.
+inline i32 liquid_strike(const Tap& t, u32 k, i32 ratio, i32 shift) {
+    using namespace sound;
+    const i32 level = k ? (tables::liquid_level[k] * t.upper) >> 15 : tables::liquid_level[0];
+    return strike_of(t.hit, level, spoon(t.log2_key + ratio + shift, t.tone), t.make_up);
+}
+inline i32 cup_strike(const Tap& t, u32 cup, u32 k, i32 log2_inc) {
+    using namespace sound;
+    const i32 level = (tables::cup_level[cup][k] * t.clink) >> 15;
+    return strike_of(t.hit, level < 32767 ? level : 32767, spoon(log2_inc, t.corner), t.make_up);
+}
+// The note's first tap, planned in its silent first block: the drink's step
+// for the block the tap sounds in, taken now, and each mode's strike, so the
+// tap's block does neither. (Every input is the same in both blocks unless a
+// control or the pitch moves between them; then the first tap takes them as
+// they were a block earlier.)
+__attribute__((noinline)) void plan_tap(Voice& voice, opxy::Parameters parameters, u32 cup, u32 key, i32 fill) {
+    i32 wobble;
+    voice.planned_void = rise(voice, voice.rate, fill, wobble);
+    voice.planned_wobble = wobble;
+    const i32 shift = wobble - voice.drop;
+    const Tap t = tap_of(voice, parameters, cup, key, voice.drop, shift, voice.taps + 1);
+    voice.planned_contact = t.contact;
+    for (u32 k = 0; k < liquid_modes; ++k) voice.planned_struck[k] = liquid_strike(t, k, voice.ratio[k], shift);
+    for (u32 k = 0; k < cup_modes; ++k) voice.planned_struck[liquid_modes + k] = cup_strike(t, cup, k, voice.cup_log2[k]);
+}
+
 inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output output,
                    opxy::Parameters parameters, opxy::Pitch pitch) {
     using namespace sound;
@@ -564,7 +649,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     // in silence, so no block both stirs and strikes. Everything sounds as
     // before, 64 samples (1.45 ms) later. A voice still sounding (a note
     // restarted in place) stirs and taps in one block, as it always has.
-    bool tap = false;
+    bool tap = false, planned = false;
     if (voice.fresh == 1) {
         i32 d[drink::classes], s[drink::classes];
         for (u32 i = 0; i < drink::classes; ++i) {
@@ -596,14 +681,15 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         if (!voice.live) {
             voice.fresh = 2;
             fill_cup(voice, fill, cup);
+            plan_tap(voice, parameters, cup, pitch[0] ? pitch[0] : 1, fill);
             for (unsigned i = 0; i < block_frames; ++i) output[i] = 0;
             return;
         }
         voice.fresh = 0;
         tap = true;
-    } else if (voice.fresh) {   // stirred last block: the spoon taps
+    } else if (voice.fresh) {   // stirred last block: the spoon taps, as planned there
         voice.fresh = 0;
-        tap = true;
+        tap = planned = true;
     } else if (step) {
         const u32 before = voice.tap_phase;
         voice.tap_phase += step;
@@ -611,19 +697,15 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
     }
     if (tap) ++voice.taps;
 
-    // The bubbles rise; the column's pitch at the block's end. The drink
-    // sloshes at its first sloshing mode, swinging the pitch as it dies away.
-    drink::advance(voice.s, rate, 1);
-    const i32 void_now = drink::effective(voice.d, voice.s);
-    const i32 drop = drink::wood_drop(void_now);
-    voice.drop = drop;
-    i32 wobble = 0;
-    if (voice.slosh) {
-        voice.slosh_phase += static_cast<u32>(drink::along(tables::slosh_inc, fill));
-        wobble = (((voice.slosh * slosh_depth) >> 15) * tables::sine[voice.slosh_phase >> 22]) >> 15;
-        voice.slosh -= (voice.slosh >> 9) + 1;   // dies away in about 0.7 s
-        if (voice.slosh < 64) voice.slosh = 0;
+    // The drink's step (rise), already taken for a planned tap.
+    i32 wobble, void_now;
+    if (planned) {
+        wobble = voice.planned_wobble;
+        void_now = voice.planned_void;
+    } else {
+        void_now = rise(voice, rate, fill, wobble);
     }
+    const i32 drop = voice.drop;
     const i32 shift = wobble - drop;   // the liquid's pitch against the clear key, Q16 octaves
 
     // The sums at each rate. The faster rates' sums wait for the eighth's:
@@ -638,39 +720,11 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
 
     // The liquid's modes: tuned to the key with no bubbles, falling by the drop.
     const u32 key = pitch[0] ? pitch[0] : 1;
-    // What only a tap needs: the spoon, how hard it strikes, and how it takes
-    // the key. Most blocks have no tap.
-    u32 contact = 0;
-    i32 corner = 0, hit = 0, log2_key = 0, tone = 0, make_up = 0, upper = 0, clink = 0;
-    if (tap) {
-        const i32 hard = static_cast<i32>(drink::q16(parameters[SPOON]));
-        corner = tables::log2_soft_corner + static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * static_cast<u32>(hard) >> 12);
-        // The contact, 4 ms to 75 us, as a power of two of samples: 64 to 4.
-        contact = static_cast<u32>(drink::clamp((tables::log2_soft_samples - (static_cast<i32>((static_cast<u32>(tables::corner_span) >> 4) * static_cast<u32>(hard) >> 12)) + 32768) >> 16, 2, 6));
-        // The tap's strength, a little uneven, as a hand's is.
-        const i32 lean = static_cast<i32>((voice.taps * 2654435761u) >> 24) - 128;   // -128..127
-        // A bubbly column's impedance (rho c) is low, so it takes up less of the
-        // spoon's blow: the tap's level falls a quarter octave each octave of drop.
-        // Fast taps on a long-ringing column pile up: each strikes softer by
-        // 1 / sqrt(1 + rate T60 / 2), so tapping holds about a single tap's level.
-        const u32 pile = 256u + drink::tap_tenths(parameters[TAPS]) * ring_time[cup] / 20u;   // Q8
-        const i32 soften = (drink::log2_q16(pile) - 8 * octave) / 2;
-        hit = static_cast<i32>(drink::scale(static_cast<u32>(((strike >> 15) * voice.share >> 15) * (32768 + lean * 20)),
-                                            -drop / 4 - soften, ceiling));
-        log2_key = drink::log2_q16(key);
-        // The spoon strikes the drink's modes up to a corner that follows the key,
-        // from half an octave under it (soft) to three and a half over (hard), so
-        // it brightens alike at every pitch; the wall's clink takes its absolute
-        // contact (corner, above).
-        tone = log2_key - octave / 2 + 4 * hard;
-        make_up = boost(log2_key + shift, tone);
-        // and a hard spoon's sharper blow carries more into the upper modes: 0.3
-        // (wood) to 2 (silver) times their level, about 1.1 at the default.
-        const u32 hard2 = (static_cast<u32>(hard) * static_cast<u32>(hard)) >> 16;
-        upper = 9830 + static_cast<i32>((((static_cast<u32>(hard) + hard2) >> 1) * 55706u) >> 16);   // Q15
-        // A hard spoon rings the wall harder: its clink 0.25 to 1.75 times.
-        clink = 8192 + static_cast<i32>(((static_cast<u32>(hard) * static_cast<u32>(hard) >> 16) * 49152u) >> 16);
-    }
+    // What only a tap needs (tap_of); most blocks have no tap, and a note's
+    // first tap was planned in its silent block.
+    Tap t = Tap();
+    if (tap && !planned) t = tap_of(voice, parameters, cup, key, drop, shift, voice.taps);
+    const u32 contact = !tap ? 0 : planned ? voice.planned_contact : t.contact;
     const i32 damping = 65536 + ((drop >> 2) * (bubble_damping >> 6) >> 8);   // Q16
     bool ringing = false;
     fill_cup(voice, fill, cup);
@@ -689,10 +743,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         }
         const i32 loss = static_cast<i32>((voice.liquid_loss[k] * static_cast<u32>(damping)) >> 16);
         i32 struck = 0;
-        if (tap) {
-            const i32 level = k ? (tables::liquid_level[k] * upper) >> 15 : tables::liquid_level[0];
-            struck = strike_of(hit, level, spoon(log2_key + ratio + shift, tone), make_up);
-        }
+        if (tap) struck = planned ? voice.planned_struck[k] : liquid_strike(t, k, ratio, shift);
         play(sums, voice.band[k], m, to, loss, tap, struck, contact, tap ? next(voice.seed) : 0);
         ringing = ringing || m.out;
     }
@@ -710,10 +761,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         const u32 to = voice.cup_inc[k];
         const i32 loss = voice.cup_loss[k];
         i32 struck = 0;
-        if (tap && shared.leader == owner) {
-            const i32 level = (tables::cup_level[cup][k] * clink) >> 15;
-            struck = strike_of(hit, level < 32767 ? level : 32767, spoon(log2_inc, corner), make_up);
-        }
+        if (tap && shared.leader == owner) struck = planned ? voice.planned_struck[liquid_modes + k] : cup_strike(t, cup, k, log2_inc);
         play(sums, voice.band[liquid_modes + k], m, to, loss, tap, struck, contact, tap ? next(voice.seed) : 0);
         ringing = ringing || m.out;
     }

@@ -72,6 +72,11 @@ struct Voice {
     Band band[liquid_modes + cup_modes];   // each mode's rates
     opxy::u8 live;                             // bits 0-3: rate 2^-r written last block; 4, 5: the quarter and half stages had input
     opxy::u8 spare[2];
+    // The first tap, planned in the note's silent first block (engine.cpp):
+    // the drink's step for the block it sounds in, and each mode's strike.
+    i32 planned_void, planned_wobble;
+    u32 planned_contact;
+    i32 planned_struck[liquid_modes + cup_modes];
     i32 eighth[kHistory4 + kBlock / 8];  // the eighth-rate sum, after the last block's tail
     i32 quarter[kHistory3 + kBlock / 4]; // the quarter-rate stage's input, after its tail
     i32 half[kHistory3 + kBlock / 2];    // the half-rate stage's input, after its tail
