@@ -325,37 +325,39 @@ longer, but a larger release is shorter.
 ## CPU
 
 Measured on an OP-XY (OS 1.2.1) with the SDK's `profile benchmark`. Sand,
-Cocoa, Fermi, Mach, Butterfly, Drop and Ghost are from two captures of one
-firmware holding v0.9.0's sound code, Coin from one capture at `v0.6.0` and
-Recur from three at `v0.8.0`. For a synth, one voice plays middle C with the
-first four controls at their midpoint; for a sample engine, its sample
-callback plays the SDK's generated two-second test sample at its default
-settings. Each figure is a share of the OP-XY's 580,352-cycle audio block: the
-mean over the test, and its worst single block.
+Cocoa, Fermi, Mach, Butterfly and Drop are from three captures of one firmware
+holding them at `v0.10.0`, Ghost from two captures of one firmware holding
+v0.9.0's sound code, Coin from one capture at `v0.6.0` and Recur from three at
+`v0.8.0`. For a synth, one voice plays middle C with the first four controls
+at their midpoint; for a sample engine, its sample callback plays the SDK's
+generated two-second test sample at its default settings. Each figure is a share of the OP-XY's 580,352-cycle audio block: the
+mean over the test, and its worst single block. The `v0.10.0` captures also
+play each control through its range, so their worst block is the worst of
+every setting played.
 
 | Machine | One voice | Worst block | Eight voices |
 | --- | ---: | ---: | ---: |
-| Sand | 5.08% | 6.89% | ~41% |
-| Cocoa | 3.73% | 7.69% | ~30% |
+| Sand | 4.37% | 6.71% | ~35% |
+| Cocoa | 3.31% | 5.64% | ~26% |
 | Coin | 1.30% | – | ~10% |
-| Fermi | 3.27% | 7.37% | ~26% |
-| Mach | 4.14% | 6.02% | ~33% |
-| Butterfly | 5.23% | 6.76% | ~42% |
-| Drop | 2.95% | 7.02% | ~24% |
+| Fermi | 2.57% | 5.06% | ~21% |
+| Mach | 3.23% | 8.88% | ~26% |
+| Butterfly | 2.52% | 4.84% | ~20% |
+| Drop | 2.55% | 6.38% | ~20% |
 | Ghost (sample callback) | 3.02% | 5.69% | n/a |
 | Recur (sample callback) | 1.23% | – | n/a |
 
-In the same firmware, v0.8.0's sound code put Mach's worst block at 6.88%
-(13.15% at the worst setting of its sweep, now 11.64%), Butterfly's voice at
-5.46% and Ghost's worst block at 6.39%. The screens run outside the audio
-block, so they aren't in these figures.
+At its heaviest single setting a voice costs 4.69% in Sand (Shake at 37.5%),
+4.05% in Cocoa (Taps at 87.5%), 4.49% in Fermi (Energy at 87.5%), 4.50% in
+Mach (Echo at 25%), 4.04% in Butterfly (Coupling at 12.5%) and 5.60% in Drop
+(Crackle at 100%). The screens run outside the audio block, so they aren't in
+these figures.
 
 The OP-XY's own engines measure 1.6–2.7% a voice in the same test, and
-Hexagon's synths 2.4–4.1%. A full chord on one track is fine; several tracks
-of heavy chords at once, with effects, can run out. Each test plays one
-setting, and heavier settings cost more: Coin's four disks, a fully rattling
-plate in Sand or a hissing chord in Recur cost several times their figure
-here. The sample engines' tests time the callback alone, not the stock
+Hexagon's synths 2.4–3.8%. A full chord on one track is fine; several tracks
+of heavy chords at once, with effects, can run out. Heavier settings cost
+more: Coin's four disks or a hissing chord in Recur cost several times their
+figure here. The sample engines' tests time the callback alone, not the stock
 sampler's own mixing, so they don't compare directly with the synths.
 
 ## Building
