@@ -423,8 +423,8 @@ int main() {
         }
         std::printf("output fingerprint %016llx\n", hash);
         char what[80];
-        std::snprintf(what, sizeof what, "the output as released (fingerprint %016llx)", hash);
-        check(what, hash == 0xcc8742c0d2a3648bull);  // origin/main, 95130c1
+        std::snprintf(what, sizeof what, "the output as expected (fingerprint %016llx)", hash);
+        check(what, hash == 0x3b10263807a12347ull);  // 63fa469: origin/main (95130c1, cc8742c0d2a3648b) with the quiet state
     }
 
     if (!failures) std::puts("Sand: all sound checks pass");
