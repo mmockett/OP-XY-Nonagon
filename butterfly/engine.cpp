@@ -11,6 +11,11 @@
 // and the struck site, so the clusters shimmer. The spectrum comes from
 // tables, so a note sounds in its first block. The OP-XY's amp envelope ends
 // the note.
+//
+// The chain moves only as fast as a hand on a knob or the wingbeat's 0.2-0.6
+// Hz, so a note solves its spectrum a stage a block, over eight blocks, and
+// each partial ramps to where a solve lands it across the next eight; only
+// the gate, which strikes in a millisecond, and the pitch follow every block.
 namespace butterfly {
 const u32 ceiling_fade = 0x29cbc14eu, ceiling = 0x2e709de5u;   // 7.2 and 8 kHz: the half-rate bank's top
 const i32 lift = 51339;   // Q15: 1.567, the partials lifted 3.9 dB to the suites' shared loudness
@@ -59,6 +64,9 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     for (u32 k = 0; k < partials; ++k) {
         voice.phase[k] = 0;
         voice.amplitude[k] = 0;
+        voice.increment[k] = voice.ratio[k] = 0;
+        voice.level[k] = voice.power[k] = voice.dim[k] = 0;
+        voice.increment_step[k] = voice.level_step[k] = voice.power_step[k] = voice.dim_step[k] = 0;
     }
     for (u32 i = 0; i < half_frames + 2 * halfband_taps; ++i) voice.low[i] = 0;
     voice.gate = 0;
@@ -66,6 +74,10 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     voice.beat = voice.beat_site = 0;
     voice.strikes = owner * 0x2545f491u;
     voice.struck = voice.sounding = voice.hush = 0;
+    voice.stage = voice.still = 0;
+    voice.stale = 1;
+    voice.note = 0;
+    for (u32 i = 0; i < 5; ++i) voice.sampled[i] = 0;
 }
 // A note-on is the strike. There is no note-off: the gate holds while the
 // note sounds, and the OP-XY's amp envelope ends it.
@@ -74,6 +86,111 @@ inline void start(Voice& voice, Shared&, opxy::u32) {
     voice.hush = voice.sounding;   // a voice still ringing fades out in one block first
 }
 inline void destroy(Voice&, Shared&, opxy::u32) {}
+
+// ---------------------------------------------------------------- the solve
+
+const u32 solve_stages = 8, ramp_shift = 3;   // a solve every 8 blocks (11.6 ms), each landing ramped over 8
+
+// Its first stage: the controls as they are now, the chain's place on the
+// tables' grid, and the first states.
+inline void solve_start(Voice& voice, const i32* p) {
+    // The flux, snapped and beating, the coupling, the struck site, beating on its own phase.
+    const u32 alpha = warp(flux(p[FLUX]), snap_pull) + static_cast<u32>(wingbeat_flux(p[WINGBEAT], voice.beat));
+    voice.lambda = coupling(p[COUPLING]);
+    voice.at = clamp(site(p[SITE]) + wingbeat_site(p[WINGBEAT], voice.beat_site), 0, 8 << 16);
+    voice.grid = grid(alpha, voice.lambda);
+    voice.octaves = static_cast<i32>(exp2_q16(spread_log2(p[SPREAD])));   // the span, octaves, Q16
+    voice.slope = tilt(p[TILT]);
+    voice.makeup = tilt_makeup(voice.slope);
+    voice.sampled[0] = p[FLUX];
+    voice.sampled[1] = p[COUPLING];
+    voice.sampled[2] = p[SITE];
+    voice.sampled[3] = p[SPREAD];
+    voice.sampled[4] = p[TILT];
+}
+
+// A value's step a block to reach its target in 2^ramp_shift blocks; within
+// a few steps of it, the value takes the target at once.
+inline void aim(i32& value, i32& step, i32 target, bool at_once) {
+    const i32 gap = target - value;
+    if (at_once || (gap > -8 && gap < 8)) {
+        value = target;
+        step = 0;
+    } else {
+        step = (gap + (1 << (ramp_shift - 1))) >> ramp_shift;
+    }
+}
+
+// The pitch increment of a partial at `ratio` (Q16) to the note's, Q32 a
+// sample, held at the half-rate bank's ceiling at or above it.
+inline u32 increment_of(u32 note, u32 ratio) {
+    if ((note >> 16) * (ratio >> 16) >= (ceiling >> 16)) return ceiling;   // and mul16u can't overflow below it
+    const u32 i = mul16u(note, ratio);
+    return i < ceiling ? i : ceiling;
+}
+
+// Partials from..to-1 land: their pitch (the note's, 2^(octaves x place)
+// times), level, and the gate's power and darkening at their place, as
+// targets to ramp to.
+// (Each stage's functions are out of line, one copy each, so the solve's
+// code stays small beside the bank's.)
+__attribute__((noinline)) void land(Voice& voice, u32 from, u32 to, bool at_once) {
+    for (u32 k = from; k < to; ++k) {
+        const i32 level = (voice.notes.level[k] * lift) >> 15;   // lifted 3.9 dB to the suites' shared loudness
+        if (!level && voice.level[k] < 8 && voice.level[k] > -8) {
+            // Silent and staying so.
+            voice.level[k] = 0;
+            voice.increment_step[k] = voice.level_step[k] = voice.power_step[k] = voice.dim_step[k] = 0;
+            continue;
+        }
+        // Its pitch, 2^(octaves x place) times the note's. The products here
+        // keep 13 to 15 bits of each side, within a hundredth of a cent and
+        // a thousandth of a dB, without mul16's four multiplies.
+        const i32 place = voice.notes.place[k];   // Q16, -0.1 to 1.1
+        u32 pm;
+        i32 pw;
+        exp2_parts(((voice.octaves >> 3) * (place >> 2)) >> 11, pm, pw);   // octaves 1/4 to 4, Q16; pm: Q15, 1 to 2
+        const i32 up = pw + 1;
+        const u32 ratio = up <= 0 ? pm >> clamp(-up, 0, 31) : pm << clamp(up, 0, 15);   // Q16
+        voice.ratio[k] = ratio;
+        // The gate's power and the darkening, as partial_share (harper.h) has them.
+        const i32 tp = ((voice.slope >> 2) * ((place > 0 ? place : 0) >> 2)) >> 12;   // tilt x place, Q16 (tilt to 3)
+        const i32 above = place > 16384 ? (((place - 16384) >> 2) * 87381) >> 14 : 0;
+        const i32 dim = ((((voice.slope >> 2) * (above >> 2)) >> 12) * 85 >> 6) - voice.makeup;
+        // A partial coming in from silence takes its pitch and tilt at once and ramps its level in.
+        const bool snap = at_once || !voice.level[k];
+        i32 increment = static_cast<i32>(voice.increment[k]);
+        aim(increment, voice.increment_step[k], static_cast<i32>(increment_of(voice.note, ratio)), snap);
+        voice.increment[k] = static_cast<u32>(increment);
+        aim(voice.power[k], voice.power_step[k], (65536 + tp) >> 4, snap);
+        aim(voice.dim[k], voice.dim_step[k], dim, snap);
+        aim(voice.level[k], voice.level_step[k], level, at_once);
+    }
+}
+
+__attribute__((noinline)) void solve_states(Voice& voice, u32 from, u32 to) { spectrum_states(voice.grid, voice.at, from, to, voice.solving); }
+__attribute__((noinline)) void solve_places(Voice& voice) { voice.sum = shape_places(voice.solving, voice.lambda, voice.notes); }
+__attribute__((noinline)) void solve_levels(Voice& voice) { shape_levels(voice.solving, voice.sum, voice.notes); }
+
+// One stage of the solve; the eight in turn are spectrum(), shape() and the landing.
+__attribute__((noinline)) void solve_stage(Voice& voice, const i32* p, u32 stage, bool at_once) {
+    switch (stage) {
+    case 0:
+        solve_start(voice, p);
+        solve_states(voice, 0, 9);
+        break;
+    case 1:
+        solve_states(voice, 9, partials);
+        voice.solving.key = spectrum_key(voice.grid);
+        break;
+    case 2: solve_places(voice); break;
+    case 3: solve_levels(voice); break;
+    case 4: land(voice, 0, 5, at_once); break;
+    case 5: land(voice, 5, 9, at_once); break;
+    case 6: land(voice, 9, 13, at_once); break;
+    default: land(voice, 13, partials, at_once); break;
+    }
+}
 
 inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::Parameters parameters, opxy::Pitch pitch) {
     const i32* p = parameters;
@@ -92,69 +209,81 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
         voice.blocks = 0;
         voice.beat = voice.beat_site = 0;
         voice.struck = 0;
+        voice.stale = 1;
     }
 
-    // The chain this block: the flux, snapped and beating, the coupling, the
-    // struck site, beating on its own phase.
-    const u32 alpha = warp(flux(p[FLUX]), snap_pull) + static_cast<u32>(wingbeat_flux(p[WINGBEAT], voice.beat));
-    const i32 lambda = coupling(p[COUPLING]);
-    const i32 at = clamp(site(p[SITE]) + wingbeat_site(p[WINGBEAT], voice.beat_site), 0, 8 << 16);
-    Spectrum spectrum_now;
-    spectrum(alpha, lambda, at, spectrum_now);
-    Notes notes;
-    shape(spectrum_now, lambda, notes);
-    const u32 rate = wingbeat_rate(p[WINGBEAT]);
-    voice.beat += rate;
-    voice.beat_site += wingbeat_site_rate(rate);
     if (!hushing) {
         voice.gate = gate_step(voice.gate, voice.blocks, strike(p[STRIKE]), glow_log2(p[GLOW]));
         if (voice.blocks < 0xffffu) ++voice.blocks;
     }
-
-    // Spread: the span of the spectrum in octaves, Q16.
-    const i32 octaves = static_cast<i32>(exp2_q16(spread_log2(p[SPREAD])));
-    const i32 slope = tilt(p[TILT]);
-    const u32 note = pitch[0];
     const u32 light = hushing ? 0 : static_cast<u32>(voice.gate) >> 15;   // Q15; 0: every partial's target is
-    const i32 gate_log = light ? gate_log2(light) : 0, makeup = tilt_makeup(slope);
+    // A new pitch (a bend or a glide) moves every partial at once, to where it last landed.
+    const u32 note = pitch[0];
+    if (note != voice.note && !voice.stale) {
+        voice.note = note;
+        for (u32 k = 0; k < partials; ++k) {
+            voice.increment[k] = increment_of(note, voice.ratio[k]);
+            voice.increment_step[k] = 0;
+        }
+    }
+
+    // The solve: whole at the strike, then a stage a block.
+    if (voice.stale) {
+        voice.note = note;
+        for (u32 s = 0; s < solve_stages; ++s) solve_stage(voice, p, s, true);
+        voice.stale = 0;
+        voice.stage = 0;
+        voice.still = 0;
+    } else {
+        bool run = true;
+        if (voice.stage == 0) {
+            // Solve again only while something moves: a control, or the wingbeat.
+            const bool moved = p[FLUX] != voice.sampled[0] || p[COUPLING] != voice.sampled[1] || p[SITE] != voice.sampled[2] ||
+                               p[SPREAD] != voice.sampled[3] || p[TILT] != voice.sampled[4] || q15(p[WINGBEAT]) != 0;
+            voice.still = moved ? 0 : voice.still < 2 ? voice.still + 1 : 2;
+            run = voice.still < 2;   // a solve after the last move lands its targets exactly; then rest
+        }
+        if (run) {
+            solve_stage(voice, p, voice.stage, false);
+            voice.stage = (voice.stage + 1) & (solve_stages - 1);
+        }
+    }
+    const u32 rate = wingbeat_rate(p[WINGBEAT]);
+    voice.beat += rate;
+    voice.beat_site += wingbeat_site_rate(rate);
+
     bool sounding = false, rendered = false;
     i32* low = voice.low;
     i32* acc = low + 2 * halfband_taps;
-    for (u32 i = 0; i < half_frames; ++i) acc[i] = 0;
-    for (u32 k = 0; k < partials; ++k) {
-        const i32 a = voice.amplitude[k];
-        const i32 level = notes.level[k];
-        const i32 place = notes.place[k];
-        // The partial's increment: the note's, 2^(octaves x place) times.
-        u32 pm;
-        i32 pw;
-        exp2_parts(mul16(octaves, place), pm, pw);
-        const u32 base = mul16u(note, pm);   // note x 2^(fraction) / 2
-        const i32 up = pw + 1;
-        u32 increment = 0;
-        i32 gain = 0;
-        if (up >= 0 && up < 31 && base < (ceiling >> up)) {
-            increment = base << up;
-            gain = increment <= ceiling_fade ? 32768 : static_cast<i32>((((ceiling - increment) >> 16) * 112978u) >> 12);   // 32768 / 1188
+    {
+        // Each partial's target: its level through the gate at its power and
+        // darkening, faded at the ceiling.
+        const u32 e = light ? static_cast<u32>(-gate_log2(light)) >> 4 : 0;   // -log2 of the light, Q12
+        i32 target[partials];
+        for (u32 k = 0; k < partials; ++k) {
+            const u32 inc = voice.increment[k] += static_cast<u32>(voice.increment_step[k]);
+            const i32 level = voice.level[k] += voice.level_step[k];
+            const i32 power = voice.power[k] += voice.power_step[k];
+            const i32 dim = voice.dim[k] += voice.dim_step[k];
+            i32 t = 0;
+            if (light && level > 0 && inc < ceiling) {
+                const i32 gain = inc <= ceiling_fade ? 32768 : static_cast<i32>((((ceiling - inc) >> 16) * 112978u) >> 12);   // 32768 / 1188
+                const i32 share = exp2_down(-static_cast<i32>((e * static_cast<u32>(power)) >> 8) - dim);   // Q15
+                t = ((((level * share) >> 15) * gain) >> 15) << 10;   // Q25
+            }
+            target[k] = t;
         }
-        i32 target = 0;
-        if (light && level > 0 && gain > 0) {
-            const i32 plain = (((level * partial_share(gate_log, makeup, slope, place)) >> 15) * gain) >> 15;   // Q15
-            // Lifted 3.9 dB to the suites' shared loudness; silence is judged
-            // before the lift, so the same partials sound as before.
-            target = plain << 10 < silence ? 0 : ((plain * lift) >> 15) << 10;   // Q25
+        for (u32 i = 0; i < half_frames; ++i) acc[i] = 0;
+        for (u32 k = 0; k < partials; ++k) {
+            const i32 a = voice.amplitude[k];
+            const i32 target_k = target[k] >= silence ? target[k] : 0;
+            voice.amplitude[k] = target_k;
+            if (!target_k && !a) continue;
+            rendered = true;
+            if (target_k) sounding = true;
+            // The bank: 32 samples at half rate, the amplitude ramped across them.
+            voice.phase[k] = bank(acc, voice.phase[k], voice.increment[k] << 1, a, (target_k - a) >> 5);
         }
-        voice.amplitude[k] = target < silence ? 0 : target;
-        const u32 step_phase = increment << 1;   // a half-rate sample
-        u32 ph = voice.phase[k];
-        if (target < silence && a < silence) {
-            voice.phase[k] = ph + (step_phase << 5);
-            continue;
-        }
-        rendered = true;
-        if (target >= silence) sounding = true;
-        // The bank: 32 samples at half rate, the amplitude ramped across them.
-        voice.phase[k] = bank(acc, ph, step_phase, a, (target - a) >> 5);
     }
     voice.sounding = sounding ? 1 : 0;
     if (hushing) {
@@ -169,6 +298,7 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
             for (u32 i = 0; i < opxy::block_frames; ++i) output[i] = 0;
             return;
         }
+        for (u32 i = 0; i < half_frames; ++i) acc[i] = 0;
     }
     // Back to the full rate: each half-rate sample, then the half-band's
     // value between it and the next. The levels sum to at most 32767 (Q15),
