@@ -287,6 +287,46 @@ int main() {
         check("raising Bow wakes a quiet plate", !n.voice.quiet && bowed > 0.02 && n.bounded);
     }
 
+    // A chord's notes start in one block: the second takes over the first's
+    // sand before the looks have poured it, and sounds exactly as it would
+    // had the first poured it all at once.
+    {
+        defaults(p);
+        static Voice a, b, ref;
+        static Shared shared, whole;
+        for (Voice* v : {&a, &b, &ref}) {
+            unsigned char* bytes = reinterpret_cast<unsigned char*>(v);
+            for (unsigned i = 0; i < sizeof(Voice); ++i) bytes[i] = 0;
+        }
+        for (Shared* s : {&shared, &whole}) {
+            unsigned char* bytes = reinterpret_cast<unsigned char*>(s);
+            for (unsigned i = 0; i < sizeof(Shared); ++i) bytes[i] = 0;
+        }
+        sand::initialize(a, shared, 1);
+        sand::start(a, shared, 1);
+        sand::initialize(b, shared, 2);
+        sand::start(b, shared, 2);
+        // The reference: the first note's sand poured whole, as its own pour draws it.
+        u32 seed = (1u * 2654435761u | 1u) * 1723622977u + 786704080u;
+        sand::pour(whole.sand, sand::kGrains, seed);
+        whole.pour_seed = seed;
+        whole.poured = sand::kGrains;
+        whole.latest = 1;
+        sand::initialize(ref, whole, 2);
+        sand::start(ref, whole, 2);
+        u32 pitch[opxy::block_frames];
+        for (unsigned i = 0; i < opxy::block_frames; ++i) pitch[i] = static_cast<u32>(110.0 / 44100.0 * 4294967296.0);
+        i32 out_a[opxy::block_frames], out_b[opxy::block_frames], out_ref[opxy::block_frames];
+        bool same = true;
+        for (unsigned blk = 0; blk < kSecond * 2; ++blk) {
+            sand::render(a, shared, 1, out_a, p, pitch);
+            sand::render(b, shared, 2, out_b, p, pitch);
+            sand::render(ref, whole, 2, out_ref, p, pitch);
+            for (unsigned i = 0; i < opxy::block_frames; ++i) same = same && out_b[i] == out_ref[i];
+        }
+        check("a chord's second note pours the first's sand as a whole pour would", same);
+    }
+
     // Pitch: the bowed mode sounds the note. The strongest component within
     // 3% of the note, by a fine sweep of single-bin DFTs over three seconds of
     // the settled, sand-free tone (long enough to part the bowed mode from its twin), lies within 3 cents of it.

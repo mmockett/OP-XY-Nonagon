@@ -286,9 +286,19 @@ inline void clear(Mode& m, u32 phase) {
     m.a = m.b = m.sa = m.sb = 0;
 }
 
-// Every grain's kept shapes, for a fresh pour, another note's sand or a new figure.
+// Every grain's kept shapes, for a fresh pour, another note's sand or a new
+// figure: marked as forgotten, and each grain's are cleared at its next look,
+// the only place they are read, rather than all 48 at once.
 inline void forget_shapes(Voice& voice) {
-    for (u32 i = 0; i < kGrains; ++i) voice.shapes[i][0] = kMoved;
+    voice.stale[0] = 0xffffffffu;
+    voice.stale[1] = (1u << (kGrains - 32)) - 1;
+}
+static_assert(kGrains > 32 && kGrains <= 64, "stale holds a bit a grain");
+// The next grain of a pour, with the draws pour() would have given it (out of
+// line: a note's first four blocks call it, others never).
+__attribute__((noinline)) void pour_next(Voice& voice) {
+    pour(voice.grains + voice.poured, 1, voice.pour_seed);
+    ++voice.poured;
 }
 
 inline void initialize(Voice& voice, Shared&, u32 owner) {
@@ -306,6 +316,9 @@ inline void initialize(Voice& voice, Shared&, u32 owner) {
     voice.struck = voice.jolted = voice.rounds = 0;
     voice.click1 = voice.click2 = 0;
     voice.seed = voice.seed * 1723622977u + 786704080u;   // start() replaces the grains: skip this pour's 144 draws
+    voice.pour_seed = 0;
+    voice.poured = kGrains;
+    voice.stale[0] = voice.stale[1] = 0;
     for (u32 k = 0; k < kModes; ++k) voice.lost[k] = 0;
     for (u32 k = 0; k < kModes; ++k) voice.rate[k] = 3;
     voice.live = 0;
@@ -320,18 +333,30 @@ namespace {
 const u32 kStale = 24;
 inline bool sounding(const Shared& shared) { return shared.latest && shared.clock - shared.fresh <= kStale; }
 inline void publish(Shared& shared, const Voice& voice) {
-    for (u32 i = 0; i < kGrains; ++i) shared.sand[i] = voice.grains[i];
+    for (u32 i = 0; i < voice.poured; ++i) shared.sand[i] = voice.grains[i];
+    shared.pour_seed = voice.pour_seed;
+    shared.poured = voice.poured;
 }
 }
 
 // A note takes over the sand of the note still sounding, or pours fresh sand
 // when none is; either way it strikes the plate as it starts (by how little it
 // is bowed), and the plate itself rings on from the voice's last note.
+// The pour itself waits for the looks (pour_next()): this voice and the
+// shared sand hold where it starts, so a note taking it over meanwhile, a
+// chord's next note say, pours the same grains. (Taking over, the shared sand
+// already holds what this voice copied, so it is not published back.)
 inline void start(Voice& voice, Shared& shared, u32 owner) {
     if (sounding(shared)) {
-        for (u32 i = 0; i < kGrains; ++i) voice.grains[i] = shared.sand[i];
+        for (u32 i = 0; i < shared.poured; ++i) voice.grains[i] = shared.sand[i];
+        voice.pour_seed = shared.pour_seed;
+        voice.poured = shared.poured;
     } else {
-        pour(voice.grains, kGrains, voice.seed);
+        voice.pour_seed = voice.seed;
+        voice.seed = voice.seed * 1723622977u + 786704080u;   // past the pour's 144 draws
+        voice.poured = 0;
+        shared.pour_seed = voice.pour_seed;
+        shared.poured = 0;
     }
     forget_shapes(voice);
     for (u32 k = 0; k < kModes; ++k) voice.gather[k] = 0;
@@ -339,7 +364,6 @@ inline void start(Voice& voice, Shared& shared, u32 owner) {
     voice.struck = 1;
     shared.latest = owner;
     shared.fresh = shared.clock;
-    publish(shared, voice);
 }
 inline void destroy(Voice&, Shared& shared, u32 owner) {
     if (shared.latest == owner) shared.latest = 0;
@@ -555,6 +579,7 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     const i32 ring = set.ring, dead = set.dead, bounce = set.bounce;
     for (u32 n = 0; n < kLooks; ++n) {
         const u32 at = voice.cursor;
+        if (at >= voice.poured) pour_next(voice);  // the looks reach the grains in order from a note's start
         if (++voice.cursor == kGrains) {
             voice.cursor = 0;
             for (u32 k = 0; k < kModes; ++k) {
@@ -565,6 +590,11 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
             if (shared.latest == owner && !(++voice.rounds & 3)) publish(shared, voice);
         }
         if (at >= grains) continue;
+        u32& stale = voice.stale[at >> 5];
+        if (stale & (1u << (at & 31))) {
+            stale &= ~(1u << (at & 31));
+            voice.shapes[at][0] = kMoved;
+        }
         const i16* const shapes = voice.shapes[at];
         const u32 seen = look(voice.grains[at], t, modes, seed, voice.shapes[at]);
         stirred = stirred || voice.grains[at].air;  // thrown, or still aloft

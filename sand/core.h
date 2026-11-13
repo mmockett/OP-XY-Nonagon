@@ -48,6 +48,11 @@ struct Voice {
     u32 figure;           // the figure the modes were last bowed in
     u32 cursor;           // the next grain to look at
     u32 seed;
+    // A note's sand is poured a grain at a time, as the looks first reach each
+    // (engine.cpp's pour_next()), so the note's first block need not pour all 48:
+    // grains from poured on are still to come, from pour_seed's draws.
+    u32 pour_seed, poured;
+    u32 stale[2];         // bit i: grain i's kept shapes are forgotten (applied at its next look)
     u32 struck;           // the note has just started: strike the plate this block
     u32 jolted;           // looks left of the strike's jolt
     u32 rounds;           // rounds of looks, for publishing the sand every fourth
@@ -81,5 +86,6 @@ struct Shared {
     u32 latest;   // the owner whose sand this is, 0 when none sounds
     u32 clock;    // renders by every voice
     u32 fresh;    // the clock when latest last rendered
+    u32 pour_seed, poured;   // as the voice's: sand from poured on is still to be poured from pour_seed
 };
 }
