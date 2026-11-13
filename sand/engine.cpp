@@ -540,14 +540,14 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     // and knock the plate for each that lands.
     // The landings wait for the slow paths: this block's are written kFullWait on,
     // after the last block's that are still to come.
+    // Both parts are filled only when needed: this block's at its first
+    // landing, and the last block's when it left any (else zeros, only if the
+    // rattle still rings and so reads them).
     i32 waiting[kFullWait + opxy::block_frames];
-    if (voice.live & 64u) {
+    const bool waited = voice.live & 64u;
+    if (waited)
         for (u32 i = 0; i < kFullWait; ++i) waiting[i] = voice.click_wait[i];
-    } else {
-        for (u32 i = 0; i < kFullWait; ++i) waiting[i] = 0;
-    }
     i32* const impulses = waiting + kFullWait;
-    for (u32 i = 0; i < opxy::block_frames; ++i) impulses[i] = 0;
     bool clicked = false, stirred = false;
     i32 knock_a[kModes], knock_b[kModes];
     for (u32 k = 0; k < kModes; ++k) knock_a[k] = knock_b[k] = 0;
@@ -578,6 +578,8 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
         seed = seed * 1664525u + 1013904223u;
         const i32 sign = static_cast<i32>(seed) < 0 ? -1 : 1;
         const i32 click = (multiply(sign * height * loud * (kClickLevel >> 8), g) >> 8) * dead;
+        if (!clicked)
+            for (u32 i = 0; i < opxy::block_frames; ++i) impulses[i] = 0;
         i32& impulse = impulses[seed >> 26];
         impulse = clamp(impulse + click, -kHalf, kHalf);
         // Slippery sand bounces: a second, softer click a moment later.
@@ -778,12 +780,19 @@ inline void render(Voice& voice, Shared& shared, u32 owner, opxy::Output output,
     const bool half_in = quarter_on || to_half;
     if (half_in) live |= 32u;
     // The rattle, and half to full: the output.
-    const bool waited = last & 64u;
     // The landings still to come wait in the voice only when there are any: a
     // block without one leaves live's bit 6 clear, so the next reads zeros.
     if (clicked)
         for (u32 i = 0; i < kFullWait; ++i) voice.click_wait[i] = impulses[opxy::block_frames - kFullWait + i];
     i32 rattle[opxy::block_frames];
+    if (!clicked && !waited && magnitude(voice.click1) + magnitude(voice.click2) >= 4096) {
+        for (u32 i = 0; i < kFullWait; ++i) waiting[i] = 0;   // a ringing rattle reads silence
+        for (u32 i = 0; i < opxy::block_frames; ++i) impulses[i] = 0;
+    } else if (!clicked && waited) {
+        for (u32 i = 0; i < opxy::block_frames; ++i) impulses[i] = 0;
+    } else if (clicked && !waited) {
+        for (u32 i = 0; i < kFullWait; ++i) waiting[i] = 0;
+    }
     const bool rattling = rattle_of(voice, waiting, clicked || waited, set.c1, set.c2, kHalf >> 1, rattle);
     const bool half_on = half_in || (last & 32u);
     if (half_on) {
