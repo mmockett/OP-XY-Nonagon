@@ -1193,7 +1193,13 @@ inline void render(Voice& voice, Shared& shared, u32, opxy::Output output,
             if (root.state == DONE) continue;
             ++live;
             if (root.state == WAITING) {
-                if (voice.t - substep_time < voice.image[root.image].birth) continue;
+                // At a cone both of an image's roots come into hearing at
+                // once; the backward one is born a sub-step after the
+                // forward one, so their births (and first, hardest solves)
+                // fall in different blocks. It is about 40 dB down then,
+                // swelling in under the boom.
+                const i32 late = root.reversed ? substep_time : 0;
+                if (voice.t - substep_time - late < voice.image[root.image].birth) continue;
                 born(voice, root, f);
             }
             solve(voice, root, block);
