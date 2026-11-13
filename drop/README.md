@@ -157,8 +157,7 @@ stepped once a 64-sample block by both. Integer and 32-bit only.
   the point, 21 at half and 7.5 at a quarter far over it, and louder as
   crackle grows (half as loud at a quarter); through a difference and two
   low-passes at about 3 kHz. Boiling, thousands a second with a frying hiss
-  of low-passed noise. The crackle runs at half the sample rate, drawn
-  between its values as heard.
+  of low-passed noise.
 - **Chords**: a chord's drops land and pulse together, so chords keep their
   rhythm, and their pulses add up. From three voices sounding (counted in
   `Shared`), each plays at √(2 / voices): an eight-note chord is 6 dB under
@@ -290,7 +289,7 @@ voice at the midpoint measured **2.95%** on average and **7.02%** in its
 worst single block.
 
 Since then a block runs as passes over block buffers, each a loop the
-Blackfin's registers hold: the noise, the crackle (at half the rate), the
+Blackfin's registers hold: the noise, the crackle, the
 beats, the jet's noise blown, the jet into the pipe (at half the rate), the
 pipe, the crackle and hiss as heard, the gated tone and the knee. Counted in
 the compiled code, a sounding voice runs about 250 instructions a sample

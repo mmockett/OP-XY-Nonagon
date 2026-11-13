@@ -29,9 +29,9 @@ const i32 crackle_level = 30000;  // a floating drop's contacts, Q15
 const i32 boil_level = 24000;     // a boiling drop's bubbles, Q15
 const i32 boil_hiss = 3000;       // its frying hiss, Q15
 const i32 vapour_hiss = 220;      // the vapour's own hiss at full vapour, Q15
-const i32 into_pipe = 3536;       // the crackle's share into the pipe, Q15 (5000 at the full rate: at half the rate its noise is 3 dB louder)
+const i32 into_pipe = 5000;       // the crackle's share into the pipe, Q15
 const i32 tone_level = 15000;    // log2 of the tone as heard at A3, Q16 (x 1.17)
-const i32 crackle_heard = 11585;  // the crackle as heard, Q15 (32767 at the full rate: at half the rate its noise is 3 dB and its difference 6 dB louder)
+const i32 crackle_heard = 32767;  // the crackle as heard, Q15
 const i32 ceiling = 32767;
 const i32 full_share = 32768;
 const u32 shares[9] = {32768, 32768, 32768, 26755, 23170, 20724, 18919, 17515, 16384};   // sqrt(2 / voices), Q15
@@ -78,15 +78,14 @@ DROP_PASS u32 noise_pass(u32 noise, i16* r1) {
 }
 
 // The crackle: a burst of noise at random moments, mostly small, now and then
-// loud. At half the rate, each value held two samples: its chance is a pair's
-// (`chance`) and it is filtered into 3 kHz and under. Hands on each pair's
-// random draw (its top half, whose sign bit 14 signs the vents' ticks) and
-// the crackle. The spark stays under 2^30. `silent` is 1 when every sample's
-// crackle was surely 0: no burst, and the spark already too small to be heard.
+// loud. Hands on each sample's random draw (its top half, whose sign bit 14
+// signs the vents' ticks) and the crackle. The spark stays under 2^30.
+// `silent` is 1 when every sample's crackle was surely 0: no burst, and the
+// spark already too small to be heard.
 DROP_PASS u32 crackle_pass(u32 dice, i32& spark_io, u32 chance, i32 loudness, i16* draw, i16* crack, u32& silent) {
     i32 spark = spark_io;
     u32 still = spark < 32768;
-    for (unsigned i = 0; i < frames / 2; ++i) {
+    for (unsigned i = 0; i < frames; ++i) {
         const u32 r2 = lcg(dice);
         const i32 high = static_cast<i32>(r2) >> 16;
         draw[i] = static_cast<i16>(high);
@@ -96,7 +95,7 @@ DROP_PASS u32 crackle_pass(u32 dice, i32& spark_io, u32 chance, i32 loudness, i1
             if (a << 15 > spark) spark = a << 15;
             still = 0;
         }
-        spark -= spark >> 5;   // each burst rings about 1.5 ms
+        spark -= spark >> 6;   // each burst rings about 1.5 ms
         crack[i] = static_cast<i16>(mul16(spark >> 15, high) >> 15);
     }
     spark_io = spark;
@@ -136,7 +135,7 @@ DROP_PASS void beats_pass(Beats& s, const i16* draw, i16* tick_out, i32* jet_out
                 pulse = full;
                 // Each vent's tick, of either sign: a vent pushes the gap's air
                 // one way or the other, so chords' beats do not pile up in sign.
-                x = (draw[i >> 1] & 0x4000 ? puff : -puff) * vent_tick >> 15;
+                x = (draw[i] & 0x4000 ? puff : -puff) * vent_tick >> 15;
             }
         } else if (vents) {
             const u32 was = vent;
@@ -146,7 +145,7 @@ DROP_PASS void beats_pass(Beats& s, const i16* draw, i16* tick_out, i32* jet_out
                 const i32 a = puff * 26000 >> 15;   // 0.8 of the first, which leads the beat
                 if (a << 15 > jet) jet = a << 15;
                 if (25000 > pulse) pulse = 25000;
-                x = (draw[i >> 1] & 0x4000 ? a : -a) * vent_tick >> 15;
+                x = (draw[i] & 0x4000 ? a : -a) * vent_tick >> 15;
             }
         }
         jet -= (jet >> 15) * decay;
@@ -166,12 +165,12 @@ DROP_PASS void beats_pass(Beats& s, const i16* draw, i16* tick_out, i32* jet_out
 }
 
 // The jet's noise blown: the vapour's noise at the jet's envelope over its
-// steady blowing. With the ticks it excites the pipe. In place: the jet's
-// envelope becomes the excitation; blow is kept for the ear.
-DROP_PASS void blow_pass(const i16* r1, const i16* tick, i32* jet_in, i32* blow_out, i32 steady, i32 hiss_of_jet) {
+// steady blowing. With the ticks and the crackle it excites the pipe. In
+// place: the jet's envelope becomes the excitation; blow is kept for the ear.
+DROP_PASS void blow_pass(const i16* r1, const i16* tick, const i16* crack, i32* jet_in, i32* blow_out, i32 steady, i32 hiss_of_jet) {
     for (unsigned i = 0; i < frames; ++i) {
         const i32 blow = (jet_in[i] + steady) * r1[i] >> 15;
-        jet_in[i] = tick[i] + (blow * hiss_of_jet >> 15);
+        jet_in[i] = tick[i] + (blow * hiss_of_jet >> 15) + (mul16(crack[i], into_pipe) >> 15);
         blow_out[i] = blow;
     }
 }
@@ -187,7 +186,7 @@ struct Jet {
 };
 // A one-pole's coefficient for two samples at once: 1 - (1 - k)^2, Q15.
 inline i32 twice(i32 k) { return 2 * k - (k * k >> 15); }
-DROP_PASS void jet_pass(Jet& s, i32* x_in, const i16* crack, const i16* pulse, i32* gain) {
+DROP_PASS void jet_pass(Jet& s, i32* x_in, const i16* pulse, i32* gain) {
     u32 kick = s.kick;
     i32 e1 = s.e1, e2 = s.e2, e3 = s.e3;
     const i32 landing = s.push, soft = twice(s.soft), under = twice(s.under), drive = s.drive, blowing = s.blowing;
@@ -196,7 +195,7 @@ DROP_PASS void jet_pass(Jet& s, i32* x_in, const i16* crack, const i16* pulse, i
     i32* gp = gain;
     const i16* pp = pulse;
     for (unsigned i = 0; i < frames / 2; ++i) {
-        const i32 x = ((xp[0] + xp[1]) >> 1) + (mul16(crack[i], into_pipe) >> 15);
+        const i32 x = (xp[0] + xp[1]) >> 1;
         e1 += ((x - e1) * soft + 16384) >> 15;   // rounded: a floor would settle on an offset
         e2 += ((e1 - e2) * soft + 16384) >> 15;
         e3 += ((e2 - e3) * under + 16384) >> 15;
@@ -276,45 +275,37 @@ inline void pipe_pass(Pipe& s, const i32* input, const i32* gain, i16* y_out) {
     }
 }
 
-// The crackle as heard: its clicks through a difference (they are bright),
-// softened twice over 3 kHz, at the crackle's half rate and drawn between its
-// values at the full. Writes it into `heard`.
-const i32 crackle_soft = 18308;   // 11000 a sample at the full rate, over two samples: 1 - (1 - k)^2, Q15
-struct Crackled {
-    i32 soft_crack, softer_crack, crack_last;
+// What is heard beside the tone: the frying hiss (white noise low-passed at
+// about 4 kHz, not the raw top end), the crackle's clicks through a difference
+// (they are bright), softened twice over 3 kHz, and a little of the jet. In
+// place: blow becomes this.
+struct Side {
+    i32 hiss_last, soft_crack, softer_crack, crack_last;
+    i32 frying, breath_heard;
 };
-DROP_PASS void crackled_pass(Crackled& s, const i16* crack, i32* heard) {
-    i32 soft_crack = s.soft_crack, softer_crack = s.softer_crack, crack_last = s.crack_last;
-    i32 was = softer_crack * crackle_heard >> 13;
-    for (unsigned i = 0; i < frames / 2; ++i) {
+DROP_PASS void side_pass(Side& s, const i16* r1, const i16* crack, i32* blow_in) {
+    i32 hiss_last = s.hiss_last, soft_crack = s.soft_crack, softer_crack = s.softer_crack, crack_last = s.crack_last;
+    const i32 frying = s.frying, breath_heard = s.breath_heard;
+    for (unsigned i = 0; i < frames; ++i) {
+        hiss_last += (r1[i] - hiss_last) * 15000 >> 15;
+        const i32 hiss = mul16(hiss_last, frying) >> 14;
         const i32 c = crack[i];
-        soft_crack += ((c - crack_last) - soft_crack) * crackle_soft >> 15;
-        softer_crack += (soft_crack - softer_crack) * crackle_soft >> 15;
+        soft_crack += ((c - crack_last) - soft_crack) * 11000 >> 15;
+        softer_crack += (soft_crack - softer_crack) * 11000 >> 15;
         crack_last = c;
-        const i32 now = softer_crack * crackle_heard >> 13;
-        heard[2 * i] = (was + now) >> 1;
-        heard[2 * i + 1] = now;
-        was = now;
+        blow_in[i] = (softer_crack * crackle_heard >> 13) + hiss + (blow_in[i] * breath_heard >> 15);
     }
+    s.hiss_last = hiss_last;
     s.soft_crack = soft_crack;
     s.softer_crack = softer_crack;
     s.crack_last = crack_last;
 }
-// What else is heard beside the tone: the frying hiss (white noise low-passed
-// at about 4 kHz, not the raw top end) and a little of the jet, added to the
-// crackle in `heard`.
-DROP_PASS i32 hiss_pass(i32 hiss_last, const i16* r1, const i32* blow, i32* heard, i32 frying, i32 breath_heard) {
+// The same with the crackle silent and its low-passes settled: their sum is
+// one value the whole block.
+DROP_PASS i32 hiss_pass(i32 hiss_last, const i16* r1, i32* blow_in, i32 frying, i32 breath_heard, i32 crackled) {
     for (unsigned i = 0; i < frames; ++i) {
         hiss_last += (r1[i] - hiss_last) * 15000 >> 15;
-        heard[i] += (mul16(hiss_last, frying) >> 14) + (blow[i] * breath_heard >> 15);
-    }
-    return hiss_last;
-}
-// The same over a crackle silent, with its low-passes settled: one value.
-DROP_PASS i32 hiss_held_pass(i32 hiss_last, const i16* r1, const i32* blow, i32* heard, i32 frying, i32 breath_heard, i32 crackled) {
-    for (unsigned i = 0; i < frames; ++i) {
-        hiss_last += (r1[i] - hiss_last) * 15000 >> 15;
-        heard[i] = crackled + (mul16(hiss_last, frying) >> 14) + (blow[i] * breath_heard >> 15);
+        blow_in[i] = crackled + (mul16(hiss_last, frying) >> 14) + (blow_in[i] * breath_heard >> 15);
     }
     return hiss_last;
 }
@@ -566,7 +557,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     const i32 bubbles = (1500 + (2500 * p.crackle >> 15)) * (boil * sinking >> 15) >> 15;
     i32 per_second = alive ? (contacts * p.floating >> 15) + bubbles : 0;
     if (voice.splash) { --voice.splash; per_second += 2500; }
-    const u32 chance = static_cast<u32>(per_second) * 194782u;   // a pair of samples, Q32
+    const u32 chance = static_cast<u32>(per_second) * 97391u;   // a sample, Q32
     // The contacts grow louder as well as denser with crackle: half as loud at a quarter.
     const i32 contact_level = crackle_level * (12000 + (p.crackle * 20767 >> 15)) >> 15;
     const i32 loudness = ((contact_level * p.floating >> 15) + (boil_level * (boil * sinking >> 15) >> 15));
@@ -588,8 +579,8 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     voice.share = fair < voice.share ? fair : voice.share + (fair - voice.share) / 8;   // down at once, up gently
     const i32 share = voice.share;
     // The block, in passes (see DROP_PASS).
-    i16 r1[frames], draw[frames / 2], crack[frames / 2], pulse[frames], y[frames];
-    i32 x[frames], gain[frames], side[frames], heard[frames];
+    i16 r1[frames], draw[frames], crack[frames], pulse[frames], y[frames];
+    i32 x[frames], gain[frames], side[frames];
     voice.noise = noise_pass(voice.noise, r1);
     u32 crackle_silent = 0;
     voice.dice = crackle_pass(voice.dice, voice.spark, chance, loudness, draw, crack, crackle_silent);
@@ -606,12 +597,12 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     voice.puff = beat_state.puff;
     voice.jet = beat_state.jet;
     voice.pulse = beat_state.pulse;
-    blow_pass(r1, y, x, side, steady, hiss_of_jet);
+    blow_pass(r1, y, crack, x, side, steady, hiss_of_jet);
     // The low-passes' rounding leaves them a unit or two off zero, which the
     // pipe's gain would hold as an offset: once the drop is gone, let it go.
     if (!alive && magnitude(voice.e1) < 8 && magnitude(voice.e2) < 8 && magnitude(voice.e3) < 8) voice.e1 = voice.e2 = voice.e3 = 0;
     Jet jet_state = {voice.kick, voice.push, voice.e1, voice.e2, voice.e3, voice.soft, voice.under, voice.drive, blowing};
-    jet_pass(jet_state, x, crack, pulse, gain);
+    jet_pass(jet_state, x, pulse, gain);
     voice.kick = jet_state.kick;
     voice.e1 = jet_state.e1;
     voice.e2 = jet_state.e2;
@@ -629,26 +620,25 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     voice.jet_lp = pipe_state.jet_lp;
     voice.hold = pipe_state.hold;
     voice.held = pipe_state.held;
-    // The crackle as heard. A silent one leaves its low-passes where they are
-    // once they have settled (a unit or two under zero, by their rounding).
+    // A silent crackle leaves its low-passes where they are once they have
+    // settled (a unit or two under zero, by their rounding).
     const i32 soft_crack = voice.soft_crack, softer_crack = voice.softer_crack;
-    if (crackle_silent && !voice.crack_last && !((-soft_crack * crackle_soft) >> 15) &&
-        !(((soft_crack - softer_crack) * crackle_soft) >> 15)) {
-        voice.hiss_last = hiss_held_pass(voice.hiss_last, r1, side, heard, frying, breath_heard, softer_crack * crackle_heard >> 13);
+    if (crackle_silent && !voice.crack_last && !((-soft_crack * 11000) >> 15) && !(((soft_crack - softer_crack) * 11000) >> 15)) {
+        voice.hiss_last = hiss_pass(voice.hiss_last, r1, side, frying, breath_heard, softer_crack * crackle_heard >> 13);
     } else {
-        Crackled crackled = {soft_crack, softer_crack, voice.crack_last};
-        crackled_pass(crackled, crack, heard);
-        voice.soft_crack = crackled.soft_crack;
-        voice.softer_crack = crackled.softer_crack;
-        voice.crack_last = crackled.crack_last;
-        voice.hiss_last = hiss_pass(voice.hiss_last, r1, side, heard, frying, breath_heard);
+        Side side_state = {voice.hiss_last, soft_crack, softer_crack, voice.crack_last, frying, breath_heard};
+        side_pass(side_state, r1, crack, side);
+        voice.hiss_last = side_state.hiss_last;
+        voice.soft_crack = side_state.soft_crack;
+        voice.softer_crack = side_state.softer_crack;
+        voice.crack_last = side_state.crack_last;
     }
     Heard heard_state = {voice.settled, voice.dc_in, voice.dc_out, tone_gain};
-    heard_pass(heard_state, y, pulse, heard);
+    heard_pass(heard_state, y, pulse, side);
     voice.settled = heard_state.settled;
     voice.dc_in = heard_state.dc_in;
     voice.dc_out = heard_state.dc_out;
-    const i32 loudest = knee_pass(heard, output, share);
+    const i32 loudest = knee_pass(side, output, share);
     const i32 spark = voice.spark;
     // Gone and rung out (under -66 dBFS as heard): clear the pipe and stop.
     // (The pipe may hold an offset of a unit or two, which the DC blocker hides.)

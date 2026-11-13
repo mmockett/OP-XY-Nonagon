@@ -36,21 +36,21 @@ struct Scene {
     u32 expected;
 };
 const Scene scenes[] = {
-    {"defaults, C4", {0.5, 0.85, 0, 0.181, 0, 0.35, 0.55, 0.25}, 60, 8, 1, still, 0xe49e59bau},
-    {"floating fast beats, A4", {0.5, 1.0, 0, 1.0, 0, 0.4, 0.55, 0.3}, 69, 6, 1, still, 0xb67270bcu},
-    {"boiling, C3", {0.2, 1.0, 0, 1.0, 0, 0.4, 0.55, 0.3}, 48, 2, 1, still, 0xa462d122u},
-    {"at the point, full crackle", {0.36, 0.6, 0, 0.5, 0, 0.6, 0.4, 1.0}, 55, 4, 1, still, 0x93a2f6bcu},
-    {"ratchet hops, slow beats", {0.7, 1.0, 0, 0.3, 1.0, 0.3, 0.7, 0.6}, 52, 8, 1, still, 0x0abff1e4u},
-    {"ethanol, thick vapour", {0.6, 0.7, 0.5, 0.6, 0.4, 1.0, 0.5, 0.5}, 72, 4, 1, still, 0x0a53f937u},
-    {"nitrogen, high key", {0.9, 0.4, 1.0, 0.8, 0.2, 0.8, 0.4, 0.8}, 96, 3, 1, still, 0x37bfe461u},
-    {"sphere, low key", {0.8, 0.0, 0, 0.5, 0, 0.1, 0.3, 0.2}, 24, 4, 1, still, 0x395f70fau},
-    {"hot, no crackle, no vapour", {1.0, 0.5, 0, 0.7, 0, 0.0, 0.2, 0.0}, 64, 3, 1, still, 0x5334ff1cu},
-    {"cold plate, bubbles", {0.0, 1.0, 0, 0.2, 0, 0.5, 1.0, 1.0}, 40, 2, 1, still, 0xa8b145d2u},
-    {"chord of five", {0.5, 0.85, 0, 0.4, 0.3, 0.4, 0.4, 0.4}, 50, 4, 5, still, 0xaf5c7d1du},
-    {"vapour swept each block", {0.55, 0.9, 0.2, 0.5, 0, 0.5, 0.6, 0.3}, 57, 4, 1, vapour_sweep, 0x07b177afu},
-    {"key gliding", {0.5, 0.85, 0, 0.6, 0, 0.35, 0.6, 0.25}, 45, 4, 2, glide, 0x1cf42ba7u},
-    {"re-dropped while ringing", {0.5, 0.9, 0, 0.7, 0.5, 0.45, 0.25, 0.5}, 62, 5, 2, redrop, 0xc44f6557u},
-    {"every control wandering", {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}, 67, 6, 3, wander, 0x49753cabu},
+    {"defaults, C4", {0.5, 0.85, 0, 0.181, 0, 0.35, 0.55, 0.25}, 60, 8, 1, still, 0x30b97b1au},
+    {"floating fast beats, A4", {0.5, 1.0, 0, 1.0, 0, 0.4, 0.55, 0.3}, 69, 6, 1, still, 0x8a13a263u},
+    {"boiling, C3", {0.2, 1.0, 0, 1.0, 0, 0.4, 0.55, 0.3}, 48, 2, 1, still, 0x9344ca85u},
+    {"at the point, full crackle", {0.36, 0.6, 0, 0.5, 0, 0.6, 0.4, 1.0}, 55, 4, 1, still, 0xab58f7a4u},
+    {"ratchet hops, slow beats", {0.7, 1.0, 0, 0.3, 1.0, 0.3, 0.7, 0.6}, 52, 8, 1, still, 0x80919720u},
+    {"ethanol, thick vapour", {0.6, 0.7, 0.5, 0.6, 0.4, 1.0, 0.5, 0.5}, 72, 4, 1, still, 0x191a3834u},
+    {"nitrogen, high key", {0.9, 0.4, 1.0, 0.8, 0.2, 0.8, 0.4, 0.8}, 96, 3, 1, still, 0xa1cfbbd9u},
+    {"sphere, low key", {0.8, 0.0, 0, 0.5, 0, 0.1, 0.3, 0.2}, 24, 4, 1, still, 0x81dee031u},
+    {"hot, no crackle, no vapour", {1.0, 0.5, 0, 0.7, 0, 0.0, 0.2, 0.0}, 64, 3, 1, still, 0x1abb25f9u},
+    {"cold plate, bubbles", {0.0, 1.0, 0, 0.2, 0, 0.5, 1.0, 1.0}, 40, 2, 1, still, 0xc89164b7u},
+    {"chord of five", {0.5, 0.85, 0, 0.4, 0.3, 0.4, 0.4, 0.4}, 50, 4, 5, still, 0xa440e751u},
+    {"vapour swept each block", {0.55, 0.9, 0.2, 0.5, 0, 0.5, 0.6, 0.3}, 57, 4, 1, vapour_sweep, 0x04f501a5u},
+    {"key gliding", {0.5, 0.85, 0, 0.6, 0, 0.35, 0.6, 0.25}, 45, 4, 2, glide, 0x389b2940u},
+    {"re-dropped while ringing", {0.5, 0.9, 0, 0.7, 0.5, 0.45, 0.25, 0.5}, 62, 5, 2, redrop, 0x7554f984u},
+    {"every control wandering", {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}, 67, 6, 3, wander, 0xa9e61121u},
 };
 }
 
