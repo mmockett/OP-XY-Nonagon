@@ -73,8 +73,11 @@ DROP_PASS u32 noise_pass(u32 noise, i16* r1) {
 // The crackle: a burst of noise at random moments, mostly small, now and then
 // loud. Hands on each sample's random draw (its top half, whose sign bit 14
 // signs the vents' ticks) and the crackle. The spark stays under 2^30.
-DROP_PASS u32 crackle_pass(u32 dice, i32& spark_io, u32 chance, i32 loudness, i16* draw, i16* crack) {
+// `silent` is 1 when every sample's crackle was surely 0: no burst, and the
+// spark already too small to be heard.
+DROP_PASS u32 crackle_pass(u32 dice, i32& spark_io, u32 chance, i32 loudness, i16* draw, i16* crack, u32& silent) {
     i32 spark = spark_io;
+    u32 still = spark < 32768;
     for (unsigned i = 0; i < frames; ++i) {
         const u32 r2 = lcg(dice);
         const i32 high = static_cast<i32>(r2) >> 16;
@@ -83,11 +86,13 @@ DROP_PASS u32 crackle_pass(u32 dice, i32& spark_io, u32 chance, i32 loudness, i1
             const i32 u = static_cast<i32>(lcg(dice) >> 17);
             const i32 a = mul16(mul16(u, u) >> 15, loudness) >> 15;
             if (a << 15 > spark) spark = a << 15;
+            still = 0;
         }
         spark -= spark >> 6;   // each burst rings about 1.5 ms
         crack[i] = static_cast<i16>(mul16(spark >> 15, high) >> 15);
     }
     spark_io = spark;
+    silent = still;
     return dice;
 }
 
@@ -262,6 +267,15 @@ DROP_PASS void side_pass(Side& s, const i16* r1, const i16* crack, i32* blow_in)
     s.soft_crack = soft_crack;
     s.softer_crack = softer_crack;
     s.crack_last = crack_last;
+}
+// The same with the crackle silent and its low-passes settled: their sum is
+// one value the whole block.
+DROP_PASS i32 hiss_pass(i32 hiss_last, const i16* r1, i32* blow_in, i32 frying, i32 breath_heard, i32 crackled) {
+    for (unsigned i = 0; i < frames; ++i) {
+        hiss_last += (r1[i] - hiss_last) * 15000 >> 15;
+        blow_in[i] = crackled + (mul16(hiss_last, frying) >> 14) + (blow_in[i] * breath_heard >> 15);
+    }
+    return hiss_last;
 }
 
 // The tone, gated by the pulses, with the rest, through the output's DC
@@ -536,7 +550,8 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     i16 r1[frames], draw[frames], crack[frames], pulse[frames], y[frames];
     i32 x[frames], gain[frames], side[frames];
     voice.noise = noise_pass(voice.noise, r1);
-    voice.dice = crackle_pass(voice.dice, voice.spark, chance, loudness, draw, crack);
+    u32 crackle_silent = 0;
+    voice.dice = crackle_pass(voice.dice, voice.spark, chance, loudness, draw, crack, crackle_silent);
     Beats beat_state = {voice.phase, voice.vent, voice.vents, voice.beats, voice.accent,
                         voice.puff, voice.jet, voice.pulse,
                         inc, short_inc, long_inc, top, lobes, d.hop,
@@ -573,12 +588,19 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     voice.jet_lp = pipe_state.jet_lp;
     voice.hold = pipe_state.hold;
     voice.held = pipe_state.held;
-    Side side_state = {voice.hiss_last, voice.soft_crack, voice.softer_crack, voice.crack_last, frying, breath_heard};
-    side_pass(side_state, r1, crack, side);
-    voice.hiss_last = side_state.hiss_last;
-    voice.soft_crack = side_state.soft_crack;
-    voice.softer_crack = side_state.softer_crack;
-    voice.crack_last = side_state.crack_last;
+    // A silent crackle leaves its low-passes where they are once they have
+    // settled (a unit or two under zero, by their rounding).
+    const i32 soft_crack = voice.soft_crack, softer_crack = voice.softer_crack;
+    if (crackle_silent && !voice.crack_last && !((-soft_crack * 11000) >> 15) && !(((soft_crack - softer_crack) * 11000) >> 15)) {
+        voice.hiss_last = hiss_pass(voice.hiss_last, r1, side, frying, breath_heard, softer_crack * crackle_heard >> 13);
+    } else {
+        Side side_state = {voice.hiss_last, soft_crack, softer_crack, voice.crack_last, frying, breath_heard};
+        side_pass(side_state, r1, crack, side);
+        voice.hiss_last = side_state.hiss_last;
+        voice.soft_crack = side_state.soft_crack;
+        voice.softer_crack = side_state.softer_crack;
+        voice.crack_last = side_state.crack_last;
+    }
     Heard heard_state = {voice.settled, voice.dc_in, voice.dc_out, tone_gain};
     heard_pass(heard_state, y, pulse, side);
     voice.settled = heard_state.settled;
