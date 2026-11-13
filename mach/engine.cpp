@@ -667,21 +667,29 @@ MACH_LOOP void air(Root& root, i32* out, const i32* x) {
 
 template <int n, bool image>
 MACH_LOOP void rung(Root& root, i32* out, i32 step0, i32 step2, const i32* amp) {
-    u32 hum = root.part[0], tierce = root.part[2];
+    const opxy::i16* const sine = tables::sine;
     const opxy::i16 a0 = static_cast<opxy::i16>(amp[0]), a1 = static_cast<opxy::i16>(amp[1]), a2 = static_cast<opxy::i16>(amp[2]), a3 = static_cast<opxy::i16>(amp[3]);
+    // Each sample's table addresses are worked out a sample ahead, so no
+    // read waits on its address (the loop's last one reads a sample past).
+    u32 hum = root.part[0] + static_cast<u32>(step0), tierce = root.part[2] + static_cast<u32>(image ? 0 : step2);
+    const opxy::i16 *p0 = sine + (hum >> 22), *p1 = sine + ((hum << 1) >> 22), *p2 = sine + (tierce >> 22), *p3 = sine + ((hum << 2) >> 22);
     i32 wave[n];
     for (i32 i = 0; i < n; ++i) {
+        i32 x = *p0 * a0 + *p1 * a1;
+        if (!image) x += *p2 * a2 + *p3 * a3;
         hum += static_cast<u32>(step0);
-        i32 x = tables::sine[hum >> 22] * a0 + tables::sine[(hum << 1) >> 22] * a1;
+        p0 = sine + (hum >> 22);
+        p1 = sine + ((hum << 1) >> 22);
         if (!image) {
             tierce += static_cast<u32>(step2);
-            x += tables::sine[tierce >> 22] * a2 + tables::sine[(hum << 2) >> 22] * a3;
+            p2 = sine + (tierce >> 22);
+            p3 = sine + ((hum << 2) >> 22);
         }
         x >>= 14;
         wave[i] = x;
     }
-    root.part[0] = hum;
-    root.part[2] = tierce;
+    root.part[0] = hum - static_cast<u32>(step0);
+    if (!image) root.part[2] = tierce - static_cast<u32>(step2);
     air<n>(root, out, wave);
 }
 
@@ -767,21 +775,28 @@ MACH_LOOP void bowed(Root& root, i32* out, const opxy::i16* t0, i32 inc, i32 sha
 //
 // The ground's reflection, the hum and prime on one phase: one loop.
 MACH_LOOP void rung_swept_image(Root& root, i32* out, i32 s0, i32 d0, const i32* from, const i32* step) {
-    u32 hum = root.part[0];
+    const opxy::i16* const sine = tables::sine;
     i32 h0 = (from[0] >> 1) + step[0], h1 = (from[1] >> 1) + step[1];
     const i32 e0 = step[0], e1 = step[1];
-    i32 st0 = s0 + d0;
     const i32 dd = 2 * d0;
+    i32 st0 = s0 + d0;
+    // The table addresses a sample ahead (the last pair read a sample past).
+    u32 hum = root.part[0] + static_cast<u32>(st0);
+    st0 += dd;
+    const opxy::i16 *p0 = sine + (hum >> 22), *p1 = sine + ((hum << 1) >> 22);
     i32 wave[substep];
+    i32* w = wave;
     for (i32 i = 0; i < substep; ++i) {
+        i32 x = *p0 * static_cast<opxy::i16>(h0) + *p1 * static_cast<opxy::i16>(h1);
         hum += static_cast<u32>(st0);
-        i32 x = tables::sine[hum >> 22] * static_cast<opxy::i16>(h0) + tables::sine[(hum << 1) >> 22] * static_cast<opxy::i16>(h1);
-        x >>= 14;
-        wave[i] = x;
         st0 += dd;
+        p0 = sine + (hum >> 22);
+        p1 = sine + ((hum << 1) >> 22);
+        x >>= 14;
+        *w++ = x;
         h0 += e0; h1 += e1;
     }
-    root.part[0] = hum;
+    root.part[0] += static_cast<u32>(s0) * static_cast<u32>(substep) + static_cast<u32>(d0) * static_cast<u32>(substep * substep);
     air<substep>(root, out, wave);
 }
 
@@ -795,10 +810,16 @@ MACH_LOOP void rung_swept_image(Root& root, i32* out, i32 s0, i32 d0, const i32*
 enum PassKind { FIRST = 1, LAST = 2 };
 template <int kind>
 MACH_LOOP void partial_swept(i32* wave, u32 phase, u32 st, u32 dd, i32 h, i32 e) {
+    const opxy::i16* const sine = tables::sine;
+    // The table address a sample ahead (the last read a sample past).
+    phase += st;
+    st += dd;
+    const opxy::i16* at = sine + (phase >> 22);
     for (i32 i = 0; i < substep; ++i) {
+        i32 x = *at * static_cast<opxy::i16>(h);
         phase += st;
         st += dd;
-        i32 x = tables::sine[phase >> 22] * static_cast<opxy::i16>(h);
+        at = sine + (phase >> 22);
         h += e;
         if (!(kind & FIRST)) x += *wave;
         if (kind & LAST) x >>= 14;
