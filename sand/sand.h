@@ -239,7 +239,9 @@ inline i32 acceleration(const Throw& t, const PlateMode* modes, u32 u, u32 v) {
 // Every mode's shape at (u, v), kept with a grain while it lies there; kMoved
 // marks a grain that has moved since.
 const i16 kMoved = -32768;
-inline void shapes_at(const PlateMode* modes, u32 u, u32 v, i16* shapes) {
+// Out of line and file-local (a copy each for the sound and the screen): the
+// sound calls it from two places in look(), only for a grain that has moved.
+static inline __attribute__((noinline)) void shapes_at(const PlateMode* modes, u32 u, u32 v, i16* shapes) {
     for (u32 k = 0; k < kModes; ++k) shapes[k] = static_cast<i16>(shape(modes[k], u, v));
 }
 inline i32 acceleration(const Throw& t, const i16* shapes) {
