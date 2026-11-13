@@ -27,6 +27,12 @@ const u32 level = 2358;                     // a mode's amplitude (Q12) to its p
 const u32 fade_from = 1717986918u;          // partials fade out from 0.40 of the sample rate...
 const u32 fade_to = 1932735283u;            // ...to silence at 0.45
 const i32 ceiling = 1 << 30;                // half scale
+// The partials' floor: one under -80 dBFS (a level of 65536 is full scale),
+// or more than 40 dB under the note's loudest, falls silent and costs nothing;
+// a silent one sounds again only once it is within 36 dB, so a partial
+// hovering at the line does not flicker.
+const u32 quietest = 7;                     // -80 dBFS, Q16
+const u32 below_off = 100, below_on = 64;   // 40 and 36 dB
 }
 
 inline void initialize(Voice& voice, Shared& shared, opxy::u32) {
@@ -232,6 +238,8 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     i32 gains[chain::voiced][4];   // each partial's level over the block's four quarters, Q16
     bool moving[chain::voiced];
     i32 was[chain::voiced];
+    u32 targets[chain::voiced];
+    u32 loudest = 0;
     for (u32 k = 0; k < chain::voiced; ++k) {
         u32 target = 0;
         if (voice.inc[k]) {
@@ -247,6 +255,12 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
             if (!voice.plain[k] && target) target = (target * tables::body_gain) >> 15;
             target = (target * voice.fade[k]) >> 15;
         }
+        targets[k] = target;
+        loudest = target > loudest ? target : loudest;
+    }
+    for (u32 k = 0; k < chain::voiced; ++k) {
+        u32 target = targets[k];
+        if (target < quietest || target * (voice.amp[k] ? below_off : below_on) < loudest) target = 0;
         was[k] = voice.amp[k] >> 15;
         const i32 delta = static_cast<i32>(target << 15) - voice.amp[k];
         for (u32 q = 0; q < 4; ++q) gains[k][q] = (voice.amp[k] + (delta >> 2) * static_cast<i32>(q + 1)) >> 15;
