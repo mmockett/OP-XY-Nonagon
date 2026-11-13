@@ -309,6 +309,9 @@ integers only.
   - Every mode loses a share, and the Laplacian of the chain takes more as ω²
     rises. The struck mode gets exactly the caption's T60, and the top voiced
     mode loses four times as fast.
+  - Once a damped note has died away (every partial silent, every mode's level
+    at zero, the chain within 2^−8 of rest), the voice stops: no steps, no
+    projections, only its partials' phases kept, until a new note or chain.
 
 ### Springs and mode
 
@@ -374,7 +377,7 @@ masses or mode change). Ten voiced partials are what fit this budget.
   the 2040 KiB module region.
 - There is no division per sample, and none per block: the tilt's gain is a
   14-step long division, without the runtime's divide.
-- **Memory:** a voice is 556 bytes, the voices' shared starting shape and setup 288
+- **Memory:** a voice is 560 bytes, the voices' shared starting shape and setup 288
   and the screen state 804.
 
 ## Tests

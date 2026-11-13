@@ -18,6 +18,7 @@ struct Voice {
     i32 springs;
     u32 turn;                   // which third of the modes this block measures
     u32 fresh;                  // 1 until the note's first block loads the chain
+    u32 quiet;                  // 1 once a damped note has died away, until the next load
 };
 // State shared by every voice: the latest starting shape, made once for a
 // seed, masses and mode and copied by every note.
