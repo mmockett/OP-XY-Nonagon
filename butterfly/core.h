@@ -26,6 +26,7 @@ struct Voice {
     Grid grid;
     i32 lambda, at, octaves, slope, makeup;
     u32 sum;                   // of the weights, between shape's halves
+    i32 loudest;               // the loudest partial's level, Q15
     i32 sampled[5];            // flux, coupling, site, spread and tilt at the last solve's start
     u32 stage;                 // the next stage of the solve
     u32 still;                 // solves started since a control last moved

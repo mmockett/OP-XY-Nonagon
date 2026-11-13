@@ -19,7 +19,11 @@
 namespace butterfly {
 const u32 ceiling_fade = 0x29cbc14eu, ceiling = 0x2e709de5u;   // 7.2 and 8 kHz: the half-rate bank's top
 const i32 lift = 51339;   // Q15: 1.567, the partials lifted 3.9 dB to the suites' shared loudness
-const i32 silence = 1 << 10;        // Q25: below this a partial is skipped
+// A partial sounds while it is within 36 dB of the block's loudest partial
+// and above -72 dB of full scale (Q25), and once sounding until 6 dB under
+// that, so one near the line doesn't flicker as the wingbeat moves it.
+const i32 quiet = 1 << 13;
+const u32 cull_shift = 6;
 // The half-band filter's odd-phase taps, Q15 (a 27-tap Kaiser-windowed sinc,
 // beta 5.5): flat to 8 kHz, its image of the bank 58 dB down above 14 kHz.
 const i32 halfband[halfband_taps] = {20556, -6082, 2851, -1374, 597, -205, 38};
@@ -75,6 +79,7 @@ inline void initialize(Voice& voice, Shared&, opxy::u32 owner) {
     voice.strikes = owner * 0x2545f491u;
     voice.struck = voice.sounding = voice.hush = 0;
     voice.stage = voice.still = 0;
+    voice.loudest = 0;
     voice.stale = 1;
     voice.note = 0;
     for (u32 i = 0; i < 5; ++i) voice.sampled[i] = 0;
@@ -135,8 +140,11 @@ inline u32 increment_of(u32 note, u32 ratio) {
 // (Each stage's functions are out of line, one copy each, so the solve's
 // code stays small beside the bank's.)
 __attribute__((noinline)) void land(Voice& voice, u32 from, u32 to, bool at_once) {
+    // Under 60 dB beneath the loudest, a partial is silent, whatever the gate and tilt make of the rest.
+    const i32 least = voice.loudest >> 10;
     for (u32 k = from; k < to; ++k) {
-        const i32 level = (voice.notes.level[k] * lift) >> 15;   // lifted 3.9 dB to the suites' shared loudness
+        const i32 unlifted = voice.notes.level[k];
+        const i32 level = unlifted > least ? (unlifted * lift) >> 15 : 0;   // lifted 3.9 dB to the suites' shared loudness
         if (!level && voice.level[k] < 8 && voice.level[k] > -8) {
             // Silent and staying so.
             voice.level[k] = 0;
@@ -170,7 +178,12 @@ __attribute__((noinline)) void land(Voice& voice, u32 from, u32 to, bool at_once
 
 __attribute__((noinline)) void solve_states(Voice& voice, u32 from, u32 to) { spectrum_states(voice.grid, voice.at, from, to, voice.solving); }
 __attribute__((noinline)) void solve_places(Voice& voice) { voice.sum = shape_places(voice.solving, voice.lambda, voice.notes); }
-__attribute__((noinline)) void solve_levels(Voice& voice) { shape_levels(voice.solving, voice.sum, voice.notes); }
+__attribute__((noinline)) void solve_levels(Voice& voice) {
+    shape_levels(voice.solving, voice.sum, voice.notes);
+    i32 loudest = 0;
+    for (u32 k = 0; k < partials; ++k) loudest = voice.notes.level[k] > loudest ? voice.notes.level[k] : loudest;
+    voice.loudest = loudest;
+}
 
 // One stage of the solve; the eight in turn are spectrum(), shape() and the landing.
 __attribute__((noinline)) void solve_stage(Voice& voice, const i32* p, u32 stage, bool at_once) {
@@ -264,6 +277,7 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
         // darkening, faded at the ceiling.
         const u32 e = light ? static_cast<u32>(-gate_log2(light)) >> 4 : 0;   // -log2 of the light, Q12
         i32 target[partials];
+        i32 loudest = 0;
         for (u32 k = 0; k < partials; ++k) {
             const u32 inc = voice.increment[k] += static_cast<u32>(voice.increment_step[k]);
             const i32 level = voice.level[k] += voice.level_step[k];
@@ -274,13 +288,15 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
                 const i32 gain = inc <= ceiling_fade ? 32768 : static_cast<i32>((((ceiling - inc) >> 16) * 112978u) >> 12);   // 32768 / 1188
                 const i32 share = exp2_down(-static_cast<i32>((e * static_cast<u32>(power)) >> 8) - dim);   // Q15
                 t = ((((level * share) >> 15) * gain) >> 15) << 10;   // Q25
+                if (t > loudest) loudest = t;
             }
             target[k] = t;
         }
+        const i32 line = loudest >> cull_shift > quiet ? loudest >> cull_shift : quiet;
         for (u32 i = 0; i < half_frames; ++i) acc[i] = 0;
         for (u32 k = 0; k < partials; ++k) {
             const i32 a = voice.amplitude[k];
-            const i32 target_k = target[k] >= silence ? target[k] : 0;
+            const i32 target_k = target[k] >= (a ? line >> 1 : line) ? target[k] : 0;
             voice.amplitude[k] = target_k;
             if (!target_k && !a) continue;
             rendered = true;
