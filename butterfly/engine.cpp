@@ -164,16 +164,25 @@ inline void solve_start(Voice& voice, const i32* p) {
     voice.sampled[4] = p[TILT];
 }
 
-// A value's step a block to reach its target in 2^ramp_shift blocks; within
-// a few steps of it, the value takes the target at once.
+// A value's step a block toward its target over 2^ramp_shift blocks, rounded
+// toward zero so it never passes it (a level never goes below 0); within a
+// few steps of it, the value takes the target at once.
 inline void aim(i32& value, i32& step, i32 target, bool at_once) {
     const i32 gap = target - value;
     if (at_once || (gap > -8 && gap < 8)) {
         value = target;
         step = 0;
     } else {
-        step = (gap + (1 << (ramp_shift - 1))) >> ramp_shift;
+        step = gap >= 0 ? gap >> ramp_shift : -((-gap) >> ramp_shift);
     }
+}
+// The same for a value and step stored in 16 bits.
+template <class T>
+inline void aim16(T& value, i16& step, i32 target, bool at_once) {
+    i32 v = value, d = 0;
+    aim(v, d, target, at_once);
+    value = static_cast<T>(v);
+    step = static_cast<i16>(d);
 }
 
 // The pitch increment of a partial at `ratio` (Q16) to the note's, Q32 a
@@ -195,7 +204,7 @@ __attribute__((noinline)) void land(Voice& voice, u32 from, u32 to, bool at_once
     for (u32 k = from; k < to; ++k) {
         const i32 unlifted = voice.notes.level[k];
         const i32 level = unlifted > least ? (unlifted * lift) >> 15 : 0;   // lifted 3.9 dB to the suites' shared loudness
-        if (!level && voice.level[k] < 8 && voice.level[k] > -8) {
+        if (!level && voice.level[k] < 8) {
             // Silent and staying so.
             voice.level[k] = 0;
             voice.increment_step[k] = voice.level_step[k] = voice.power_step[k] = voice.dim_step[k] = 0;
@@ -214,15 +223,15 @@ __attribute__((noinline)) void land(Voice& voice, u32 from, u32 to, bool at_once
         // The gate's power and the darkening, as partial_share (harper.h) has them.
         const i32 tp = ((voice.slope >> 2) * ((place > 0 ? place : 0) >> 2)) >> 12;   // tilt x place, Q16 (tilt to 3)
         const i32 above = place > 16384 ? (((place - 16384) >> 2) * 87381) >> 14 : 0;
-        const i32 dim = ((((voice.slope >> 2) * (above >> 2)) >> 12) * 85 >> 6) - voice.makeup;
+        const i32 dim = (((((voice.slope >> 2) * (above >> 2)) >> 12) * 85 >> 6) - voice.makeup) >> 4;   // Q12
         // A partial coming in from silence takes its pitch and tilt at once and ramps its level in.
         const bool snap = at_once || !voice.level[k];
         i32 increment = static_cast<i32>(voice.increment[k]);
         aim(increment, voice.increment_step[k], static_cast<i32>(increment_of(voice.note, ratio)), snap);
         voice.increment[k] = static_cast<u32>(increment);
-        aim(voice.power[k], voice.power_step[k], (65536 + tp) >> 4, snap);
-        aim(voice.dim[k], voice.dim_step[k], dim, snap);
-        aim(voice.level[k], voice.level_step[k], level, at_once);
+        aim16(voice.power[k], voice.power_step[k], (65536 + tp) >> 4, snap);
+        aim16(voice.dim[k], voice.dim_step[k], dim, snap);
+        aim16(voice.level[k], voice.level_step[k], level, at_once);
     }
 }
 
@@ -350,13 +359,16 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
         i32 loudest = 0;
         for (u32 k = 0; k < partials; ++k) {
             const u32 inc = voice.increment[k] += static_cast<u32>(voice.increment_step[k]);
-            const i32 level = voice.level[k] += voice.level_step[k];
-            const i32 power = voice.power[k] += voice.power_step[k];
-            const i32 dim = voice.dim[k] += voice.dim_step[k];
+            const i32 level = voice.level[k] + voice.level_step[k];
+            const i32 power = voice.power[k] + voice.power_step[k];
+            const i32 dim = voice.dim[k] + voice.dim_step[k];
+            voice.level[k] = static_cast<u16>(level);
+            voice.power[k] = static_cast<i16>(power);
+            voice.dim[k] = static_cast<i16>(dim);
             i32 t = 0;
             if (light && level > 0 && inc < ceiling) {
                 const i32 gain = inc <= ceiling_fade ? 32768 : static_cast<i32>((((ceiling - inc) >> 16) * 112978u) >> 12);   // 32768 / 1188
-                const i32 share = exp2_down(-static_cast<i32>((e * static_cast<u32>(power)) >> 8) - dim);   // Q15
+                const i32 share = exp2_down(-static_cast<i32>((e * static_cast<u32>(power)) >> 8) - (dim << 4));   // Q15
                 t = ((((level * share) >> 15) * gain) >> 15) << 10;   // Q25
                 if (t > loudest) loudest = t;
             }
@@ -364,9 +376,9 @@ inline void render(Voice& voice, Shared&, opxy::u32, opxy::Output output, opxy::
         }
         const i32 line = loudest >> cull_shift > quiet ? loudest >> cull_shift : quiet;
         for (u32 k = 0; k < partials; ++k) {
-            const i32 a = voice.amplitude[k];
+            const i32 a = voice.amplitude[k] << 10;   // Q25 (targets are whole Q15 steps)
             const i32 target_k = target[k] >= (a ? line >> 1 : line) ? target[k] : 0;
-            voice.amplitude[k] = target_k;
+            voice.amplitude[k] = static_cast<u16>(target_k >> 10);
             if (!target_k && !a) continue;
             rendered = true;
             if (target_k) sounding = true;
