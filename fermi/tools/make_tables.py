@@ -11,7 +11,8 @@ CAL = json.loads((ROOT / "tools" / "calibration.json").read_text())
 NS = CAL["N"]
 MS = CAL["m"]
 VOICED = 16
-BUDGET = 96           # mass-steps a block (chain.h)
+BUDGET = 96           # mass-steps a block: the clock's law (chain.h)
+CAP = (2, 3)          # the steps a block actually run, at most: two thirds of BUDGET // N, rounded
 
 
 def omega(N, k):
@@ -37,6 +38,10 @@ out = ["#pragma once",
        arr("most_steps", "u32", [BUDGET // N for N in NS]),
        "// log2 of most_steps, Q12.",
        arr("log2_most_steps", "i32", [round(4096 * math.log2(BUDGET // N)) for N in NS]),
+       "// The steps a block run at most, the CPU's cap: two thirds of most_steps, rounded.",
+       arr("step_cap", "u32", [(CAP[0] * (BUDGET // N) + CAP[1] // 2) // CAP[1] for N in NS]),
+       "// log2 of step_cap, Q12.",
+       arr("log2_step_cap", "i32", [round(4096 * math.log2((CAP[0] * (BUDGET // N) + CAP[1] // 2) // CAP[1])) for N in NS]),
        ""]
 
 # Half mode shapes: S[k][j] = sqrt(2/(N+1)) sin(j k pi/(N+1)) for k = 1..N and

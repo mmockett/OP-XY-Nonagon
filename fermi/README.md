@@ -33,7 +33,7 @@ version 1.10 of the Open-XY SDK, on its `staging` branch.
 
 | Page | Encoder 1 | 2 | 3 | 4 |
 | --- | --- | --- | --- | --- |
-| 1 | **Energy**: the load on the springs. Still at 0, breathing from about 0.05, deeper to 0.5, chaos above about 0.85 | **Masses**: 8, 12, 16, 20, 24, 28 or 32 | **Springs**: from quadratic (the α chain) to cubic (the β chain), the even partials fading on the way | **Time**: the chain's clock, independent of pitch: a breath from 1.4 s to 32 s at 16 masses |
+| 1 | **Energy**: the load on the springs. Still at 0, breathing from about 0.05, deeper to 0.5, chaos above about 0.85 | **Masses**: 8, 12, 16, 20, 24, 28 or 32 | **Springs**: from quadratic (the α chain) to cubic (the β chain), the even partials fading on the way | **Time**: the chain's clock, independent of pitch: a breath from 2.1 s to 32 s at 16 masses |
 | 2 | **Dispersion**: partials from exact harmonics to the top one 500 cents flat, along the chain's own law | **Mode**: the mode the note strikes, 1 to 4, always tuned to the key | **Damping**: lossless, or the struck mode's T60, with the high modes faster | **Seed**: a nudge to the starting shape, from none to two thirds of the note's energy in the low modes |
 
 Measured on a 12 s A3 note through Fermi's own `render()`
@@ -52,7 +52,7 @@ previous setting's, in dB.
 | Energy | `3e-7` 246 Hz (246–246), still | `1e-3` 249 Hz (236–268), breath 0.13, Δ 8.3 dB | `0.04` 326 Hz (256–414), breath 0.50, Δ 11.5 dB | `0.57` 570 Hz (265–671), breath 0.65, Δ 10.6 dB | `7.7` 706 Hz (426–881), breath 0.58, Δ 4.7 dB |
 | Masses | `8` 311 Hz (252–378), breath 0.38 every 0.37s | `12` 312 Hz (257–388), breath 0.37 every 1.7s, Δ 0.2 dB | `20` 373 Hz (262–418), breath 0.49 every 14s, Δ 3.1 dB | `28` 261 Hz (242–304), breath 0.20 every 51s, Δ 6.7 dB | `32` 250 Hz (239–276), breath 0.14 every 79s, Δ 4.7 dB |
 | Springs | `quad` 326 Hz (256–414), breath 0.50 every 4.8s, even 0.36 | `75:25` 300 Hz (243–369), breath 0.36 every 5.4s, even 0.28, Δ 2.3 dB | `50:50` 277 Hz (244–388), breath 0.36 every 5.1s, even 0.21, -1 dB by 2 s, Δ 1.8 dB | `25:75` 262 Hz (243–335), breath 0.19 every 7.2s, even 0.14, Δ 2.2 dB | `cubic` 311 Hz (251–500), breath 0.34 every 1.5s, even 0.12, Δ 8.0 dB |
-| Time | `1.4s` 327 Hz (254–415), breath 0.49 | `3.1s` 331 Hz (258–422), breath 0.51, Δ 0.1 dB | `6.8s` 348 Hz (249–415), breath 0.50, Δ 0.3 dB | `15s` 375 Hz (259–417), breath 0.48, Δ 0.8 dB | `32s` 292 Hz (243–378), breath 0.33, Δ 2.7 dB |
+| Time | `2.1s` 327 Hz (254–415), breath 0.49 | `3.1s` 331 Hz (258–422), breath 0.51, Δ 0.1 dB | `6.8s` 348 Hz (249–415), breath 0.50, Δ 0.3 dB | `15s` 375 Hz (259–417), breath 0.48, Δ 0.8 dB | `32s` 292 Hz (243–378), breath 0.33, Δ 2.7 dB |
 | Dispersion | `0c` 378 Hz (274–451), breath 0.47, harmonic 0.79, rough 0.001 | `-118c` 316 Hz (248–409), breath 0.49, harmonic 0.76, rough 0.001, Δ 1.3 dB | `-238c` 324 Hz (250–405), breath 0.48, harmonic 0.75, rough 0.003, Δ 0.6 dB | `-367c` 326 Hz (252–409), breath 0.48, harmonic 0.72, rough 0.007, Δ 0.4 dB | `-502c` 327 Hz (251–408), breath 0.46, harmonic 0.69, rough 0.006, Δ 1.1 dB |
 | Mode | `1` 326 Hz (256–414), breath 0.50 every 4.8s | `1` 326 Hz (256–414), breath 0.50 every 4.8s, Δ 0.0 dB | `2` 303 Hz (250–373), breath 0.41 every 0.66s, Δ 2.8 dB | `3` 297 Hz (273–324), breath 0.33 every 0.15s, Δ 12.5 dB | `4` 265 Hz (246–277), breath 0.50 every 0.24s, Δ 10.9 dB |
 | Damping | `off` 326 Hz (256–414), breath 0.50 | `13s` 288 Hz (249–321), breath 0.28, -6 dB by 2 s, Δ 6.8 dB | `5.5s` 268 Hz (237–293), breath 0.19, -16 dB by 2 s, Δ 4.4 dB | `2.3s` 251 Hz (237–301), breath 0.07, -41 dB by 2 s, Δ 3.4 dB | `1.0s` 250 Hz (246–448), breath 0.30, -154 dB by 2 s, Δ 2.7 dB |
@@ -60,6 +60,8 @@ previous setting's, in dB.
 
 Time and masses act mostly on the breath's rate, which the spectrum's change
 (Δ) does not see: the time caption gives it. Mode is a four-position switch.
+Time's 0 column was measured before the CPU's step cap, which runs the chain
+a third slower there: its caption now reads 2.1s.
 
 The captions use real units:
 - **Energy** is the chain's energy in the 1955 runs' units: a chain with
@@ -68,9 +70,10 @@ The captions use real units:
   twentieth.
 - **Masses** and **mode** are numbers.
 - **Springs** shows the quadratic and cubic shares.
-- **Time** is the breathing period in seconds, from 1.4 s to 32 s at 16
-  masses. Larger chains breathe more slowly: 23 s at 32 masses at the
-  fastest.
+- **Time** is the breathing period in seconds, from 2.1 s to 32 s at 16
+  masses. Larger chains breathe more slowly: about 35 s at 32 masses at the
+  fastest. The CPU's cap holds the first eighth of the knob at its fastest,
+  more with stiff springs.
 - **Dispersion** is how far the top voiced partial sits from harmonic, in
   cents: −500 at full for every number of masses. The partials between bend
   as the chain's own law does, growing as (k/N)², so the low ones stay close
@@ -261,8 +264,10 @@ integers only.
     constants in the Blackfin's registers.
   - A guard every fourth block restrikes a chain that ever left the force's
     range. No test reaches it.
-- **The clock.** Each block runs a whole number of steps, at most 96/N: 12
-  for 8 masses, 3 for 32. Time slows it by up to 2^4.5.
+- **The clock.** Each block runs a whole number of steps. The clock's law is
+  96/N steps a block at its fastest, slowed by time by up to 2^4.5; the CPU
+  runs at most two thirds of that (`step_cap`: 8 for 8 masses, 4 for 16, 2
+  for 32), so the top of the knob, and stiff springs, meet the cap sooner.
 - **Calibration.** `tools/calibrate.py` simulates every masses, mode and
   springs setting in double precision. For each it finds where mode m stays
   pure, where it gives up 70% and comes back, and where the spectrum
@@ -359,7 +364,7 @@ host estimate varies widely from run to run (3,500 to 17,500 instructions).
 At the heaviest setting (32 masses, energy 1, the fastest clock, damping on)
 a voice block runs about:
 
-- 4,600 instructions in the chain: 3 steps × (33 bonds × 28 + 32 masses ×
+- 3,000 instructions in the chain: 2 steps × (33 bonds × 28 + 32 masses ×
   18);
 - 5,900 in synthesis: 5 pairs × 64 samples × 16, plus overhead;
 - 1,300 in projections: 4 modes × 16 × 13, plus overhead;
@@ -368,7 +373,7 @@ a voice block runs about:
 - up to 480 in damping;
 - and up to 1,200 of straight-line code, counted as if it all ran.
 
-That is about 14,300, and 14,900 at most. A note's first block costs about
+That is about 12,700, and 13,300 at most. A note's first block costs about
 2,000 more for its per-sample ramps; the seed's starting shape is made once
 for every note that shares it (about 1,400 instructions, when the seed,
 masses or mode change). Ten voiced partials are what fit this budget.

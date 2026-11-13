@@ -19,6 +19,14 @@ const u32 most_steps[7] = {
 const i32 log2_most_steps[7] = {
     14684, 12288, 10588, 8192, 8192, 6492, 6492,
 };
+// The steps a block run at most, the CPU's cap: two thirds of most_steps, rounded.
+const u32 step_cap[7] = {
+    8, 5, 4, 3, 3, 2, 2,
+};
+// log2 of step_cap, Q12.
+const i32 log2_step_cap[7] = {
+    12288, 9511, 8192, 6492, 6492, 4096, 4096,
+};
 
 // Mode k's shape over the first half of the chain, Q15: shape[shape_at[n] + (k - 1) N/2 + j - 1].
 const u32 shape_at[7] = {
