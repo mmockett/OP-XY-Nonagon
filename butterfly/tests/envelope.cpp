@@ -132,7 +132,9 @@ int main() {
         const unsigned long long h = play(s ? heavy : specimen, unknown, 180, 240, true).hash;
         hash = fnv(hash, &h, sizeof h);
     }
-    const unsigned long long before = 0x0f26c5dbf5184779ull;  // the screen at origin/main, 59f7414
+    // The screen at origin/main, 59f7414, then on the 1024-step sine (its wingbeat and breath
+    // move within a step of Q15 of the 4096-step one; 0x0f26c5dbf5184779 before).
+    const unsigned long long before = 0x0159a0e729a0c8f6ull;
     if (hash != before) { std::printf("FAIL unknown envelope: frames hash %016llx, before %016llx\n", hash, before); ++failures; }
 
     // 2. A short envelope against a long one, Specimen and Shimmer (a pad
