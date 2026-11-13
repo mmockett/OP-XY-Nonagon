@@ -85,12 +85,12 @@ __attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 a
     i32 a = amp;
     if (!glide) {   // a steady pitch: the same sums without the glide's add
         for (u32 i = 0; i < split; ++i) {
-            sum[i] += ((a >> 16) * tables::sine[p >> 22]) >> 3;
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
             a += slope;
             p += inc;
         }
         for (u32 i = split; i < opxy::block_frames; ++i) {
-            sum[i] += ((a >> 16) * tables::sine[p >> 22]) >> 3;
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
             a += after;
             p += inc;
         }
@@ -98,13 +98,13 @@ __attribute__((noinline)) void sing(i32* sum, Mode& m, u32 inc, i32 glide, i32 a
         return;
     }
     for (u32 i = 0; i < split; ++i) {
-        sum[i] += ((a >> 16) * tables::sine[p >> 22]) >> 3;
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
         a += slope;
         p += inc;
         inc += static_cast<u32>(glide);
     }
     for (u32 i = split; i < opxy::block_frames; ++i) {
-        sum[i] += ((a >> 16) * tables::sine[p >> 22]) >> 3;
+        sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[p >> 22]) >> 3;
         a += after;
         p += inc;
         inc += static_cast<u32>(glide);
@@ -781,7 +781,7 @@ inline void render(Voice& voice, Shared& shared, opxy::u32 owner, opxy::Output o
         i32 a = p.amp;
         const u32 shift = p.shift, chirp = inc >> 13;
         for (unsigned i = 0; i < block_frames; ++i) {
-            sum[i] += ((a >> 16) * tables::sine[ph >> 22]) >> 3;
+            sum[i] += (static_cast<opxy::i16>(static_cast<u32>(a) >> 16) * tables::sine[ph >> 22]) >> 3;
             a -= a >> shift;
             ph += inc;
             inc += chirp;
