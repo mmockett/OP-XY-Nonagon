@@ -403,7 +403,7 @@ inline i32 finish_one(i32 x, i32& dc_in, i32& dc_out, i32 hi, i32 reach) {
     const i32 lifted = r + multiply(r, lift);   // the level after the knee, so its shape is kept
     return (lifted ^ sign) - sign;
 }
-__attribute__((noinline)) void finish(Voice& voice, const i32* sum, opxy::Output output, i32 hi, i32 reach, u32 count) {
+__attribute__((noinline)) void finish(Voice& voice, const i32* sum, i32* output, i32 hi, i32 reach, u32 count) {   // sum may be output
     i32 dc_in = voice.dc_in, dc_out = voice.dc_out;
     for (unsigned i = 0; i < count; ++i) output[i] = finish_one(sum[i], dc_in, dc_out, hi, reach);
     for (unsigned i = count; i < opxy::block_frames; ++i) output[i] = 0;
@@ -475,11 +475,12 @@ inline void back_to_full_rate(Voice& voice, sound::Sums& sums, i32* full, i32* h
     const i32 hi = (1 << 27) - 1, reach = 1 << 29;
     if (half_on) {
         if (!half_in) for (u32 i = 0; i < block_frames / 2; ++i) stage3[i] = 0;
-        i32 tone[block_frames];
-        if (to_full) twice<3, false>(voice.half, full, tone, block_frames / 2);
-        else twice<3, false>(voice.half, tone, block_frames / 2);
+        // The last stage writes straight into the output, which finish
+        // then works on in place: no block buffer of its own.
+        if (to_full) twice<3, false>(voice.half, full, output, block_frames / 2);
+        else twice<3, false>(voice.half, output, block_frames / 2);
         for (u32 i = 0; i < kHistory3; ++i) voice.half[i] = voice.half[block_frames / 2 + i];
-        finish(voice, tone, output, hi, reach, count);
+        finish(voice, output, output, hi, reach, count);
     } else {
         if (!to_full) for (u32 i = 0; i < block_frames; ++i) full[i] = 0;
         finish(voice, full, output, hi, reach, count);
