@@ -29,7 +29,7 @@ const i32 crackle_level = 30000;  // a floating drop's contacts, Q15
 const i32 boil_level = 24000;     // a boiling drop's bubbles, Q15
 const i32 boil_hiss = 3000;       // its frying hiss, Q15
 const i32 vapour_hiss = 220;      // the vapour's own hiss at full vapour, Q15
-const i32 into_pipe = 3536;       // the crackle's share into the pipe, Q15 (5000 at the full rate: its noise held two samples is 3 dB louder)
+const i32 into_pipe = 3536;       // the crackle's share into the pipe, Q15 (5000 at the full rate: at half the rate its noise is 3 dB louder)
 const i32 tone_level = 15000;    // log2 of the tone as heard at A3, Q16 (x 1.17)
 const i32 crackle_heard = 11585;  // the crackle as heard, Q15 (32767 at the full rate: at half the rate its noise is 3 dB and its difference 6 dB louder)
 const i32 ceiling = 32767;
@@ -159,40 +159,52 @@ DROP_PASS void beats_pass(Beats& s, const i16* draw, i16* tick_out, i32* jet_out
 }
 
 // The jet's noise blown: the vapour's noise at the jet's envelope over its
-// steady blowing. With the ticks and the crackle it excites the pipe. In
-// place: the jet's envelope becomes the excitation; blow is kept for the ear.
-DROP_PASS void blow_pass(const i16* r1, const i16* tick, const i16* crack, i32* jet_in, i32* blow_out, i32 steady, i32 hiss_of_jet) {
-    for (unsigned i = 0; i < frames; i += 2) {
-        const i32 cracked = mul16(crack[i >> 1], into_pipe) >> 15;
+// steady blowing. With the ticks it excites the pipe. In place: the jet's
+// envelope becomes the excitation; blow is kept for the ear.
+DROP_PASS void blow_pass(const i16* r1, const i16* tick, i32* jet_in, i32* blow_out, i32 steady, i32 hiss_of_jet) {
+    for (unsigned i = 0; i < frames; ++i) {
         const i32 blow = (jet_in[i] + steady) * r1[i] >> 15;
-        jet_in[i] = tick[i] + (blow * hiss_of_jet >> 15) + cracked;
+        jet_in[i] = tick[i] + (blow * hiss_of_jet >> 15);
         blow_out[i] = blow;
-        const i32 next = (jet_in[i + 1] + steady) * r1[i + 1] >> 15;
-        jet_in[i + 1] = tick[i + 1] + (next * hiss_of_jet >> 15) + cracked;
-        blow_out[i + 1] = next;
     }
 }
 
-// The jet into the pipe: the landing's push, and the jet's noise through two
-// low-passes less its low end, at the pipe's input gain. In place: x becomes
-// the pipe's input. With it, the jet's feedback gain, which the pulses swell.
+// The jet into the pipe: the jet's noise, the ticks and the crackle through
+// two low-passes less its low end, at the pipe's input gain, and the landing's
+// push. The low-passes run at half the rate, on each pair's mean, and are
+// drawn between at the full. In place: x becomes the pipe's input. With it,
+// the jet's feedback gain, which the pulses swell.
 struct Jet {
     u32 kick;
     i32 push, e1, e2, e3, soft, under, drive, blowing;
 };
-DROP_PASS void jet_pass(Jet& s, i32* x_in, const i16* pulse, i32* gain) {
+// A one-pole's coefficient for two samples at once: 1 - (1 - k)^2, Q15.
+inline i32 twice(i32 k) { return 2 * k - (k * k >> 15); }
+DROP_PASS void jet_pass(Jet& s, i32* x_in, const i16* crack, const i16* pulse, i32* gain) {
     u32 kick = s.kick;
     i32 e1 = s.e1, e2 = s.e2, e3 = s.e3;
-    const i32 landing = s.push, soft = s.soft, under = s.under, drive = s.drive, blowing = s.blowing;
-    for (unsigned i = 0; i < frames; ++i) {
-        i32 push = 0;
-        if (kick) { --kick; push = landing; }   // the landing sets the pipe going
-        e1 += ((x_in[i] - e1) * soft + 16384) >> 15;   // rounded: a floor would settle on an offset
+    const i32 landing = s.push, soft = twice(s.soft), under = twice(s.under), drive = s.drive, blowing = s.blowing;
+    i32 was = (e2 - e3) * drive >> 10;
+    i32* xp = x_in;
+    i32* gp = gain;
+    const i16* pp = pulse;
+    for (unsigned i = 0; i < frames / 2; ++i) {
+        const i32 x = ((xp[0] + xp[1]) >> 1) + (mul16(crack[i], into_pipe) >> 15);
+        e1 += ((x - e1) * soft + 16384) >> 15;   // rounded: a floor would settle on an offset
         e2 += ((e1 - e2) * soft + 16384) >> 15;
         e3 += ((e2 - e3) * under + 16384) >> 15;
-        x_in[i] = push + ((e2 - e3) * drive >> 10);
-        gain[i] = blowing * (16384 + (pulse[i] >> 1)) >> 15;
+        const i32 now = (e2 - e3) * drive >> 10;
+        xp[0] = (was + now) >> 1;
+        xp[1] = now;
+        was = now;
+        gp[0] = blowing * (16384 + (pp[0] >> 1)) >> 15;
+        gp[1] = blowing * (16384 + (pp[1] >> 1)) >> 15;
+        xp += 2;
+        gp += 2;
+        pp += 2;
     }
+    // The landing sets the pipe going: a push over its first samples.
+    for (unsigned i = 0; kick && i < frames; ++i, --kick) x_in[i] += landing;
     s.kick = kick;
     s.e1 = e1;
     s.e2 = e2;
@@ -578,12 +590,12 @@ inline void render(Voice& voice, Shared& shared, opxy::u32, opxy::Output output,
     voice.puff = beat_state.puff;
     voice.jet = beat_state.jet;
     voice.pulse = beat_state.pulse;
-    blow_pass(r1, y, crack, x, side, steady, hiss_of_jet);
+    blow_pass(r1, y, x, side, steady, hiss_of_jet);
     // The low-passes' rounding leaves them a unit or two off zero, which the
     // pipe's gain would hold as an offset: once the drop is gone, let it go.
     if (!alive && magnitude(voice.e1) < 8 && magnitude(voice.e2) < 8 && magnitude(voice.e3) < 8) voice.e1 = voice.e2 = voice.e3 = 0;
     Jet jet_state = {voice.kick, voice.push, voice.e1, voice.e2, voice.e3, voice.soft, voice.under, voice.drive, blowing};
-    jet_pass(jet_state, x, pulse, gain);
+    jet_pass(jet_state, x, crack, pulse, gain);
     voice.kick = jet_state.kick;
     voice.e1 = jet_state.e1;
     voice.e2 = jet_state.e2;
